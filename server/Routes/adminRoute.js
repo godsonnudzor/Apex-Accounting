@@ -5,7 +5,7 @@ import sql from "../db.js";
 
 const router = express.Router();
 
-router.post("/login", async (req, res) => {
+const handleLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -32,14 +32,21 @@ router.post("/login", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.cookie("token", token, { httpOnly: true, sameSite: "lax" });
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
 
     return res.json({ loginStatus: true, id: admin.id });
   } catch (error) {
     console.error("Admin login error:", error);
     return res.status(500).json({ loginStatus: false, Error: "Server error" });
   }
-});
+};
+
+router.post("/api/login", handleLogin);
+router.post("/login", handleLogin);
 
 router.get("/api/users", async (req, res) => {
   try {
