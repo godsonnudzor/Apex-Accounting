@@ -7,7 +7,12 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const apiBaseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+  const apiBaseUrl =
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_BACKEND_URL ||
+    (import.meta.env.MODE === "development"
+      ? "http://localhost:5000"
+      : window.location.origin);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

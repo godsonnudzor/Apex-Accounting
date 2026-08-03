@@ -14,7 +14,13 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http:/
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })
@@ -46,6 +52,7 @@ app.get("/verify", verifyUser, (req, res) => {
 });
 
 app.use("/admin", adminRouter);
+app.use("/", adminRouter);
 
 app.listen(process.env.PORT || 5000, () => {
   console.log(`Server is running on port ${process.env.PORT || 5000}`);
