@@ -12,14 +12,23 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http:/
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  const normalized = origin.trim();
+  return (
+    allowedOrigins.includes(normalized) ||
+    normalized.endsWith(".vercel.app") ||
+    normalized.endsWith(".vercel.app/")
+  );
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
-      callback(new Error("Not allowed by CORS"));
+      return callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
@@ -54,6 +63,38 @@ app.get("/verify", verifyUser, (req, res) => {
 app.use("/admin", adminRouter);
 app.use("/", adminRouter);
 
-app.listen(process.env.PORT || 6000, () => {
-  console.log(`Server is running on port ${process.env.PORT || 6000}`);
+app.use((req, res) => {
+  res.status(404).json({ error: "Endpoint not found" });
+});
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled server error:", err);
+  if (err instanceof Error && err.message.includes("Not allowed by CORS")) {
+    return res.status(403).json({ error: "CORS origin not allowed" });
+  }
+  res.status(500).json({ error: "Internal server error" });
+});
+
+const port = Number(process.env.PORT) || 6000;
+const server = app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${port} is already in use. Set PORT in .env or stop the process using it.`);
+    process.exit(1);
+  }
+  console.error("Server error:", error);
+  process.exit(1);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+  process.exit(1);
 });
