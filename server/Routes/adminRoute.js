@@ -46,7 +46,6 @@ const handleLogin = async (req, res) => {
 };
 
 router.post("/api/login", handleLogin);
-router.post("/login", handleLogin);
 
 router.get("/api/users", async (req, res) => {
   try {

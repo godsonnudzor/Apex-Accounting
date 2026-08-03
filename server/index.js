@@ -54,6 +54,6 @@ app.get("/verify", verifyUser, (req, res) => {
 app.use("/admin", adminRouter);
 app.use("/", adminRouter);
 
-app.listen(process.env.PORT || 5000, () => {
-  console.log(`Server is running on port ${process.env.PORT || 5000}`);
+app.listen(process.env.PORT || 6000, () => {
+  console.log(`Server is running on port ${process.env.PORT || 6000}`);
 });
