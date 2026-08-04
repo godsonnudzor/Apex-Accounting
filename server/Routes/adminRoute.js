@@ -41,7 +41,10 @@ const handleLogin = async (req, res) => {
     return res.json({ loginStatus: true, id: admin.id });
   } catch (error) {
     console.error("Admin login error:", error);
-    return res.status(500).json({ loginStatus: false, Error: error.message || "Server error" });
+    const message = error?.message?.includes("password authentication failed")
+      ? "Database authentication failed. Please update the backend database credentials."
+      : error.message || "Server error";
+    return res.status(500).json({ loginStatus: false, Error: message });
   }
 };
 
@@ -60,7 +63,10 @@ router.get("/api/users", async (req, res) => {
     return res.status(200).json(users);
   } catch (error) {
     console.error("Users endpoint error:", error);
-    return res.status(500).json({ message: error.message || "Server error", error: error.message });
+    const message = error?.message?.includes("password authentication failed")
+      ? "Database authentication failed. Please update the backend database credentials."
+      : error.message || "Server error";
+    return res.status(500).json({ message, error: error.message });
   }
 });
 
