@@ -34,7 +34,7 @@ const handleLogin = async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       secure: process.env.NODE_ENV === "production",
     });
 
@@ -46,6 +46,8 @@ const handleLogin = async (req, res) => {
 };
 
 router.post("/api/login", handleLogin);
+router.post("/login", handleLogin);
+router.post("/admin/api/login", handleLogin);
 
 router.get("/api/users", async (req, res) => {
   try {

@@ -13,7 +13,7 @@ const Login = () => {
     ? rawApiUrl.trim().replace(/\/+$/, "")
     : import.meta.env.MODE === "development"
     ? "http://localhost:5000"
-    : window.location.origin;
+    : "https://apex-accounting-server.vercel.app";
   const apiUrl = new URL("/api/login", apiBaseUrl).toString();
 
   const handleSubmit = async (e) => {
@@ -24,6 +24,7 @@ const Login = () => {
     try {
       const response = await fetch(apiUrl, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },

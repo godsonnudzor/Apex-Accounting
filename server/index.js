@@ -7,17 +7,27 @@ import cookieParser from "cookie-parser";
 import { adminRouter } from "./Routes/adminRoute.js";
 
 const app = express();
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:3000,https://apex-accounting.vercel.app")
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:3000,https://apex-accounting.vercel.app,https://apex-accounting-server.vercel.app")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-app.use(
-  cors({
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static("Public"));
@@ -44,7 +54,7 @@ app.get("/verify", verifyUser, (req, res) => {
   });
 });
 
-app.use("/admin", adminRouter);
+app.use("/", adminRouter);
 
 app.listen(process.env.PORT || 5000, () => {
   console.log(`Server is running on port ${process.env.PORT || 5000}`);
