@@ -29,10 +29,19 @@ const Login = () => {
         body: JSON.stringify({ email, password }),
       });
 
-      const result = await response.json();
+      const contentType = response.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json");
+      const result = isJson ? await response.json() : await response.text();
 
       if (!response.ok) {
-        throw new Error(result?.Error || result?.message || "Login failed");
+        const message = isJson
+          ? result?.Error || result?.message || "Login failed"
+          : result || "Login failed";
+        throw new Error(message);
+      }
+
+      if (!isJson) {
+        throw new Error(result || "Unexpected response from server");
       }
 
       console.log("Login successful", result);
