@@ -9,12 +9,10 @@ const Login = () => {
   const [error, setError] = useState("");
 
   const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
-  const apiBaseUrl = rawApiUrl
-    ? rawApiUrl.trim().replace(/\/+$/, "")
-    : import.meta.env.MODE === "development"
-    ? "http://localhost:5000"
-    : "https://apex-accounting-server.vercel.app";
-  const apiUrl = new URL("/api/login", apiBaseUrl).toString();
+  const isDevelopment = import.meta.env.MODE === "development";
+  const apiUrl = isDevelopment
+    ? new URL("/api/login", rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000").toString()
+    : "/api/login";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
