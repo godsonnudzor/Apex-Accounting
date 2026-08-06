@@ -8,7 +8,7 @@ const router = express.Router();
 const fallbackAdmin = {
   id: 1,
   email: "admin@example.com",
-  password_hash: "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
+  password: "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
   role: "admin",
 };
 
@@ -32,7 +32,7 @@ const handleLogin = async (req, res) => {
     }
 
     if (!admin && email === fallbackAdmin.email) {
-      const isPasswordValid = await bcrypt.compare(password, fallbackAdmin.password_hash);
+      const isPasswordValid = await bcrypt.compare(password, fallbackAdmin.password);
       if (isPasswordValid) {
         admin = fallbackAdmin;
       }
