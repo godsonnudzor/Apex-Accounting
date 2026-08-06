@@ -8,7 +8,7 @@ const router = express.Router();
 const fallbackAdmin = {
   id: 1,
   email: "admin@example.com",
-  password: "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
+  password_hash: "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
   role: "admin",
 };
 
@@ -23,7 +23,7 @@ const handleLogin = async (req, res) => {
     let admin = null;
 
     try {
-      const result = await sql`SELECT * FROM users WHERE email = ${email}`;
+      const result = await sql`SELECT * FROM admin WHERE email = ${email}`;
       if (Array.isArray(result) && result.length > 0) {
         admin = result[0];
       }
@@ -32,7 +32,7 @@ const handleLogin = async (req, res) => {
     }
 
     if (!admin && email === fallbackAdmin.email) {
-      const isPasswordValid = await bcrypt.compare(password, fallbackAdmin.password);
+      const isPasswordValid = await bcrypt.compare(password, fallbackAdmin.password_hash);
       if (isPasswordValid) {
         admin = fallbackAdmin;
       }
@@ -42,7 +42,7 @@ const handleLogin = async (req, res) => {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    const isPasswordValid = await bcrypt.compare(password, admin.password_hash);
     if (!isPasswordValid) {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
@@ -82,8 +82,8 @@ router.get("/api/users", async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const users = await sql`SELECT * FROM users`;
-    return res.status(200).json(users);
+    const admins = await sql`SELECT * FROM admin`;
+    return res.status(200).json(admins);
   } catch (error) {
     console.error("Users endpoint error:", error);
     const message = error?.message?.includes("password authentication failed")
