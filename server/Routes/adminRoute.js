@@ -23,7 +23,7 @@ const handleLogin = async (req, res) => {
     let admin = null;
 
     try {
-      const result = await sql`SELECT * FROM employees WHERE email = ${email}`;
+      const result = await sql`SELECT * FROM users WHERE email = ${email}`;
       if (Array.isArray(result) && result.length > 0) {
         admin = result[0];
       }

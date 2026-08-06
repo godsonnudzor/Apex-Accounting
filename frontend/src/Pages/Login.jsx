@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
   const isDevelopment = import.meta.env.MODE === "development";
@@ -45,6 +47,7 @@ const Login = () => {
       }
 
       console.log("Login successful", result);
+      navigate("/dashboard"); // Redirect to dashboard on successful login
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
