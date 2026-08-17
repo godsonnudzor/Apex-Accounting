@@ -7,14 +7,28 @@ const router = express.Router();
 
 const fallbackAdmin = {
   id: 1,
-  email: "admin@example.com",
-  password: "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
+  email: (process.env.ADMIN_EMAIL || "admin@example.com").trim().toLowerCase(),
+  password: process.env.ADMIN_PASSWORD || "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
   role: "admin",
+};
+
+const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
+
+const passwordMatches = async (candidatePassword, storedPassword) => {
+  if (!candidatePassword || !storedPassword) return false;
+
+  const normalizedStoredPassword = String(storedPassword).trim();
+  if (normalizedStoredPassword.startsWith("$2") && normalizedStoredPassword.length > 20) {
+    return bcrypt.compare(candidatePassword, normalizedStoredPassword);
+  }
+
+  return candidatePassword === normalizedStoredPassword;
 };
 
 const handleLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password ?? "");
 
     if (!email || !password) {
       return res.status(400).json({ loginStatus: false, Error: "Email and password are required" });
@@ -22,19 +36,21 @@ const handleLogin = async (req, res) => {
 
     let admin = null;
 
-    try {
-      const result = await sql`SELECT * FROM admin WHERE email = ${email}`;
-      if (Array.isArray(result) && result.length > 0) {
-        admin = result[0];
+    if (sql) {
+      try {
+        const result = await sql`SELECT * FROM admin WHERE LOWER(email) = ${email}`;
+        if (Array.isArray(result) && result.length > 0) {
+          admin = result[0];
+        }
+      } catch (error) {
+        admin = null;
       }
-    } catch (error) {
-      admin = null;
     }
 
-    if (!admin && email === fallbackAdmin.email) {
-      const isPasswordValid = await bcrypt.compare(password, fallbackAdmin.password);
+    if (!admin && email === normalizeEmail(fallbackAdmin.email)) {
+      const isPasswordValid = await passwordMatches(password, fallbackAdmin.password);
       if (isPasswordValid) {
-        admin = fallbackAdmin;
+        admin = { ...fallbackAdmin, email: fallbackAdmin.email, password: fallbackAdmin.password };
       }
     }
 
@@ -42,7 +58,8 @@ const handleLogin = async (req, res) => {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    const storedPassword = admin.password ?? admin.password_hash ?? null;
+    const isPasswordValid = await passwordMatches(password, storedPassword);
     if (!isPasswordValid) {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
