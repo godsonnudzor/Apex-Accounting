@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import sql from "../db.js";
+import { supabase } from "../lib/supabaseClient.js";
 
 const router = express.Router();
 
@@ -37,12 +38,28 @@ const handleLogin = async (req, res) => {
     let admin = null;
 
     try {
-      const result = await sql`SELECT * FROM users WHERE LOWER(email) = ${email}`;
-      if (Array.isArray(result) && result.length > 0) {
-        admin = result[0];
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .ilike("email", email)
+        .limit(1);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        admin = data[0];
       }
     } catch (error) {
       admin = null;
+    }
+
+    if (!admin && sql) {
+      try {
+        const result = await sql`SELECT * FROM users WHERE LOWER(email) = ${email}`;
+        if (Array.isArray(result) && result.length > 0) {
+          admin = result[0];
+        }
+      } catch (error) {
+        admin = null;
+      }
     }
 
     if (!admin && email === normalizeEmail(fallbackAdmin.email)) {
@@ -56,7 +73,7 @@ const handleLogin = async (req, res) => {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
 
-    const storedPassword = admin.password ?? admin.password_hash ?? null;
+    const storedPassword = admin.password ?? admin.password_hash ?? admin.password_hash ?? null;
     const isPasswordValid = await passwordMatches(password, storedPassword);
     if (!isPasswordValid) {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
@@ -97,7 +114,7 @@ router.get("/api/users", async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const admins = await sql`SELECT * FROM admin`;
+    const admins = await sql`SELECT * FROM users`;
     return res.status(200).json(admins);
   } catch (error) {
     console.error("Users endpoint error:", error);
