@@ -36,15 +36,13 @@ const handleLogin = async (req, res) => {
 
     let admin = null;
 
-    if (sql) {
-      try {
-        const result = await sql`SELECT * FROM admin WHERE LOWER(email) = ${email}`;
-        if (Array.isArray(result) && result.length > 0) {
-          admin = result[0];
-        }
-      } catch (error) {
-        admin = null;
+    try {
+      const result = await sql`SELECT * FROM users WHERE LOWER(email) = ${email}`;
+      if (Array.isArray(result) && result.length > 0) {
+        admin = result[0];
       }
+    } catch (error) {
+      admin = null;
     }
 
     if (!admin && email === normalizeEmail(fallbackAdmin.email)) {
@@ -65,7 +63,7 @@ const handleLogin = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { role: "admin", email: admin.email, id: admin.id },
+      { role: admin.role || "admin", email: admin.email, id: admin.id },
       process.env.JWT_SECRET || "secret_key_jwt",
       { expiresIn: "1d" }
     );

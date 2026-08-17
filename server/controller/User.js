@@ -42,22 +42,31 @@ async function createUser(userData) {
 
 async function loginUser(email, password) {
   try {
-    // Fetch users by email (may return multiple if duplicates exist)
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     const { data: users, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email);
+      .ilike('email', normalizedEmail);
 
-    if (error || !users || users.length === 0) {
+    if (error) {
+      console.error('Supabase login query error:', error);
+      return { success: false, message: 'Database error during login' };
+    }
+
+    if (!users || users.length === 0) {
       return { success: false, message: 'Invalid email or password' };
     }
 
-    // Check password for each user (in case of duplicates)
     for (const user of users) {
-      const isValidPassword = await bcrypt.compare(password, user.password_hash);
-      if (isValidPassword) {
-        // Return user data (excluding password)
-        const { password_hash, ...userWithoutPassword } = user;
+      const storedPassword = user.password_hash || user.password || null;
+      const passwordMatches = storedPassword
+        ? (storedPassword.startsWith('$2')
+            ? await bcrypt.compare(password, storedPassword)
+            : String(password) === String(storedPassword))
+        : false;
+
+      if (passwordMatches) {
+        const { password_hash, password: plainPassword, ...userWithoutPassword } = user;
         return { success: true, user: userWithoutPassword };
       }
     }
