@@ -70,6 +70,10 @@ app.get("/verify", verifyUser, (req, res) => {
 
 app.use("/", adminRouter);
 
-app.listen(process.env.PORT || 5000, () => {
-  console.log(`Server is running on port ${process.env.PORT || 5000}`);
-});
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  app.listen(process.env.PORT || 5000, () => {
+    console.log(`Server is running on port ${process.env.PORT || 5000}`);
+  });
+}
+
+export default app;
