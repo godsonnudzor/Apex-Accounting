@@ -42,7 +42,7 @@ const handleLogin = async (req, res) => {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, admin.password_hash);
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
       return res.status(401).json({ loginStatus: false, Error: "Wrong Email or Password" });
     }
@@ -50,7 +50,7 @@ const handleLogin = async (req, res) => {
     const token = jwt.sign(
       { role: "admin", email: admin.email, id: admin.id },
       process.env.JWT_SECRET || "secret_key_jwt",
-      { expiresIn: "7d" }
+      { expiresIn: "1d" }
     );
 
     res.cookie("token", token, {
