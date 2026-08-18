@@ -1,9 +1,9 @@
 import React from 'react'
 
-const AdminHeader = () => {
+const admin = () => {
   return (
-    <div>Admin Header</div>
+    <div>admin</div>
   )
 }
 
-export default AdminHeader
+export default admin

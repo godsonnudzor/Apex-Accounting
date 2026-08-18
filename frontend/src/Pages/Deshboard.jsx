@@ -1,11 +1,11 @@
 import React from 'react'
-import  AdminHeader from '../Components/AdminHeader'
+import  Admin from '../Component/Dashboard/admin'
 
 const Deshboard = () => {
   return (
     <div>
-      <AdminHeader />
-      <div>Welcome to the Dashboard</div>
+      <Admin />
+  
     </div>
   )
 }
