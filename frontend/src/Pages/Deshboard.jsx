@@ -1,8 +1,12 @@
 import React from 'react'
+import  AdminHeader from '../Components/AdminHeader'
 
 const Deshboard = () => {
   return (
-    <div>Welcome to the Dashboard</div>
+    <div>
+      <AdminHeader />
+      <div>Welcome to the Dashboard</div>
+    </div>
   )
 }
 
