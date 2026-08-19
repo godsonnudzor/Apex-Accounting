@@ -158,7 +158,7 @@ function Admin() {
   const [range, setRange] = useState("30 days");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
-  const [user, setUser] = useState(null);
+  const [users, setUsers] = useState(null);
 
   useEffect(() => {
     const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
@@ -172,8 +172,8 @@ function Admin() {
         if (!response.ok) throw new Error(result.message || "Unable to load user");
         return result;
       })
-      .then((result) => setUser(result.user))
-      .catch(() => setUser(null));
+      .then((result) => setUsers(result.user))
+      .catch(() => setUsers(null));
   }, []);
 
   const runAction = (action) => {
@@ -203,6 +203,9 @@ function Admin() {
           <a className="nav-item" href="#expenses">
             <span>⊙</span>Expenses
           </a>
+          <a className="nav-item" href="#payroll">
+            <span>⊙</span>Payroll
+          </a>
           <a className="nav-item" href="#reports">
             <span>▥</span>Reports
           </a>
@@ -214,7 +217,7 @@ function Admin() {
           <div className="profile">
             <div className="avatar">GN</div>
             <div>
-              <strong>{user?.name }</strong>
+              <strong>{users?.name }</strong>
               <small>Administrator</small>
             </div>
             <span>•••</span>
@@ -247,7 +250,7 @@ function Admin() {
           <div>
             <p className="eyebrow">Wednesday, 19 August 2026</p>
             <h1>
-              Good morning, {user?.name || "User"} <span>✦</span>
+              Good morning, {users?.name || "User"} <span>✦</span>
             </h1>
             <p className="subtitle">
               Here’s what’s happening with your finances today.
