@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import sql from "../db.js";
 import { supabase } from "../lib/supabaseClient.js";
+import { createUser } from "../controller/User.js";
 
 const router = express.Router();
 
@@ -106,6 +107,46 @@ const handleLogin = async (req, res) => {
 router.post("/api/login", handleLogin);
 router.post("/login", handleLogin);
 router.post("/admin/api/login", handleLogin);
+
+router.post("/api/signup", async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email, and password are required" });
+    }
+
+    const { data: existingUsers, error: lookupError } = await supabase
+      .from("users")
+      .select("id")
+      .ilike("email", email)
+      .limit(1);
+
+    if (lookupError) {
+      return res.status(500).json({ message: "Database error while checking the email" });
+    }
+
+    if (existingUsers?.length) {
+      return res.status(409).json({ message: "An account with this email already exists" });
+    }
+
+    const result = await createUser({ name, email, password, role: "employee" });
+    if (!result.success) {
+      return res.status(500).json({ message: "Unable to create account" });
+    }
+
+    const user = result.data?.[0];
+    return res.status(201).json({
+      message: "Account created successfully",
+      user: user ? { id: user.id, name: user.name, email: user.email, role: user.role } : null,
+    });
+  } catch (error) {
+    console.error("Signup error:", error);
+    return res.status(500).json({ message: "Unable to create account" });
+  }
+});
 
 router.get("/api/users", async (req, res) => {
   try {
