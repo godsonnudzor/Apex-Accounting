@@ -148,6 +148,36 @@ router.post("/api/signup", async (req, res) => {
   }
 });
 
+router.get("/api/me", async (req, res) => {
+  try {
+    const token = req.cookies?.token;
+    if (!token) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key_jwt");
+    let users = [];
+
+    if (sql) {
+      users = await sql`
+        SELECT id, name, email, role
+        FROM users
+        WHERE id = ${decoded.id}
+        LIMIT 1
+      `;
+    }
+
+    if (!users.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({ user: users[0] });
+  } catch (error) {
+    console.error("Current user error:", error);
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+});
+
 router.get("/api/users", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];

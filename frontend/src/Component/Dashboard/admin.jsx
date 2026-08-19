@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../../App.css";
 
 const metrics = [
@@ -159,6 +159,23 @@ function Admin() {
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+    const apiUrl = import.meta.env.MODE === "development"
+      ? new URL("/api/me", rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000").toString()
+      : "/api/me";
+
+    fetch(apiUrl, { credentials: "include" })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Unable to load user");
+        return result;
+      })
+      .then((result) => setUser(result.user))
+      .catch(() => setUser(null));
+  }, []);
+
   const runAction = (action) => {
     setMessage(`${action} is ready to start`);
     window.setTimeout(() => setMessage(""), 2600);
@@ -197,7 +214,7 @@ function Admin() {
           <div className="profile">
             <div className="avatar">GN</div>
             <div>
-              <strong>{user?.name || "User"}</strong>
+              <strong>{user?.name }</strong>
               <small>Administrator</small>
             </div>
             <span>•••</span>
