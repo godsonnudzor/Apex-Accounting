@@ -5,7 +5,6 @@ const Deshboard = () => {
   return (
     <div>
       <Admin />
-  
     </div>
   )
 }
