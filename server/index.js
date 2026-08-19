@@ -71,9 +71,25 @@ app.get("/verify", verifyUser, (req, res) => {
 app.use("/", adminRouter);
 
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
-  app.listen(process.env.PORT || 5000, () => {
-    console.log(`Server is running on port ${process.env.PORT || 5000}`);
-  });
+  const startPort = Number(process.env.PORT) || 5000;
+
+  const startServer = (port) => {
+    const server = app.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
+
+    server.on("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        console.warn(`Port ${port} is already in use. Trying port ${port + 1}.`);
+        startServer(port + 1);
+        return;
+      }
+
+      throw error;
+    });
+  };
+
+  startServer(startPort);
 }
 
 export default app;
