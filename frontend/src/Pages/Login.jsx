@@ -67,7 +67,7 @@ const Login = () => {
               <strong>Email</strong>
             </label>
             <input
-               className="w-full px-3 py-2 border rounded"
+               className=" px-3 py-2 border rounded"
               id="email"
               placeholder="Enter your Email"
               type="email"
@@ -80,7 +80,7 @@ const Login = () => {
               <strong>PassWord</strong>
             </label>
             <input
-              className="w-full px-3 py-2 border rounded"
+              className=" px-3 py-2 border rounded"
               id="password"
               placeholder="*****"
               type="password"
