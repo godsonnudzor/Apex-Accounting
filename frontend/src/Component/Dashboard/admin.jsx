@@ -203,7 +203,7 @@ function Admin() {
           <a className="nav-item" href="#expenses">
             <span>⊙</span>Expenses
           </a>
-          <a className="nav-item" href="#payroll">
+          <a className="nav-item" href="/EmployeeDashboard">
             <span>⊙</span>Payroll
           </a>
           <a className="nav-item" href="#reports">
