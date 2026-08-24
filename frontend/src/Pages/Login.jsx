@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import "../App.css";
 import { useNavigate } from "react-router-dom";
 
@@ -88,10 +87,7 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {error ? <p className="text-danger mt-2">{error}</p> : null}
-          <button type="submit" className="btn btn-success w-100 rounded-0" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </button>
+          
         </form>
 
         </div>
@@ -101,7 +97,12 @@ const Login = () => {
             <input type="checkbox" className="form-checkbox" />
             <span className="ml-2 text-gray-700">Remember me</span>
           </label>
-          <Link to="/signup">Create Account</Link>
+        </div>
+        <div className="mb-4">
+          {error ? <p className="text-danger mt-2">{error}</p> : null}
+          <button type="submit" className="btn btn-success w-100 rounded-0" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
         </div>
     </div>
   );
