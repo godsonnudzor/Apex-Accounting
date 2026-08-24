@@ -56,11 +56,13 @@ const Login = () => {
   };
 
   return (
-    <div className="d-flex justify-content-center align-items-center vh-100 App">
-      <div className="bg-blue p-3 rounded w-25">
-        <h2 className="text-center mb-4">Login</h2>
-        <form onSubmit={handleSubmit} className="d-flex flex-column">
-          <div>
+    <div className="flex flex-column items-center h-screen justify-center
+     bg-gradient-to-b from-teal-600 from-50% to-gray-100 to-50% space-y-6 App">
+        <h2 className="font-sevillana text-3xl text-white">Apex ERP</h2>
+        <div classname = "border shadow p-6  w-80 bg-white rounded-lg">
+          <h3 classname = " text-2xl font-bold md-4">Login</h3>
+           <form onSubmit={handleSubmit}>
+          <div className="mb-4">
             <label htmlFor="email">
               <strong>Email</strong>
             </label>
@@ -72,7 +74,7 @@ const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div>
+          <div className="mb-4">
             <label htmlFor="password">
               <strong>PassWord</strong>
             </label>
@@ -89,11 +91,13 @@ const Login = () => {
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        </div>
+       
         <div>
           <p>I do not have account</p>
           <Link to="/signup">Create Account</Link>
         </div>
-      </div>
     </div>
   );
 };
