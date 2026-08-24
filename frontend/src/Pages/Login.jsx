@@ -87,9 +87,11 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          
+          {error ? <p className="text-danger mt-2">{error}</p> : null}
+          <button type="submit" className="btn btn-success w-100 rounded-0" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
         </form>
-
         </div>
        
         <div className="mb-4 flex items-center justify-between ">
@@ -97,12 +99,7 @@ const Login = () => {
             <input type="checkbox" className="form-checkbox" />
             <span className="ml-2 text-gray-700">Remember me</span>
           </label>
-        </div>
-        <div className="mb-4">
-          {error ? <p className="text-danger mt-2">{error}</p> : null}
-          <button type="submit" className="w-full bg-teal-500 text-white py-2 px-4 rounded hover:bg-teal-600" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </button>
+         
         </div>
     </div>
   );
