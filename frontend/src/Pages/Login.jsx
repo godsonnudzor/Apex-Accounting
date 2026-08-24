@@ -96,8 +96,11 @@ const Login = () => {
 
         </div>
        
-        <div>
-          <p>I do not have account</p>
+        <div className="mb-4 flex items-center justify-between ">
+          <label htmlFor="" className="inline-flex items-center text-gray-700">
+            <input type="checkbox" className="form-checkbox" />
+            <span className="ml-2 text-gray-700">Remember me</span>
+          </label>
           <Link to="/signup">Create Account</Link>
         </div>
     </div>
