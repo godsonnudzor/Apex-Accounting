@@ -63,7 +63,7 @@ const Login = () => {
           <h3 classname = " text-2xl font-bold md-4">Login</h3>
            <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="email" className="block text-gray-700">
+            <label htmlFor="email" className="text-gray-700">
               <strong>Email</strong>
             </label>
             <input
@@ -76,7 +76,7 @@ const Login = () => {
             />
           </div>
           <div className="mb-4">
-            <label htmlFor="password" className="block text-gray-700">
+            <label htmlFor="password" className=" text-gray-700">
               <strong>PassWord</strong>
             </label>
             <input
