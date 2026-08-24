@@ -3,6 +3,10 @@
     {
       "source": "/api/(.*)",
       "destination": "https://apex-accounting-server.vercel.app/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

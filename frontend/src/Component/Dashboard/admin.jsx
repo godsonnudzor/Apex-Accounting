@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import "../../App.css";
 
 const metrics = [
@@ -203,9 +204,9 @@ function Admin() {
           <a className="nav-item" href="#expenses">
             <span>⊙</span>Expenses
           </a>
-          <a className="nav-item" href="/EmployeeDashboard">
+          <Link className="nav-item" to="/EmployeeDashboard">
             <span>⊙</span>Payroll
-          </a>
+          </Link>
           <a className="nav-item" href="#reports">
             <span>▥</span>Reports
           </a>
