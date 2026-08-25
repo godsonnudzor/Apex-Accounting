@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
-import menu from "../menu";
+import Menu from "../menu";
 
 const metrics = [
   {
@@ -194,7 +194,7 @@ function Admin() {
           </span>
         </div>
         /**Sidebar Navigation */
-        <menu/> 
+        <Menu />
         <nav className="nav-list" aria-label="Main navigation">
           <a className="nav-item active" href="#overview">
             <span>◈</span>Overview
