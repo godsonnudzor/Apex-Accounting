@@ -173,7 +173,7 @@ function Admin() {
         if (!response.ok) throw new Error(result.message || "Unable to load user");
         return result;
       })
-      .then((result) => setUsers(result.user))
+      .then((result) => setUsers(result.users))
       .catch(() => setUsers(null));
   }, []);
 
