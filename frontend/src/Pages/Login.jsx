@@ -57,7 +57,7 @@ const Login = () => {
   return (
     <div className="flex flex-column items-center h-screen justify-center
      bg-gradient-to-b from-teal-600 from-50% to-gray-100 to-50% space-y-6 App">
-        <h2 className="font-sevillana text-3xl text-white">Apex ERP</h2>
+        <h2 className="font-pacific text-3xl text-white">Apex ERP</h2>
         <div classname = "border shadow p-6  w-80 bg-white rounded-lg">
           <h3 classname = " text-2xl font-bold md-4">Login</h3>
            <form onSubmit={handleSubmit}>
