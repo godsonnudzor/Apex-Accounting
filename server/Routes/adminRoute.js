@@ -158,6 +158,16 @@ router.get("/api/me", async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key_jwt");
     let users = [];
 
+    const { data: supabaseUser, error: supabaseError } = await supabase
+      .from("users")
+      .select("id, name, email, role")
+      .eq("id", decoded.id)
+      .maybeSingle();
+
+    if (!supabaseError && supabaseUser) {
+      return res.json({ user: supabaseUser });
+    }
+
     if (sql) {
       users = await sql`
         SELECT id, name, email, role
