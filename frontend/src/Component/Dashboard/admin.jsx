@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
+import menu from "../menu";
 
 const metrics = [
   {
@@ -192,6 +193,8 @@ function Admin() {
             Apex<span className="brand-muted"> / finance</span>
           </span>
         </div>
+        /**Sidebar Navigation */
+        <menu/> 
         <nav className="nav-list" aria-label="Main navigation">
           <a className="nav-item active" href="#overview">
             <span>◈</span>Overview
@@ -199,11 +202,11 @@ function Admin() {
           <a className="nav-item" href="#transactions">
             <span>↕</span>Transactions
           </a>
-          <Link className="nav-item" to="/Invoice">
-            <span>▤</span>Invoices <b>8</b>
+          <Link className="nav-item" to="#">
+            <span>▤</span>Customers <b>8</b>
           </Link>
           <a className="nav-item" href="#expenses">
-            <span>⊙</span>Expenses
+            <span>⊙</span>Suppliers <b>3</b>
           </a>
           <Link className="nav-item" to="/EmployeeDashboard">
             <span>⊙</span>Employees
