@@ -198,9 +198,9 @@ function Admin() {
           <a className="nav-item" href="#transactions">
             <span>↕</span>Transactions
           </a>
-          <a className="nav-item" href="#invoices">
+          <Link className="nav-item" to="/Invoice">
             <span>▤</span>Invoices <b>8</b>
-          </a>
+          </Link>
           <a className="nav-item" href="#expenses">
             <span>⊙</span>Expenses
           </a>
