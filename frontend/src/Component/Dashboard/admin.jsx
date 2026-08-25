@@ -159,7 +159,7 @@ function Admin() {
   const [range, setRange] = useState("30 days");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
-  const [users, setUsers] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
@@ -173,8 +173,8 @@ function Admin() {
         if (!response.ok) throw new Error(result.message || "Unable to load user");
         return result;
       })
-      .then((result) => setUsers(result.users))
-      .catch(() => setUsers(null));
+      .then((result) => setUser(result.user))
+      .catch(() => setUser(null));
   }, []);
 
   const runAction = (action) => {
@@ -218,7 +218,7 @@ function Admin() {
           <div className="profile">
             <div className="avatar">GN</div>
             <div>
-              <strong>{users?.name }</strong>
+              <strong>{user?.name}</strong>
               <small>Administrator</small>
             </div>
             <span>•••</span>
