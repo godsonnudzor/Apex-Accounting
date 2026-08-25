@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
 
 const metrics = [
@@ -156,6 +156,7 @@ function CashFlowChart({ range }) {
 }
 
 function Admin() {
+  const navigate = useNavigate();
   const [range, setRange] = useState("30 days");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
@@ -266,7 +267,7 @@ function Admin() {
         </div>
         <div className="quick-actions">
           <span className="quick-label">Quick actions</span>
-          <button onClick={() => runAction("Create invoice")}>
+          <button onClick={() => navigate("/invoice")}>
             ＋ <span>Create invoice</span>
           </button>
           <button onClick={() => runAction("Record expense")}>
