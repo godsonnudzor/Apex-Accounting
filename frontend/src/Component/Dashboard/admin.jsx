@@ -193,8 +193,8 @@ function Admin() {
             Apex<span className="brand-muted"> / finance</span>
           </span>
         </div>
-        /**Sidebar Navigation */
-        <Menu />
+        /*Sidebar Navigation */
+        
         <nav className="nav-list" aria-label="Main navigation">
           <a className="nav-item active" href="#overview">
             <span>◈</span>Overview
@@ -202,6 +202,7 @@ function Admin() {
           <a className="nav-item" href="#transactions">
             <span>↕</span>Transactions
           </a>
+          <Menu />
           <Link className="nav-item" to="#">
             <span>▤</span>Customers <b>8</b>
           </Link>
