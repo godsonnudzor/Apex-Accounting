@@ -251,7 +251,7 @@ function Admin() {
           <div>
             <p className="eyebrow">Wednesday, 19 August 2026</p>
             <h1>
-              Good morning, {users?.name || "User"} <span>✦</span>
+              Good morning, {user?.name || "User"} <span>✦</span>
             </h1>
             <p className="subtitle">
               Here’s what’s happening with your finances today.
