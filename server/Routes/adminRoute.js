@@ -6,13 +6,13 @@ import { supabase } from "../lib/supabaseClient.js";
 import { createUser } from "../controller/User.js";
 
 const router = express.Router();
-
+/*
 const fallbackAdmin = {
   id: 1,
   email: (process.env.ADMIN_EMAIL || "admin@example.com").trim().toLowerCase(),
   password: process.env.ADMIN_PASSWORD || "$2b$10$y6pN3M2fX9IUJ6/1sY6hQOh2sK8xqY1fZH6a7g0r5YQ5L0J0cx5u",
   role: "admin",
-};
+};*/
 
 const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
 
