@@ -27,6 +27,27 @@ const passwordMatches = async (candidatePassword, storedPassword) => {
   return candidatePassword === normalizedStoredPassword;
 };
 
+const authenticate = (req) => {
+  const token = req.cookies?.token;
+  if (!token) return null;
+  try { return jwt.verify(token, process.env.JWT_SECRET || "secret_key_jwt"); } catch { return null; }
+};
+
+const readPermissions = async (userId, role) => {
+  if (role === "admin") return { dashboard: true, writeCheque: true, bills: true, reports: true };
+  const { data } = await supabase
+    .from("employee_permissions")
+    .select("dashboard, write_cheque, bills, reports")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return {
+    dashboard: data?.dashboard ?? true,
+    writeCheque: data?.write_cheque ?? false,
+    bills: data?.bills ?? false,
+    reports: data?.reports ?? false,
+  };
+};
+
 const handleLogin = async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
@@ -165,7 +186,7 @@ router.get("/api/me", async (req, res) => {
       .maybeSingle();
 
     if (!supabaseError && supabaseUser) {
-      return res.json({ user: supabaseUser });
+      return res.json({ user: { ...supabaseUser, permissions: await readPermissions(supabaseUser.id, supabaseUser.role) } });
     }
 
     if (sql) {
@@ -181,7 +202,7 @@ router.get("/api/me", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    return res.json({ user: users[0] });
+    return res.json({ user: { ...users[0], permissions: await readPermissions(users[0].id, users[0].role) } });
   } catch (error) {
     console.error("Current user error:", error);
     return res.status(401).json({ message: "Not authenticated" });
@@ -190,13 +211,15 @@ router.get("/api/me", async (req, res) => {
 
 router.get("/api/users", async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const admins = await sql`SELECT * FROM users`;
-    return res.status(200).json(admins);
+    const currentUser = authenticate(req);
+    if (!currentUser || currentUser.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const { data: users, error } = await supabase.from("users").select("id, name, email, role").order("name");
+    if (error) return res.status(500).json({ message: "Unable to load employees" });
+    const result = await Promise.all(users.map(async (employee) => ({
+      ...employee,
+      permissions: await readPermissions(employee.id, employee.role),
+    })));
+    return res.status(200).json({ users: result });
   } catch (error) {
     console.error("Users endpoint error:", error);
     const message = error?.message?.includes("password authentication failed")
@@ -207,5 +230,47 @@ router.get("/api/users", async (req, res) => {
     return res.status(500).json({ message, error: error.message });
   }
 });
+router.put("/api/users/:userId/permissions", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser || currentUser.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const userId = Number(req.params.userId);
+    const {
+      dashboard = true,
+      writeCheque = false,
+      bills = false,
+      reports = false,
+    } = req.body;
+
+    const { data, error } = await supabase
+      .from("employee_permissions")
+      .upsert({
+        user_id: userId,
+        dashboard,
+        write_cheque: writeCheque,
+        bills,
+        reports,
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ message: error.message });
+    }
+
+    return res.json({
+      permissions: {
+        dashboard: data.dashboard,
+        writeCheque: data.write_cheque,
+        bills: data.bills,
+        reports: data.reports,
+      },
+    });
+  } catch {
+    return res.status(500).json({ message: "Unable to update permissions" });
+  }
+});
+
 
 export { router as adminRouter };

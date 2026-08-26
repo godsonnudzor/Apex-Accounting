@@ -31,7 +31,7 @@ function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/dashboard" element={<Deshboard />} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboard />} />
-        <Route path="/bill" element={<Bill />} />
+        <Route path="/bill" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
         <Route path="/settings" element={<Setting />} />
         <Route path="/invoice" element={<Bill />} />

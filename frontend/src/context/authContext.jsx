@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 const AuthContext = createContext(null);
 const permissionDefaults = { dashboard: true, writeCheque: false, bills: false, reports: false };
 
-const getApiUrl = (path) => {
+export const getApiUrl = (path) => {
   const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
   if (import.meta.env.MODE !== "development") return path;
   const baseUrl = rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000";
@@ -13,9 +13,6 @@ const getApiUrl = (path) => {
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [permissions, setPermissions] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("apexEmployeePermissions")) || {}; } catch { return {}; }
-  });
 
   useEffect(() => {
     fetch(getApiUrl("/api/me"), { credentials: "include" })
@@ -60,20 +57,37 @@ function AuthProvider({ children }) {
   };
 
   const logout = () => setUser(null);
-  const getPermissions = (employee) => employee?.role === "admin"
-    ? { dashboard: true, writeCheque: true, bills: true, reports: true }
-    : { ...permissionDefaults, ...(permissions[employee?.email] || {}) };
-  const updatePermissions = (email, nextPermissions) => {
-    setPermissions((current) => {
-      const next = { ...current, [email]: nextPermissions };
-      localStorage.setItem("apexEmployeePermissions", JSON.stringify(next));
-      return next;
+  const getPermissions = (employee = user) => {
+    if (employee?.role === "admin") return { dashboard: true, writeCheque: true, bills: true, reports: true };
+    const permissions = employee?.permissions || {};
+    return {
+      dashboard: permissions.dashboard ?? true,
+      writeCheque: permissions.writeCheque ?? permissions.write_cheque ?? false,
+      bills: permissions.bills ?? false,
+      reports: permissions.reports ?? false,
+    };
+  };
+  const updatePermissions = async (userId, nextPermissions) => {
+    const response = await fetch(getApiUrl(`/api/users/${userId}/permissions`), {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nextPermissions),
     });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "Unable to update permissions");
+    return result.permissions;
   };
   const hasPermission = (permission) => Boolean(getPermissions(user)[permission]);
-
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, getPermissions, updatePermissions, hasPermission }}>
+    <AuthContext.Provider value={{ user,
+    loading,
+    login,
+    logout,
+    getPermissions,
+    updatePermissions,
+    hasPermission,
+    }}>
       {children}
     </AuthContext.Provider>
   );
