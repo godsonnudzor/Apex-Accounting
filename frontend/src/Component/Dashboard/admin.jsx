@@ -206,9 +206,9 @@ function Admin() {
           <Link className="nav-item" to="/bill">
             <span>▤</span>Customers <b>8</b>
           </Link>
-          <a className="nav-item" href="#expenses">
-            <span>⊙</span>Suppliers <b>3</b>
-          </a>
+          <Link className="nav-item" to="/write-cheque">
+            <span>⊙</span>Banking <b>3</b>
+          </Link>
           <Link className="nav-item" to="/EmployeeDashboard">
             <span>⊙</span>Employees
           </Link>
