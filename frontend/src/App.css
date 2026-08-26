@@ -65,6 +65,76 @@
 .bill-toast { position: fixed; right: 22px; bottom: 20px; padding: 10px 16px; color: #fff; border-radius: 3px; background: #2f6e8e; box-shadow: 0 2px 8px #0003; }
 @media (max-width: 850px) { .bill-layout { grid-template-columns: 1fr; } .bill-sidebar { border-top: 1px solid #bec3c4; border-left: 0; } .bill-header-grid { margin-top: 18px; margin-left: 0; } .bill-heading { min-height: 390px; } }
 @media (max-width: 620px) { .bill-sheet { padding: 17px 12px 150px; } .bill-header-grid { grid-template-columns: 1fr 1fr; } .bill-header-grid .bill-address { grid-row: auto; } .bill-bottom-grid { grid-template-columns: 1fr; } .bill-footer-actions { right: 12px; bottom: 12px; left: 12px; align-items: flex-end; flex-direction: column; gap: 10px; } .bill-footer-actions div { flex-wrap: wrap; justify-content: flex-end; } .bill-table { overflow-x: auto; } .bill-table-head, .bill-table-row { min-width: 590px; } }
+
+.cheque-app { min-height: 100vh; color: #29363d; background: #eceeed; font-family: "Segoe UI", Arial, sans-serif; font-size: 12px; }
+.cheque-toolbar { min-height: 80px; padding: 0 12px; background: #f2f2f0; border-bottom: 1px solid #c8cccb; box-shadow: 0 1px 4px #0002; }
+.cheque-tabs { height: 27px; display: flex; align-items: end; gap: 2px; }
+.cheque-tab { padding: 5px 17px; border: 1px solid transparent; border-radius: 5px 5px 0 0; background: transparent; color: #4b5559; }
+.cheque-tab.active { border-color: #c9cdcc; border-bottom-color: #fff; background: #fff; font-weight: 700; }
+.cheque-tools { display: flex; align-items: center; gap: 21px; height: 52px; overflow-x: auto; }
+.cheque-tools button { min-width: 48px; padding: 19px 2px 0; border: 0; color: #1b64a0; background: transparent; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.cheque-tools button::before { content: ""; display: block; width: 21px; height: 18px; margin: -15px auto 2px; border: 2px solid currentColor; border-radius: 3px; opacity: .75; }
+.cheque-tools button:hover { color: #0b416e; }
+.cheque-switcher { display: flex; align-items: center; gap: 20px; height: 38px; padding: 0 14px; color: #fff; background: #414342; }
+.cheque-switcher label { display: flex; align-items: center; gap: 5px; }
+.cheque-switcher input { accent-color: #4e8bc0; }
+.cheque-later { margin-left: 12px; }
+.cheque-account-bar { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 17px; background: #f7f7f6; border-bottom: 1px solid #d6d9d7; color: #717b7c; font-size: 10px; }
+.cheque-account-bar label { display: flex; align-items: center; gap: 7px; }
+.cheque-account-bar select { width: 225px; height: 24px; border: 1px solid #aeb9c0; background: #fff; color: #26343a; }
+.cheque-account-bar span { display: flex; align-items: center; gap: 15px; }
+.cheque-account-bar strong { color: #27383d; font-size: 15px; }
+.cheque-layout { display: grid; grid-template-columns: minmax(670px, 1fr) 266px; min-height: 700px; }
+.cheque-sheet { position: relative; padding: 0 18px 82px 0; background: #fff; }
+.cheque-paper { position: relative; min-height: 254px; margin-bottom: 5px; padding: 15px 18px; border: 1px solid #c1d9c5; background: repeating-linear-gradient(120deg, #fbfffb, #fbfffb 4px, #f2faf3 4px, #f2faf3 6px); box-shadow: inset 0 0 0 3px #eff8ef; }
+.cheque-paper-title a { color: #39729e; text-decoration: none; }
+.cheque-paper-title h1 { margin: 3px 0; color: #475762; font-size: 34px; font-weight: 400; }
+.cheque-meta { position: absolute; top: 15px; right: 22px; display: grid; gap: 7px; width: 150px; }
+.cheque-meta label { display: grid; grid-template-columns: 38px 1fr; align-items: center; color: #667478; font-size: 10px; }
+.cheque-meta input, .cheque-meta output { width: 109px; height: 24px; padding: 3px 6px; border: 1px solid #c5cccc; background: #fff; color: #27363d; font: inherit; }
+.cheque-meta output { display: flex; align-items: center; color: #37464b; }
+.payee-field { display: flex; align-items: center; gap: 20px; width: calc(100% - 180px); margin-top: 5px; color: #6a7579; font-size: 10px; }
+.payee-field select { flex: 1; height: 25px; border: 1px solid #b8c4c7; background: #fff; }
+.address-field, .cheque-memo { display: flex; flex-direction: column; gap: 5px; width: 52%; margin-top: 20px; color: #6b7679; font-size: 10px; }
+.address-field textarea { height: 72px; resize: none; }
+.address-field textarea, .cheque-memo input { padding: 5px; border: 1px solid #c4cccc; background: #fff; font: inherit; }
+.cheque-memo { flex-direction: row; align-items: center; width: 100%; margin-top: 9px; }
+.cheque-memo input { flex: 1; height: 24px; }
+.amount-words { position: absolute; right: 20px; bottom: 15px; width: 42%; color: #778185; font-size: 10px; }
+.amount-words strong { display: block; margin-top: 4px; padding: 5px; border-bottom: 1px solid #bbc6c2; color: #39494d; font-size: 11px; font-weight: 400; text-transform: capitalize; }
+.cheque-section-bar { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 8px; height: 29px; color: #344249; }
+.cheque-section-bar strong:nth-of-type(2) { padding: 6px 10px; background: #d9dee0; font-weight: 400; }
+.cheque-section-bar span { font-weight: 700; }
+.cheque-table { margin-left: 6px; border: 1px solid #c5cdd1; }
+.cheque-table-head, .cheque-table-row { display: grid; grid-template-columns: 170px 66px minmax(180px, 1fr) 32px; }
+.cheque-table-head { height: 25px; color: #68757b; font-size: 10px; align-items: center; }
+.cheque-table-head span { padding-left: 6px; border-right: 1px dotted #adb7ba; }
+.cheque-table-row { min-height: 34px; background: #fff; }
+.cheque-table-row:nth-child(odd) { background: #e3efff; }
+.cheque-table-row select, .cheque-table-row input { width: 100%; min-width: 0; padding: 5px 6px; border: 0; border-right: 1px solid #c9d0d4; outline: 0; background: transparent; font: inherit; }
+.cheque-table-row select:focus, .cheque-table-row input:focus { background: #fff; box-shadow: inset 0 0 0 1px #347eae; }
+.cheque-table-row button { border: 0; color: #98a2a6; background: transparent; cursor: pointer; }
+.cheque-add-line { margin: 10px 0 10px 6px; padding: 6px 10px; border: 1px solid #bdcbd2; border-radius: 2px; color: #276b9c; background: #f4f8fb; }
+.journal-check { display: flex; align-items: center; gap: 13px; margin: 0 6px; padding: 9px 11px; border: 1px solid #d5dadd; background: #f8f9f8; color: #69757a; font-size: 10px; }
+.journal-check strong { padding: 3px 7px; border-radius: 3px; font-size: 10px; }
+.journal-check .balanced { color: #26735b; background: #dff1e9; }
+.journal-check .pending { color: #9c6d25; background: #fff0d0; }
+.cheque-footer { position: absolute; right: 18px; bottom: 16px; left: 0; display: flex; align-items: center; justify-content: space-between; color: #9da6a8; font-size: 10px; }
+.cheque-footer input { width: 60px; height: 23px; border: 1px solid #d0d3d3; }
+.cheque-footer div { display: flex; gap: 10px; }
+.cheque-footer button { min-width: 106px; padding: 7px 12px; border: 1px solid #b7c0c4; border-radius: 3px; color: #43515a; background: linear-gradient(#fff, #e9e9e8); font-weight: 700; }
+.cheque-footer .cheque-primary { color: #fff; border-color: #3c6fae; background: #477fc2; }
+.cheque-sidebar { padding: 27px 15px; border-left: 1px solid #bec3c4; background: #fff; }
+.cheque-sidebar h2 { margin: 0 0 12px; padding-bottom: 7px; border-bottom: 1px solid #d5d5d5; color: #344047; font-size: 11px; }
+.cheque-sidebar p { display: flex; justify-content: space-between; margin: 8px 0; color: #69767a; }
+.cheque-sidebar hr { margin: 24px 0; border: 0; border-top: 1px solid #d5d5d5; }
+.cheque-side-total { margin: 3px 0 10px; color: #2d3b42; font-size: 24px; font-weight: 700; }
+.effect-row { display: flex; justify-content: space-between; margin: 10px 0; color: #69767a; }
+.effect-row strong { color: #34484a; }
+.cheque-sidebar .side-muted { color: #929b9e; }
+.cheque-toast { position: fixed; right: 22px; bottom: 20px; padding: 10px 16px; color: #fff; border-radius: 3px; background: #2f6e8e; box-shadow: 0 2px 8px #0003; }
+@media (max-width: 850px) { .cheque-layout { grid-template-columns: 1fr; } .cheque-sidebar { border-top: 1px solid #bec3c4; border-left: 0; } }
+@media (max-width: 620px) { .cheque-sheet { padding: 0 10px 145px; } .cheque-paper { min-height: 475px; } .cheque-meta { position: static; width: 100%; margin-top: 18px; } .payee-field { width: 100%; margin-top: 18px; } .address-field { width: 100%; } .amount-words { position: static; width: 100%; margin-top: 16px; } .cheque-table { overflow-x: auto; } .cheque-table-head, .cheque-table-row { min-width: 590px; } .cheque-footer { right: 10px; bottom: 12px; left: 10px; align-items: flex-end; flex-direction: column; gap: 10px; } .cheque-footer div { flex-wrap: wrap; justify-content: flex-end; } .cheque-account-bar { align-items: flex-start; height: auto; flex-direction: column; gap: 7px; padding: 8px 12px; } .cheque-account-bar span { margin-left: 0; } }
 :root {
   font-family: "DM Sans", "Segoe UI", sans-serif;
   color: #172b3a;

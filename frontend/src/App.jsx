@@ -8,6 +8,7 @@ import SignUp from "./Pages/Signup";
 import Deshboard from "./Pages/Deshboard";
 import EmployeeDashboard from "./Pages/EmployeeDashboard";
 import Bill from "./Pages/Bill";
+import WriteCheque from "./Pages/WriteCheque";
 
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <Route path="/dashboard" element={<Deshboard />} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboard />} />
         <Route path="/bill" element={<Bill />} />
+        <Route path="/write-cheque" element={<WriteCheque />} />
         <Route path="/invoice" element={<Bill />} />
       </Routes>
     </Router>
