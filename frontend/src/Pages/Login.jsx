@@ -1,56 +1,29 @@
 import React, { useState } from "react";
 import "../App.css";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/authContext";
+
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-
-  const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
-  const isDevelopment = import.meta.env.MODE === "development";
-  const apiUrl = isDevelopment
-    ? new URL("/api/login", rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000").toString()
-    : "/api/login";
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError("");
 
     try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const contentType = response.headers.get("content-type") || "";
-      const isJson = contentType.includes("application/json");
-      const result = isJson ? await response.json() : await response.text();
-
-      if (!response.ok) {
-        const message = isJson
-          ? result?.Error || result?.message || "Login failed"
-          : result || "Login failed";
-        throw new Error(message);
-      }
-
-      if (!isJson) {
-        throw new Error(result || "Unexpected response from server");
-      }
-
-      console.log("Login successful", result);
-      navigate("/dashboard"); // Redirect to dashboard on successful login
+      await login(email, password);
+      navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -88,8 +61,8 @@ const Login = () => {
             />
           </div>
           {error ? <p className="text-danger mt-2">{error}</p> : null}
-          <button type="submit" className="btn btn-success w-100 rounded-0" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button type="submit" className="btn btn-success w-100 rounded-0" disabled={submitting}>
+            {submitting ? "Logging in..." : "Login"}
           </button>
         </form>
         </div>

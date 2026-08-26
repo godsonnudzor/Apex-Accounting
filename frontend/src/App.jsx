@@ -9,12 +9,14 @@ import Deshboard from "./Pages/Deshboard";
 import EmployeeDashboard from "./Pages/EmployeeDashboard";
 import Bill from "./Pages/Bill";
 import WriteCheque from "./Pages/WriteCheque";
+import AuthProvider from "./context/authContext";
 
 
 function App() {
   return (
-    <Router>
-      <Routes>
+    <AuthProvider>
+      <Router>
+        <Routes>
         <Route index element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/dashboard" element={<Deshboard />} />
@@ -22,8 +24,9 @@ function App() {
         <Route path="/bill" element={<Bill />} />
         <Route path="/write-cheque" element={<WriteCheque />} />
         <Route path="/invoice" element={<Bill />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 
