@@ -11,14 +11,14 @@ import Bill from "./Pages/Bill";
 import WriteCheque from "./Pages/WriteCheque";
 import AuthProvider from "./context/authContext";
 import Setting from "./Pages/Setting";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "./context/authContext";
 
-function PermissionRoute({ permission, children }) {
-  const { loading, hasPermission } = useAuth();
-  const location = useLocation();
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
-  return hasPermission(permission) ? children : <Navigate to="/EmployeeDashboard" state={{ from: location.pathname }} replace />;
+  if (!user) return <Navigate to="/" replace />;
+  return user.role === "admin" ? children : <Navigate to="/EmployeeDashboard" replace />;
 }
 
 
@@ -29,12 +29,12 @@ function App() {
         <Routes>
         <Route index element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="/dashboard" element={<Deshboard />} />
+        <Route path="/dashboard" element={<AdminRoute><Deshboard /></AdminRoute>} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboard />} />
-        <Route path="/bill" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
-        <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
-        <Route path="/settings" element={<Setting />} />
-        <Route path="/invoice" element={<Bill />} />
+        <Route path="/bill" element={<AdminRoute><Bill /></AdminRoute>} />
+        <Route path="/write-cheque" element={<AdminRoute><WriteCheque /></AdminRoute>} />
+        <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
+        <Route path="/invoice" element={<AdminRoute><Bill /></AdminRoute>} />
         </Routes>
       </Router>
     </AuthProvider>
