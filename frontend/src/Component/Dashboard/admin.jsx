@@ -203,7 +203,7 @@ function Admin() {
             <span>↕</span>Transactions
           </a>
           <Menu />
-          <Link className="nav-item" to="#">
+          <Link className="nav-item" to="/bill">
             <span>▤</span>Customers <b>8</b>
           </Link>
           <a className="nav-item" href="#expenses">
@@ -271,7 +271,7 @@ function Admin() {
         </div>
         <div className="quick-actions">
           <span className="quick-label">Quick actions</span>
-          <button onClick={() => navigate("/invoice")}>
+          <button onClick={() => navigate("/bill")}>
             ＋ <span>Create invoice</span>
           </button>
           <button onClick={() => runAction("Record expense")}>

@@ -7,7 +7,7 @@ import Login from "./Pages/Login";
 import SignUp from "./Pages/Signup";
 import Deshboard from "./Pages/Deshboard";
 import EmployeeDashboard from "./Pages/EmployeeDashboard";
-import Invoice from "./Pages/Invoice";
+import Bill from "./Pages/Bill";
 
 
 function App() {
@@ -18,7 +18,8 @@ function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/dashboard" element={<Deshboard />} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboard />} />
-        <Route path="/invoice" element={<Invoice />} />
+        <Route path="/bill" element={<Bill />} />
+        <Route path="/invoice" element={<Bill />} />
       </Routes>
     </Router>
   );
