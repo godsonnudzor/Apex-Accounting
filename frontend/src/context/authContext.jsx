@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext(null);
+const permissionDefaults = { dashboard: true, writeCheque: false, bills: false, reports: false };
 
 const getApiUrl = (path) => {
   const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
@@ -12,6 +13,9 @@ const getApiUrl = (path) => {
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [permissions, setPermissions] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("apexEmployeePermissions")) || {}; } catch { return {}; }
+  });
 
   useEffect(() => {
     fetch(getApiUrl("/api/me"), { credentials: "include" })
@@ -56,9 +60,20 @@ function AuthProvider({ children }) {
   };
 
   const logout = () => setUser(null);
+  const getPermissions = (employee) => employee?.role === "admin"
+    ? { dashboard: true, writeCheque: true, bills: true, reports: true }
+    : { ...permissionDefaults, ...(permissions[employee?.email] || {}) };
+  const updatePermissions = (email, nextPermissions) => {
+    setPermissions((current) => {
+      const next = { ...current, [email]: nextPermissions };
+      localStorage.setItem("apexEmployeePermissions", JSON.stringify(next));
+      return next;
+    });
+  };
+  const hasPermission = (permission) => Boolean(getPermissions(user)[permission]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, getPermissions, updatePermissions, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

@@ -10,6 +10,16 @@ import EmployeeDashboard from "./Pages/EmployeeDashboard";
 import Bill from "./Pages/Bill";
 import WriteCheque from "./Pages/WriteCheque";
 import AuthProvider from "./context/authContext";
+import Setting from "./Pages/Setting";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "./context/authContext";
+
+function PermissionRoute({ permission, children }) {
+  const { loading, hasPermission } = useAuth();
+  const location = useLocation();
+  if (loading) return <div>Loading...</div>;
+  return hasPermission(permission) ? children : <Navigate to="/EmployeeDashboard" state={{ from: location.pathname }} replace />;
+}
 
 
 function App() {
@@ -22,7 +32,8 @@ function App() {
         <Route path="/dashboard" element={<Deshboard />} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboard />} />
         <Route path="/bill" element={<Bill />} />
-        <Route path="/write-cheque" element={<WriteCheque />} />
+        <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
+        <Route path="/settings" element={<Setting />} />
         <Route path="/invoice" element={<Bill />} />
         </Routes>
       </Router>

@@ -135,6 +135,39 @@
 .cheque-toast { position: fixed; right: 22px; bottom: 20px; padding: 10px 16px; color: #fff; border-radius: 3px; background: #2f6e8e; box-shadow: 0 2px 8px #0003; }
 @media (max-width: 850px) { .cheque-layout { grid-template-columns: 1fr; } .cheque-sidebar { border-top: 1px solid #bec3c4; border-left: 0; } }
 @media (max-width: 620px) { .cheque-sheet { padding: 0 10px 145px; } .cheque-paper { min-height: 475px; } .cheque-meta { position: static; width: 100%; margin-top: 18px; } .payee-field { width: 100%; margin-top: 18px; } .address-field { width: 100%; } .amount-words { position: static; width: 100%; margin-top: 16px; } .cheque-table { overflow-x: auto; } .cheque-table-head, .cheque-table-row { min-width: 590px; } .cheque-footer { right: 10px; bottom: 12px; left: 10px; align-items: flex-end; flex-direction: column; gap: 10px; } .cheque-footer div { flex-wrap: wrap; justify-content: flex-end; } .cheque-account-bar { align-items: flex-start; height: auto; flex-direction: column; gap: 7px; padding: 8px 12px; } .cheque-account-bar span { margin-left: 0; } }
+
+.settings-app { min-height: 100vh; padding: 42px 6vw 70px; color: #18313a; background: #f3f7f6; background-image: radial-gradient(#d4e4e0 1px, transparent 1px); background-size: 26px 26px; font-family: "DM Sans", "Segoe UI", sans-serif; }
+.settings-topbar { display: flex; justify-content: space-between; align-items: flex-start; max-width: 1120px; margin: 0 auto 32px; }
+.settings-back { color: #227d66; text-decoration: none; font-size: 13px; font-weight: 700; }
+.settings-eyebrow { margin: 28px 0 7px; color: #227d66; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.settings-topbar h1 { margin: 0; font-size: 34px; letter-spacing: -.5px; }
+.settings-topbar p:last-child { margin: 8px 0 0; color: #71848a; }
+.settings-admin-badge { padding: 8px 12px; border: 1px solid #b8ddd2; border-radius: 20px; color: #227d66; background: #e2f3ee; font-size: 11px; font-weight: 800; }
+.settings-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); max-width: 1120px; min-height: 560px; margin: 0 auto; overflow: hidden; border: 1px solid #dce8e5; border-radius: 10px; background: #fff; box-shadow: 0 12px 35px #214d4514; }
+.settings-people { padding: 24px 15px; border-right: 1px solid #e5eeec; background: #fbfdfc; }
+.settings-panel-heading { display: flex; justify-content: space-between; padding: 0 10px 14px; color: #7a8c91; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.settings-panel-heading strong { color: #227d66; }
+.settings-person { display: flex; align-items: center; width: 100%; gap: 10px; margin: 3px 0; padding: 12px 10px; border: 0; border-radius: 7px; color: #385158; background: transparent; text-align: left; }
+.settings-person.selected { color: #18313a; background: #e8f4f0; box-shadow: inset 3px 0 #227d66; }
+.settings-person > span:not(.settings-avatar) { display: flex; flex-direction: column; gap: 4px; }
+.settings-person strong { font-size: 12px; }
+.settings-person small { color: #819197; font-size: 10px; }
+.settings-person b { margin-left: auto; color: #92a5a7; font-size: 18px; font-weight: 400; }
+.settings-avatar { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; color: #227d66; background: #cdebe2; font-size: 10px; font-weight: 800; }
+.settings-avatar.large { width: 46px; height: 46px; font-size: 13px; }
+.settings-content { padding: 28px 34px; }
+.settings-profile { display: flex; align-items: center; gap: 13px; padding-bottom: 24px; border-bottom: 1px solid #e5eeec; }
+.settings-profile p { margin: 0 0 4px; color: #85969a; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.settings-profile h2 { margin: 0 0 4px; font-size: 21px; }
+.settings-profile span:not(.settings-avatar) { color: #7b8c91; font-size: 11px; }
+.settings-profile > strong { margin-left: auto; padding: 5px 9px; border-radius: 4px; font-size: 10px; text-transform: capitalize; }
+.role-admin { color: #1e6d56; background: #dff2e9; }.role-employee { color: #6c687f; background: #eeebf6; }
+.settings-section-title { display: flex; justify-content: space-between; align-items: end; margin: 26px 0 14px; }
+.settings-section-title h2 { margin: 0 0 5px; font-size: 17px; }.settings-section-title p { margin: 0; color: #7d8e93; font-size: 11px; }.settings-section-title > span { color: #227d66; font-size: 11px; font-weight: 800; }
+.permission-list { border-top: 1px solid #e5eeec; }.permission-row { display: flex; justify-content: space-between; align-items: center; min-height: 67px; border-bottom: 1px solid #e5eeec; }.permission-row strong { font-size: 13px; }.permission-row p { margin: 4px 0 0; color: #839298; font-size: 11px; }
+.permission-toggle { position: relative; width: 40px; height: 22px; padding: 2px; border: 0; border-radius: 20px; background: #c5d1d1; transition: background .2s; }.permission-toggle span { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003; transition: transform .2s; }.permission-toggle.on { background: #227d66; }.permission-toggle.on span { transform: translateX(18px); }
+.settings-note { margin-top: 24px; padding: 13px 15px; border-left: 3px solid #e3b967; background: #fff8e8; color: #6f603e; font-size: 11px; }.settings-note strong { font-size: 11px; }.settings-note p { margin: 5px 0 0; }
+@media (max-width: 760px) { .settings-app { padding: 25px 14px 40px; }.settings-topbar { gap: 15px; flex-direction: column; }.settings-layout { grid-template-columns: 1fr; }.settings-people { border-right: 0; border-bottom: 1px solid #e5eeec; }.settings-content { padding: 24px 20px; } }
 :root {
   font-family: "DM Sans", "Segoe UI", sans-serif;
   color: #172b3a;

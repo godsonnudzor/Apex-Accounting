@@ -217,9 +217,9 @@ function Admin() {
           </a>
         </nav>
         <div className="sidebar-bottom">
-          <a className="nav-item" href="#settings">
+          <Link className="nav-item" to="/settings">
             <span>⚙</span>Settings
-          </a>
+          </Link>
           <div className="profile">
             <div className="avatar">GN</div>
             <div>
