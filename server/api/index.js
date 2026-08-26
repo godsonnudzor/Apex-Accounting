@@ -1,4 +1,4 @@
-/*
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -55,4 +55,4 @@ app.get("/verify", (req, res) => {
 
 app.use("/", adminRouter);
 
-export default app;*/
+export default app;

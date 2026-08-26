@@ -1,3 +1,4 @@
+/*
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
@@ -92,4 +93,4 @@ if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   startServer(startPort);
 }
 
-export default app;
+export default app; */
