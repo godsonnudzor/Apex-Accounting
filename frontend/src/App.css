@@ -1409,4 +1409,7 @@ button {
     margin-top: 24px;
     flex-wrap: wrap;
   }
+  .main .sidebarWrapper {
+    font-size: 300px;
+  }
 }
