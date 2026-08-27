@@ -202,7 +202,12 @@ function Admin() {
           <a className="nav-item" href="#transactions">
             <span>↕</span>Transactions
           </a>
-          <Menu />
+          <div className="main d-flex">
+            <div className="sidebarWrapper">
+               <Menu />
+            </div>
+          </div>
+         
           <Link className="nav-item" to="/bill">
             <span>▤</span>Customers <b>8</b>
           </Link>
