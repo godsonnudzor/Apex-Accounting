@@ -1,8 +1,16 @@
 import React from 'react'
+import "../../Menu.css";
+
+
 
 const Menu = () => {
   return (
-    <div>menubar</div>
+    <div className='main d-flex'>
+      <div className = "sidebarWrapper">
+        menubar
+      </div>
+      
+    </div>
   )
 }
 
