@@ -19,7 +19,7 @@ const Login = () => {
 
     try {
       const data = await login(email, password);
-      const role = data?.user?.role || data?.role;
+      const role = String(data?.user?.role || data?.role || "").toLowerCase();
 
       if (role === "admin") {
         navigate("/dashboard");

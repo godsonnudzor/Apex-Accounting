@@ -21,6 +21,14 @@ function AdminRoute({ children }) {
   return user.role === "admin" ? children : <Navigate to="/EmployeeDashboard" replace />;
 }
 
+function EmployeeDashboardRoute() {
+  const { user, loading, hasPermission } = useAuth();
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <Navigate to="/" replace />;
+  if (!hasPermission("dashboard")) return <Navigate to="/" replace />;
+  return <EmployeeDashboard />;
+}
+
 
 function App() {
   return (
@@ -30,7 +38,7 @@ function App() {
         <Route index element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/dashboard" element={<AdminRoute><Deshboard /></AdminRoute>} />
-        <Route path="/EmployeeDashboard" element={<EmployeeDashboard />} />
+        <Route path="/EmployeeDashboard" element={<EmployeeDashboardRoute />} />
         <Route path="/bill" element={<AdminRoute><Bill /></AdminRoute>} />
         <Route path="/write-cheque" element={<AdminRoute><WriteCheque /></AdminRoute>} />
         <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
