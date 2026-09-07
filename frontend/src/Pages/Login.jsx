@@ -10,7 +10,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, getPermissions } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,12 +19,19 @@ const Login = () => {
 
     try {
       const data = await login(email, password);
-      const role = String(data?.user?.role || data?.role || "").toLowerCase();
+      const role = String(data?.role || "").toLowerCase();
+      const permissions = getPermissions(data);
 
       if (role === "admin") {
         navigate("/dashboard");
-      } else {
+      } else if (permissions.dashboard) {
         navigate("/EmployeeDashboard");
+      } else if (permissions.bills) {
+        navigate("/bill");
+      } else if (permissions.writeCheque) {
+        navigate("/write-cheque");
+      } else {
+        setError("Your account does not have access to any workspace.");
       }
     } catch (err) {
       setError(err.message || "Login failed");
