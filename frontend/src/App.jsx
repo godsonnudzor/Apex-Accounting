@@ -18,15 +18,23 @@ function AdminRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
-  return user.role === "admin" ? children : <Navigate to="/EmployeeDashboard" replace />;
+  return String(user.role).toLowerCase() === "admin" ? children : <Navigate to="/EmployeeDashboard" replace />;
 }
 
-function EmployeeDashboardRoute() {
+function PermissionRoute({ permission, children }) {
   const { user, loading, hasPermission } = useAuth();
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
-  if (!hasPermission("dashboard")) return <Navigate to="/" replace />;
-  return <EmployeeDashboard />;
+  if (!hasPermission(permission)) return <Navigate to="/EmployeeDashboard" replace />;
+  return children;
+}
+
+function EmployeeDashboardRoute() {
+  return (
+    <PermissionRoute permission="dashboard">
+      <EmployeeDashboard />
+    </PermissionRoute>
+  );
 }
 
 
@@ -39,10 +47,10 @@ function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/dashboard" element={<AdminRoute><Deshboard /></AdminRoute>} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboardRoute />} />
-        <Route path="/bill" element={<AdminRoute><Bill /></AdminRoute>} />
-        <Route path="/write-cheque" element={<AdminRoute><WriteCheque /></AdminRoute>} />
+        <Route path="/bill" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
+        <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
         <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
-        <Route path="/invoice" element={<AdminRoute><Bill /></AdminRoute>} />
+        <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         </Routes>
       </Router>
     </AuthProvider>
