@@ -1,10 +1,10 @@
 import React from 'react'
-
+import PayrollDashboardSidebar from '../Component/Dashboard/payrollSidebar'
 
 const PayrollDashboard = props => {
   return (
     <div>
-        <h1>Payroll Dashboard</h1>
+        <PayrollDashboardSidebar />
       
     </div>
   )
