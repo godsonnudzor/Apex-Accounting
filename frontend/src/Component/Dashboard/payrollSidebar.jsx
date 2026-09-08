@@ -23,8 +23,8 @@ const payrollSidebar = () => {
         </NavLink>
         <NavLink
           to="/employees"
-          className={({ isActive }) =>
-            `flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200 ${isActive ? "bg-teal-600" : ""}`
+          className={({ isActive }) => `${isActive ? "bg-teal-600" : ""}
+            flex items-center space-x-4 block py-2.5 px-4 rounded text-white }`
           }
         >
           <FaUsers /> <span>Employees List</span>
