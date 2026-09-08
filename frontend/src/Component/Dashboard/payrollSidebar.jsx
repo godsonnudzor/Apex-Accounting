@@ -11,19 +11,19 @@ const payrollSidebar = () => {
         </div>
         <div className='px-4'>
             <NavLink to="/payroll"
-             className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
+             className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200'>
                 <FaTachometerAlt /> <span>Payroll</span>
             </NavLink>
-            <NavLink to="/employees" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
+            <NavLink to="/employees" className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200'>
                 <FaUsers /> <span>Employees List</span>
             </NavLink>
-             <NavLink to="/departments" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
+             <NavLink to="/departments" className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200'>
                 <FaBuilding /> <span>Departments</span>
             </NavLink>
-            <NavLink to="/leave" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
+            <NavLink to="/leave" className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200'>
                 <FaCalendar /> <span>Leave</span>
             </NavLink>
-            <NavLink to="/salaries" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
+            <NavLink to="/salaries" className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200'>
                 <FaMoneyBill /> <span>Salaries</span>
             </NavLink>
         </div>
