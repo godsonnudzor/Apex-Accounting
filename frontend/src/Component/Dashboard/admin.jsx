@@ -217,6 +217,9 @@ function Admin() {
           <Link className="nav-item" to="/EmployeeDashboard">
             <span>⊙</span>Employees
           </Link>
+          <Link className="nav-item" to="/PayrollDashboard">
+            <span>⊙</span>Payroll
+          </Link>
           <a className="nav-item" href="#reports">
             <span>▥</span>Reports
           </a>

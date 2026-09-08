@@ -13,6 +13,7 @@ import AuthProvider from "./context/authContext";
 import Setting from "./Pages/Setting";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./context/authContext";
+import PayrollDashboard from "./Pages/PayrollDashboard";
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
@@ -51,6 +52,7 @@ function App() {
         <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
         <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
         <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
+        <Route path="/PayrollDashboard" element={<AdminRoute><PayrollDashboard /></AdminRoute>} />
         </Routes>
       </Router>
     </AuthProvider>
