@@ -7,9 +7,10 @@ const permissionLabels = [
   { key: "dashboard", label: "Dashboard", description: "View financial overview and activity" },
   { key: "writeCheque", label: "Write cheque", description: "Create cash and cheque transactions" },
   { key: "bills", label: "Bills", description: "Create and manage supplier bills" },
+  { key: "payroll", label: "Payroll", description: "Manage employee compensation and benefits" },
   { key: "reports", label: "Reports", description: "Open financial reports" },
 ];
-const defaults = { dashboard: true, writeCheque: false, bills: false, reports: false };
+const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: false, reports: false };
 
 function Setting() {
   const { user, getPermissions, updatePermissions } = useAuth();
