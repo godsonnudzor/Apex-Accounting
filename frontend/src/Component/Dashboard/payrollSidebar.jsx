@@ -10,19 +10,20 @@ const payrollSidebar = () => {
            <h3 className='text-2xl text-center font-pacific'>Payroll </h3>
         </div>
         <div className='px-4'>
-            <NavLink to="/payroll" className={({ isActive }) => isActive ? 'bg-teal-600 text-cadetBlue rounded-md px-2 py-1 flex items-center space-x-2' : 'text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-2 py-1 flex items-center space-x-2'}>
+            <NavLink to="/payroll"
+             className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
                 <FaTachometerAlt /> <span>Payroll</span>
             </NavLink>
-            <NavLink to="/employees" className={({ isActive }) => isActive ? 'bg-teal-600 text-cadetBlue rounded-md px-2 py-1 flex items-center space-x-2' : 'text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-2 py-1 flex items-center space-x-2'}>
+            <NavLink to="/employees" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
                 <FaUsers /> <span>Employees List</span>
             </NavLink>
-             <NavLink to="/departments" className={({ isActive }) => isActive ? 'bg-teal-600 text-cadetBlue rounded-md px-2 py-1 flex items-center space-x-2' : 'text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-2 py-1 flex items-center space-x-2'}>
+             <NavLink to="/departments" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
                 <FaBuilding /> <span>Departments</span>
             </NavLink>
-            <NavLink to="/leave" className={({ isActive }) => isActive ? 'bg-teal-600 text-cadetBlue rounded-md px-2 py-1 flex items-center space-x-2' : 'text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-2 py-1 flex items-center space-x-2'}>
+            <NavLink to="/leave" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
                 <FaCalendar /> <span>Leave</span>
             </NavLink>
-            <NavLink to="/salaries" className={({ isActive }) => isActive ? 'bg-teal-600 text-cadetBlue rounded-md px-2 py-1 flex items-center space-x-2' : 'text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-2 py-1 flex items-center space-x-2'}>
+            <NavLink to="/salaries" className='flex items-center space-x-4 block py-2.5 px-4 rounded'>
                 <FaMoneyBill /> <span>Salaries</span>
             </NavLink>
         </div>
