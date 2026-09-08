@@ -9,7 +9,7 @@ const payrollSidebar = () => {
            <h3>Payroll Sidebar</h3>
         </div>
         <div>
-            <NavLink>
+            <NavLink to="/PayrollDashboard" className={({ isActive }) => (isActive ? 'active' : '')}>
                 <FaTachometerAlt /> <span>Payroll</span>
             </NavLink>
         </div>
