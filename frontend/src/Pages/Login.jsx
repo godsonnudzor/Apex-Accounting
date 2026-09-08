@@ -30,6 +30,8 @@ const Login = () => {
         navigate("/bill");
       } else if (permissions.writeCheque) {
         navigate("/write-cheque");
+      } else if (permissions.payroll) {
+        navigate("/PayrollDashboard");
       } else {
         setError("Your account does not have access to any workspace.");
       }
