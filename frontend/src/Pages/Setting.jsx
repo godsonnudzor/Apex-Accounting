@@ -10,7 +10,7 @@ const permissionLabels = [
   { key: "payroll", label: "Payroll", description: "Manage employee compensation and benefits" },
   { key: "reports", label: "Reports", description: "Open financial reports" },
 ];
-const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: false, reports: false };
+const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: true, reports: false };
 
 function Setting() {
   const { user, getPermissions, updatePermissions } = useAuth();

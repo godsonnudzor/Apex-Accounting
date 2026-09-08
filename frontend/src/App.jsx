@@ -52,7 +52,7 @@ function App() {
         <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
         <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
         <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
-        <Route path="/PayrollDashboard" element={<AdminRoute><PayrollDashboard /></AdminRoute>} />
+        <Route path="/PayrollDashboard" element={<PermissionRoute permission="payroll"><PayrollDashboard /></PermissionRoute>} />
         </Routes>
       </Router>
     </AuthProvider>

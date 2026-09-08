@@ -34,16 +34,17 @@ const authenticate = (req) => {
 };
 
 const readPermissions = async (userId, role) => {
-  if (role === "admin") return { dashboard: true, writeCheque: true, bills: true, reports: true };
+  if (role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, reports: true };
   const { data } = await supabase
     .from("employee_permissions")
-    .select("dashboard, write_cheque, bills, reports")
+    .select("dashboard, write_cheque, bills, payroll, reports")
     .eq("user_id", userId)
     .maybeSingle();
   return {
     dashboard: data?.dashboard ?? true,
     writeCheque: data?.write_cheque ?? false,
     bills: data?.bills ?? false,
+    payroll: data?.payroll ?? true,
     reports: data?.reports ?? false,
   };
 };
@@ -239,6 +240,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
       dashboard = true,
       writeCheque = false,
       bills = false,
+      payroll = true,
       reports = false,
     } = req.body;
 
@@ -249,6 +251,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         dashboard,
         write_cheque: writeCheque,
         bills,
+        payroll,
         reports,
         updated_at: new Date().toISOString(),
       })
@@ -264,6 +267,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         dashboard: data.dashboard,
         writeCheque: data.write_cheque,
         bills: data.bills,
+        payroll: data.payroll,
         reports: data.reports,
       },
     });
