@@ -8,6 +8,7 @@ const PayrollDashboard = props => {
         <PayrollDashboardSidebar />
         <div className='flex-1 ml-64 bg-gray-100 h-screen'>
           <NavBar />
+          <PayrollSummary />
         </div>
       
     </div>
