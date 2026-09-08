@@ -2,7 +2,7 @@ import React from 'react'
 import PayrollDashboardSidebar from '../Component/Dashboard/payrollSidebar'
 import NavBar from '../Component/Dashboard/navBar'
 
-const PayrollDashboard = props => {
+const PayrollDashboard = () => {
   return (
     <div className='flex'>
         <PayrollDashboardSidebar />
