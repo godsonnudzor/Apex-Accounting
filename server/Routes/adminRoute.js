@@ -44,7 +44,7 @@ const readPermissions = async (userId, role) => {
     dashboard: data?.dashboard ?? true,
     writeCheque: data?.write_cheque ?? false,
     bills: data?.bills ?? false,
-    payroll: data?.payroll ?? true,
+    payroll: data?.payroll ?? false,
     reports: data?.reports ?? false,
   };
 };
@@ -240,7 +240,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
       dashboard = true,
       writeCheque = false,
       bills = false,
-      payroll = true,
+      payroll = false,
       reports = false,
     } = req.body;
 

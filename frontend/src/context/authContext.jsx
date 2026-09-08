@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext(null);
-const permissionDefaults = { dashboard: true, writeCheque: false, bills: false, reports: false, payroll: true };
+const permissionDefaults = { dashboard: true, writeCheque: false, bills: false, reports: false, payroll: false };
 
 export const getApiUrl = (path) => {
   const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
@@ -64,7 +64,7 @@ function AuthProvider({ children }) {
       dashboard: permissions.dashboard ?? true,
       writeCheque: permissions.writeCheque ?? permissions.write_cheque ?? false,
       bills: permissions.bills ?? false,
-      payroll: permissions.payroll ?? true,
+      payroll: permissions.payroll ?? false,
       reports: permissions.reports ?? false,
     };
   };

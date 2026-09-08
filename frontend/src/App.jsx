@@ -47,10 +47,11 @@ function App() {
         <Route index element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/dashboard" element={<AdminRoute><Deshboard /></AdminRoute>} />
+        <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
         <Route path="/EmployeeDashboard" element={<EmployeeDashboardRoute />} />
         <Route path="/bill" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
-        <Route path="/settings" element={<AdminRoute><Setting /></AdminRoute>} />
+        
         <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         <Route path="/PayrollDashboard" element={<PermissionRoute permission="payroll"><PayrollDashboard /></PermissionRoute>} />
         </Routes>
