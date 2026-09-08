@@ -1,6 +1,7 @@
 import React from 'react'
 import PayrollDashboardSidebar from '../Component/Dashboard/payrollSidebar'
-import NavBar from '../Component/Dashboard/navBar'
+import NavBar from '../Component/Dashboard/NavBar'
+import PayrollSummary from '../Component/Dashboard/payrollSummary'
 
 const PayrollDashboard = () => {
   return (

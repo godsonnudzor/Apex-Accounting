@@ -6,9 +6,9 @@ const payrollSummary = () => {
   return (
     <div>
         <h3>Payroll Overview</h3>
-        <Div>
+        <div>
             <SummaryCards icon={FaUsers} text="Total Employees" number={100} />
-        </Div>
+        </div>
     </div>
   )
 }

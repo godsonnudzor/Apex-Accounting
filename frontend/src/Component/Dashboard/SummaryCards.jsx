@@ -1,10 +1,12 @@
 import React from 'react'
 
 const SummaryCards = ({ icon, text, number }) => {
+  const Icon = icon
+
   return (
     <div>
         <div>
-            {icon}
+            <Icon />
 
         </div>
         <div>
