@@ -45,7 +45,10 @@ const readPermissions = async (userId, role) => {
     writeCheque: data?.write_cheque ?? false,
     bills: data?.bills ?? false,
     payroll: data?.payroll ?? false,
+    departments: data?.departments ?? false,
+    salaries: data?.salaries ?? false,
     reports: data?.reports ?? false,
+    
   };
 };
 
@@ -241,7 +244,10 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
       writeCheque = false,
       bills = false,
       payroll = false,
+      departments = false,
+      salaries = false,
       reports = false,
+      
     } = req.body;
 
     const { data, error } = await supabase
@@ -252,6 +258,8 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         write_cheque: writeCheque,
         bills,
         payroll,
+        departments,
+        salaries,
         reports,
         updated_at: new Date().toISOString(),
       })
@@ -269,6 +277,8 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         bills: data.bills,
         payroll: data.payroll,
         reports: data.reports,
+        departments: data.departments,
+        salaries: data.salaries,
       },
     });
   } catch {

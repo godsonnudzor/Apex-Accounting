@@ -4,7 +4,9 @@ create table if not exists employee_permissions (
   dashboard boolean not null default true,
   write_cheque boolean not null default false,
   bills boolean not null default false,
+  departments boolean not null default false,
   payroll boolean not null default true,
+  salaries boolean not null default false,
   reports boolean not null default false,
   updated_at timestamptz not null default now()
 );

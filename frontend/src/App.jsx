@@ -14,6 +14,8 @@ import Setting from "./Pages/Setting";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./context/auth";
 import PayrollDashboard from "./Pages/PayrollDashboard";
+import Department from "./Pages/Department";
+import Salary from "./Pages/Salary";
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
@@ -51,8 +53,9 @@ function App() {
         <Route path="/EmployeeDashboard" element={<EmployeeDashboardRoute />} />
         <Route path="/bill" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         <Route path="/write-cheque" element={<PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute>} />
-        
+        <Route path="/salary" element={<PermissionRoute permission="salaries"><Salary /></PermissionRoute>} />
         <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
+        <Route path="/department" element={<PermissionRoute permission="departments"><Department /></PermissionRoute>} />
         <Route path="/PayrollDashboard" element={<PermissionRoute permission="payroll"><PayrollDashboard /></PermissionRoute>} />
         </Routes>
       </Router>

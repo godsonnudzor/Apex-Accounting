@@ -6,11 +6,13 @@ import "../App.css";
 const permissionLabels = [
   { key: "dashboard", label: "Dashboard", description: "View financial overview and activity" },
   { key: "writeCheque", label: "Write cheque", description: "Create cash and cheque transactions" },
-  { key: "bills", label: "Bills", description: "Create and manage supplier bills" },
   { key: "payroll", label: "Payroll", description: "Manage employee compensation and benefits" },
+  { key: "bills", label: "Bills", description: "Create and manage supplier bills" },
+ { key: "departments", label: "Departments", description: "Manage organizational departments" },
+  { key: "salaries", label: "Salaries", description: "Manage employee salary records" },
   { key: "reports", label: "Reports", description: "Open financial reports" },
 ];
-const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: false, reports: false };
+const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: false, departments: false, salaries: false, reports: false };
 
 function Setting() {
   const { user, getPermissions, updatePermissions } = useAuth();

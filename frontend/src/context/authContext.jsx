@@ -49,13 +49,15 @@ function AuthProvider({ children }) {
 
   const logout = () => setUser(null);
   const getPermissions = (employee = user) => {
-    if (employee?.role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, reports: true };
+    if (employee?.role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, reports: true };
     const permissions = employee?.permissions || {};
     return {
       dashboard: permissions.dashboard ?? true,
       writeCheque: permissions.writeCheque ?? permissions.write_cheque ?? false,
       bills: permissions.bills ?? false,
       payroll: permissions.payroll ?? false,
+      departments: permissions.departments ?? false,
+      salaries: permissions.salaries ?? false,
       reports: permissions.reports ?? false,
     };
   };
