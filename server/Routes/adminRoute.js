@@ -35,11 +35,14 @@ const authenticate = (req) => {
 
 const readPermissions = async (userId, role) => {
   if (role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, reports: true };
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("employee_permissions")
     .select("dashboard, write_cheque, bills, payroll, departments, salaries, reports")
     .eq("user_id", userId)
     .maybeSingle();
+  if (error) {
+    console.error("Permission lookup error:", error.message);
+  }
   return {
     dashboard: data?.dashboard ?? true,
     writeCheque: data?.write_cheque ?? false,
