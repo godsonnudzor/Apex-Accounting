@@ -10,10 +10,10 @@ const SummaryCards = ({ icon, text, number, colour }) => {
         </div>
         <div className="pl-4 py-1">
             <p className="text-lg font-semibold">{text}</p>
-            <p className="text-xl font-bold">${number}</p>
+            <p className="text-xl font-bold">{number}</p>
         </div>
       
-    </div>
+    </div> 
   )
 }
 
