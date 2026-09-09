@@ -9,7 +9,7 @@ const payrollSummary = () => {
         <div className="grid grid-cols-1 md:grid-cols-3  gap-4 mt-6">
             <SummaryCards icon={FaUsers} text="Total Employees" number={13} colour="bg-blue-600" />
             <SummaryCards icon={FaBuilding} text="Total Departments" number={4} colour="bg-yellow-600" />
-            <SummaryCards icon={FaMoneyBillAlt} text="Total Salaries" number={`~${100000}`} colour="bg-red-600" />
+            <SummaryCards icon={FaMoneyBillAlt} text="Total Salaries" number={`$${100000}`} colour="bg-red-600" />
         </div>
         <div className="mt-12">
           <h3 className="text-center text-xl font-semibold">Leave Summary</h3>
