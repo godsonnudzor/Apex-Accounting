@@ -4,14 +4,13 @@ const SummaryCards = ({ icon, text, number }) => {
   const Icon = icon
 
   return (
-    <div>
-        <div>
+    <div className="bg-white rounded flex ">
+        <div className="text-3xl bg-teal-600 p-4  flex items-center justify-center">
             <Icon />
-
         </div>
-        <div>
-            <p>{text}</p>
-            <p>{number}</p>
+        <div className="pl-4 py-1">
+            <p className="text-lg font-semibold">{text}</p>
+            <p className="text-xl font-bold">${number.toLocaleString()}</p>
         </div>
       
     </div>

@@ -17,11 +17,11 @@ const payrollSidebar = () => {
       <div className="px-4">
         <NavLink
           to="/payroll"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""}
+          className={({ isActive }) =>`${isActive ? "bg-teal-500" : ""}
             flex items-center space-x-4 block py-2.5 px-4 rounded text-white }`
           }
         >
-          <FaTachometerAlt /> <span>Payroll</span>
+          <FaTachometerAlt /> <span>Payroll dashboard</span>
         </NavLink>
         <NavLink
           to="/employees"
