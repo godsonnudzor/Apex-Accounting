@@ -12,7 +12,7 @@ import WriteCheque from "./Pages/WriteCheque";
 import AuthProvider from "./context/authContext";
 import Setting from "./Pages/Setting";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "./context/authContext";
+import { useAuth } from "./context/auth";
 import PayrollDashboard from "./Pages/PayrollDashboard";
 
 function AdminRoute({ children }) {

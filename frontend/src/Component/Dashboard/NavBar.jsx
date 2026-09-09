@@ -1,7 +1,7 @@
 import React from 'react'
-import { useAuth } from '../../context/authContext';
+import { useAuth } from '../../context/auth';
 
-const navBar = () => {
+const NavBar = () => {
   const { user } = useAuth();
 
   return (
@@ -13,4 +13,4 @@ const navBar = () => {
   )
 }
 
-export default navBar
+export default NavBar

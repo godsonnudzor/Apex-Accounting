@@ -1,14 +1,5 @@
-import { createContext, useContext, useEffect, useState } from "react";
-
-const AuthContext = createContext(null);
-const permissionDefaults = { dashboard: true, writeCheque: false, bills: false, reports: false, payroll: false };
-
-export const getApiUrl = (path) => {
-  const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
-  if (import.meta.env.MODE !== "development") return path;
-  const baseUrl = rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000";
-  return new URL(path, `${baseUrl}/`).toString();
-};
+import { useEffect, useState } from "react";
+import { AuthContext, getApiUrl } from "./auth";
 
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -93,11 +84,5 @@ function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used inside AuthProvider");
-  return context;
-};
 
 export default AuthProvider;

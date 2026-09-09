@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { getApiUrl, useAuth } from "../context/authContext";
+import { getApiUrl, useAuth } from "../context/auth";
 import "../App.css";
 
 const permissionLabels = [
