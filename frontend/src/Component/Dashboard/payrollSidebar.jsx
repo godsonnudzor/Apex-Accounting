@@ -17,32 +17,32 @@ const payrollSidebar = () => {
       <div className="px-4">
         <NavLink
           to="/PayrollDashboard"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white`
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`
           }
         >
           <FaTachometerAlt /> <span>Payroll dashboard</span>
         </NavLink>
         <NavLink
           to="/employees"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white`}
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
         >
           <FaUsers /> <span>Employees List</span>
         </NavLink>
         <NavLink
           to="/departments"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white`}
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
         >
           <FaBuilding /> <span>Departments</span>
         </NavLink>
         <NavLink
           to="/leave"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white`}
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
         >
           <FaCalendar /> <span>Leave</span>
         </NavLink>
         <NavLink
           to="/salaries"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white`}
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
         >
           <FaMoneyBill /> <span>Salaries</span>
         </NavLink>
