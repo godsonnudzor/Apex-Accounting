@@ -34,10 +34,10 @@ const authenticate = (req) => {
 };
 
 const readPermissions = async (userId, role) => {
-  if (role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, reports: true };
+  if (role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, reports: true };
   const { data } = await supabase
     .from("employee_permissions")
-    .select("dashboard, write_cheque, bills, payroll, reports")
+    .select("dashboard, write_cheque, bills, payroll, departments, salaries, reports")
     .eq("user_id", userId)
     .maybeSingle();
   return {

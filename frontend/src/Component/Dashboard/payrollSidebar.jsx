@@ -29,7 +29,7 @@ const payrollSidebar = () => {
           <FaUsers /> <span>Employees List</span>
         </NavLink>
         <NavLink
-          to="/departments"
+          to="/department"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
         >
           <FaBuilding /> <span>Departments</span>
@@ -41,7 +41,7 @@ const payrollSidebar = () => {
           <FaCalendar /> <span>Leave</span>
         </NavLink>
         <NavLink
-          to="/salaries"
+          to="/salary"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
         >
           <FaMoneyBill /> <span>Salaries</span>

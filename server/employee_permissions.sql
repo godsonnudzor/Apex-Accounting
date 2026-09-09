@@ -13,3 +13,9 @@ create table if not exists employee_permissions (
 
 alter table employee_permissions
   add column if not exists payroll boolean not null default true;
+
+alter table employee_permissions
+  add column if not exists departments boolean not null default false;
+
+alter table employee_permissions
+  add column if not exists salaries boolean not null default false;
