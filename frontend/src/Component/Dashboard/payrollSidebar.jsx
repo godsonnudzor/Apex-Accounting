@@ -17,39 +17,33 @@ const payrollSidebar = () => {
       <div className="px-4">
         <NavLink
           to="/payroll"
-          className={`flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200`}
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""}
+            flex items-center space-x-4 block py-2.5 px-4 rounded text-white }`
+          }
         >
           <FaTachometerAlt /> <span>Payroll</span>
         </NavLink>
         <NavLink
           to="/employees"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""}
-            flex items-center space-x-4 block py-2.5 px-4 rounded text-white }`
-          }
+          className= 'flex items-center space-x-4 block py-2.5 px-4 rounded text-white '  
         >
           <FaUsers /> <span>Employees List</span>
         </NavLink>
         <NavLink
           to="/departments"
-          className={({ isActive }) =>
-            `flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200 ${isActive ? "bg-teal-600" : ""}`
-          }
+          className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white' 
         >
           <FaBuilding /> <span>Departments</span>
         </NavLink>
         <NavLink
           to="/leave"
-          className={({ isActive }) =>
-            `flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200 ${isActive ? "bg-teal-600" : ""}`
-          }
+          className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white' 
         >
           <FaCalendar /> <span>Leave</span>
         </NavLink>
         <NavLink
           to="/salaries"
-          className={({ isActive }) =>
-            `flex items-center space-x-4 block py-2.5 px-4 rounded text-white hover:bg-teal-600 transition-colors duration-200 ${isActive ? "bg-teal-600" : ""}`
-          }
+          className='flex items-center space-x-4 block py-2.5 px-4 rounded text-white' 
         >
           <FaMoneyBill /> <span>Salaries</span>
         </NavLink>
