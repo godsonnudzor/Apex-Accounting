@@ -1,4 +1,5 @@
 import React from 'react'
+import { Outlet } from 'react-router-dom'
 import PayrollDashboardSidebar from '../Component/Dashboard/payrollSidebar'
 import NavBar from '../Component/Dashboard/NavBar'
 import PayrollSummary from '../Component/Dashboard/payrollSummary'
@@ -10,6 +11,7 @@ const PayrollDashboard = () => {
         <div className='flex-1 ml-64 bg-gray-100 h-screen'>
           <NavBar />
           <PayrollSummary />
+          <Outlet />
         </div>
       
     </div>
