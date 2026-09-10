@@ -26,24 +26,28 @@ const payrollSidebar = () => {
         <NavLink
           to="/employees"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
         >
           <FaUsers /> <span>Employees List</span>
         </NavLink>
         <NavLink
           to="/department"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
         >
           <FaBuilding /> <span>Departments</span>
         </NavLink>
         <NavLink
           to="/leave"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
         >
           <FaCalendar /> <span>Leave</span>
         </NavLink>
         <NavLink
           to="/salary"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
         >
           <FaMoneyBill /> <span>Salaries</span>
         </NavLink>
