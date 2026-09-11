@@ -10,7 +10,7 @@ const Add = () => {
         <form>
           <div >
             <label htmlFor="dep_name"
-              className='text-sm font-medium text-gray-700 mb-1 block'>
+              className='text-sm font-medium text-gray-700 '>
               Department Name
             </label>
             <input type="text" 
@@ -25,16 +25,16 @@ const Add = () => {
             </label>
             <textarea 
               name="description"
-              placeholder=" description"
+              placeholder="Enter description"
               rows ={4}
               className='block mt-1 p-2 w-full border border-gray-300 rounded-md' />
           </div>
-        </form>
-        <button 
+           <button 
         type="submit"
-        className='px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 mt-4'>
+        className='px-4 py-2 bg-teal-500 text-white  rounded hover:bg-teal-600 mt-4'>
           Add Department
         </button>
+        </form>   
       </div> 
     </div>
   )
