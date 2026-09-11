@@ -7,8 +7,11 @@ import {
   FaBuilding,
   FaCalendar,
 } from "react-icons/fa";
+import { useAuth } from "../../context/auth";
 
-const payrollSidebar = () => {
+const PayrollDashboardSidebar = () => {
+  const { hasPermission } = useAuth();
+
   return (
     <div className="bg-gray-800 text-white h-screen fixed left-0 top-0 bottom-0 space-y-2 w-64 ">
       <div className="bg-teal-600 h-12 flex  items-center justify-center">
@@ -23,37 +26,23 @@ const payrollSidebar = () => {
         >
           <FaTachometerAlt /> <span>Payroll dashboard</span>
         </NavLink>
-        <NavLink
-          to="/employees"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
-          end
-        >
-          <FaUsers /> <span>Employees List</span>
-        </NavLink>
-        <NavLink
+        {hasPermission("departments") ? <NavLink
           to="/department"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
           end
         >
           <FaBuilding /> <span>Departments</span>
-        </NavLink>
-        <NavLink
-          to="/leave"
-          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
-          end
-        >
-          <FaCalendar /> <span>Leave</span>
-        </NavLink>
-        <NavLink
+        </NavLink> : null}
+        {hasPermission("salaries") ? <NavLink
           to="/salary"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
           end
         >
           <FaMoneyBill /> <span>Salaries</span>
-        </NavLink>
+        </NavLink> : null}
       </div>
     </div>
   );
 };
 
-export default payrollSidebar;
+export default PayrollDashboardSidebar;
