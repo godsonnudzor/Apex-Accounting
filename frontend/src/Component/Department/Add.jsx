@@ -9,20 +9,20 @@ const Add = () => {
         </h3>
         <form>
           <div >
-            <Label htmlFor="dep_name"
+            <label htmlFor="dep_name"
               className='text-sm font-medium text-gray-700 mb-1 block'>
               Department Name
-              </Label>
+            </label>
             <input type="text" 
             name="dep_name" 
             placeholder="Enter dept name" 
             className='mt-1 w-full p-2 border border-gray-300 rounded-md' />
           </div>
           <div className=' mt-3'>
-            <Label htmlFor="description"
+            <label htmlFor="description"
               className='text-sm font-medium text-gray-700 mb-1 block'>
               Description
-            </Label>
+            </label>
             <textarea 
               name="description"
               placeholder=" description"
