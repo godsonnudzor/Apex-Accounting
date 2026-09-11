@@ -2,33 +2,39 @@ import React from 'react'
 
 const Add = () => {
   return (
-    <div className='p-5'>
+    <div className='max-w-3xl mx-auto mt-10 bg-white p-8 rounded-md shadow-md w-96'>
       <div>
-        <h3 className='text-2xl font-bold'>Add New Department</h3>
+        <h3 className='text-2xl font-bold mb-6'>
+          Add New Department
+        </h3>
         <form>
-          <div className='flex flex-col gap-4 mt-4'>
+          <div >
             <Label htmlFor="dep_name"
-              className='block mb-1'>
+              className='text-sm font-medium text-gray-700 mb-1 block'>
               Department Name
               </Label>
             <input type="text" 
-            id="dep_name" 
             name="dep_name" 
             placeholder="Enter dept name" 
-            className='px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full' />
+            className='mt-1 w-full p-2 border border-gray-300 rounded-md' />
           </div>
-          <div className='flex flex-col gap-4 mt-4'>
+          <div className=' mt-3'>
             <Label htmlFor="description"
-              className='block mb-1'>
+              className='text-sm font-medium text-gray-700 mb-1 block'>
               Description
             </Label>
             <textarea 
               name="description"
               placeholder=" description"
-              className='px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full' />
+              rows ={4}
+              className='block mt-1 p-2 w-full border border-gray-300 rounded-md' />
           </div>
         </form>
-        <button className='px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 mt-4'>Add Department</button>
+        <button 
+        type="submit"
+        className='px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 mt-4'>
+          Add Department
+        </button>
       </div> 
     </div>
   )
