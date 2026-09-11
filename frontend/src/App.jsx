@@ -18,6 +18,7 @@ import PayrollDashboard from "./Pages/PayrollDashboard";
 import Department from "./Component/Department/Department";
 import Salary from "./Pages/Salary";
 import LeaveManagement from "./Pages/LeaveManagemet";
+import Add from "./Component/Department/Add";
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
@@ -73,6 +74,7 @@ function App() {
         <Route path="/salary" element={<PermissionRoute permission="salaries"><Salary /></PermissionRoute>} />
         <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         <Route path="/department" element={<PermissionRoute permission="departments"><Department /></PermissionRoute>} />
+        <Route path="/department/add" element={<PermissionRoute permission="departments"><Add /></PermissionRoute>} />
         <Route path="/leaveManagement" element={<PermissionRoute permission="leaveManagement"><LeaveManagement /></PermissionRoute>} />
         <Route path="/PayrollDashboard" element={<PermissionRoute permission="payroll"><PayrollDashboard /></PermissionRoute>} />
         </Routes>
