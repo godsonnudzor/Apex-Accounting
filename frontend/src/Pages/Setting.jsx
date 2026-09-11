@@ -10,9 +10,10 @@ const permissionLabels = [
   { key: "bills", label: "Bills", description: "Create and manage supplier bills" },
  { key: "departments", label: "Departments", description: "Manage organizational departments" },
   { key: "salaries", label: "Salaries", description: "Manage employee salary records" },
+  { key: "leaveManagement", label: "Leave", description: "Manage employee leave requests" },
   { key: "reports", label: "Reports", description: "Open financial reports" },
 ];
-const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: false, departments: false, salaries: false, reports: false };
+const defaults = { dashboard: true, writeCheque: false, bills: false, payroll: false, departments: false, salaries: false, leaveManagement: false, reports: false };
 
 function Setting() {
   const { user, getPermissions, updatePermissions } = useAuth();

@@ -7,6 +7,7 @@ create table if not exists employee_permissions (
   departments boolean not null default false,
   payroll boolean not null default true,
   salaries boolean not null default false,
+  leave_management boolean not null default false,
   reports boolean not null default false,
   updated_at timestamptz not null default now()
 );
@@ -19,3 +20,6 @@ alter table employee_permissions
 
 alter table employee_permissions
   add column if not exists salaries boolean not null default false;
+
+alter table employee_permissions
+  add column if not exists leave_management boolean not null default false;
