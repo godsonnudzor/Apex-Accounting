@@ -5,14 +5,20 @@ function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const refreshUser = async () => {
+    const response = await fetch(getApiUrl("/api/me"), { credentials: "include" });
+    if (!response.ok) {
+      setUser(null);
+      return null;
+    }
+    const result = await response.json();
+    const currentUser = result.user || null;
+    setUser(currentUser);
+    return currentUser;
+  };
+
   useEffect(() => {
-    fetch(getApiUrl("/api/me"), { credentials: "include" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const result = await response.json();
-        return result.user || null;
-      })
-      .then(setUser)
+    refreshUser()
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
@@ -85,6 +91,7 @@ function AuthProvider({ children }) {
     login,
     logout,
     getPermissions,
+    refreshUser,
     updatePermissions,
     hasPermission,
     }}>

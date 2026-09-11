@@ -3,6 +3,7 @@ import {
   Route,
   Routes,
 } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Login from "./Pages/Login";
 import SignUp from "./Pages/Signup";
 import Deshboard from "./Pages/Deshboard";
@@ -25,9 +26,24 @@ function AdminRoute({ children }) {
 }
 
 function PermissionRoute({ permission, children }) {
-  const { user, loading, hasPermission } = useAuth();
+  const { user, loading, hasPermission, refreshUser } = useAuth();
+  const [checkingPermission, setCheckingPermission] = useState(false);
+  const [permissionChecked, setPermissionChecked] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user && !hasPermission(permission) && !permissionChecked && !checkingPermission) {
+      setCheckingPermission(true);
+      refreshUser()
+        .finally(() => {
+          setPermissionChecked(true);
+          setCheckingPermission(false);
+        });
+    }
+  }, [loading, user, permission, permissionChecked, checkingPermission, hasPermission, refreshUser]);
+
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
+  if (checkingPermission) return <div>Loading...</div>;
   if (!hasPermission(permission)) return <Navigate to="/EmployeeDashboard" replace />;
   return children;
 }
