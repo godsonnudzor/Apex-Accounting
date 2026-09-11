@@ -15,7 +15,7 @@ import Setting from "./Pages/Setting";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./context/auth";
 import PayrollDashboard from "./Pages/PayrollDashboard";
-import Department from "./Pages/Department";
+import Department from "./Component/Department/Department";
 import Salary from "./Pages/Salary";
 import LeaveManagement from "./Pages/LeaveManagemet";
 
