@@ -48,17 +48,23 @@ function AuthProvider({ children }) {
   };
 
   const logout = () => setUser(null);
+  const asBoolean = (value, fallback = false) => {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "string") return value.trim().toLowerCase() === "true";
+    return Boolean(value);
+  };
+
   const getPermissions = (employee = user) => {
     if (employee?.role === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, reports: true };
     const permissions = employee?.permissions || {};
     return {
-      dashboard: permissions.dashboard ?? true,
-      writeCheque: permissions.writeCheque ?? permissions.write_cheque ?? false,
-      bills: permissions.bills ?? false,
-      payroll: permissions.payroll ?? false,
-      departments: permissions.departments ?? false,
-      salaries: permissions.salaries ?? false,
-      reports: permissions.reports ?? false,
+      dashboard: asBoolean(permissions.dashboard, true),
+      writeCheque: asBoolean(permissions.writeCheque ?? permissions.write_cheque),
+      bills: asBoolean(permissions.bills),
+      payroll: asBoolean(permissions.payroll),
+      departments: asBoolean(permissions.departments),
+      salaries: asBoolean(permissions.salaries),
+      reports: asBoolean(permissions.reports),
     };
   };
   const updatePermissions = async (userId, nextPermissions) => {
