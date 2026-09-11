@@ -33,6 +33,17 @@ const authenticate = (req) => {
   try { return jwt.verify(token, process.env.JWT_SECRET || "secret_key_jwt"); } catch { return null; }
 };
 
+const hasUserPermission = async (user) => {
+  if (String(user?.role).toLowerCase() === "admin") return true;
+  const { data, error } = await supabase
+    .from("employee_permissions")
+    .select("departments")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.departments === true;
+};
+
 const readPermissions = async (userId, role) => {
   if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, leaveManagement: true, reports: true };
   const { data, error } = await supabase
@@ -238,6 +249,52 @@ router.get("/api/users", async (req, res) => {
     return res.status(500).json({ message, error: error.message });
   }
 });
+
+router.get("/api/departments", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser) return res.status(401).json({ message: "Authentication required" });
+    if (!(await hasUserPermission(currentUser))) return res.status(403).json({ message: "Department permission required" });
+
+    const { data, error } = await supabase
+      .from("departments")
+      .select("id, name, description, created_at")
+      .order("name");
+    if (error) throw error;
+    return res.json({ departments: data || [] });
+  } catch (error) {
+    console.error("Departments lookup error:", error);
+    return res.status(500).json({ message: "Unable to load departments" });
+  }
+});
+
+router.post("/api/departments", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser) return res.status(401).json({ message: "Authentication required" });
+    if (!(await hasUserPermission(currentUser))) return res.status(403).json({ message: "Department permission required" });
+
+    const name = String(req.body?.name || "").trim();
+    const description = String(req.body?.description || "").trim();
+    if (!name) return res.status(400).json({ message: "Department name is required" });
+    if (name.length > 100) return res.status(400).json({ message: "Department name must be 100 characters or fewer" });
+
+    const { data, error } = await supabase
+      .from("departments")
+      .insert({ name, description: description || null, created_by: currentUser.id })
+      .select("id, name, description, created_at")
+      .single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ message: "A department with that name already exists" });
+      throw error;
+    }
+    return res.status(201).json({ department: data });
+  } catch (error) {
+    console.error("Department creation error:", error);
+    return res.status(500).json({ message: "Unable to create department" });
+  }
+});
+
 router.put("/api/users/:userId/permissions", async (req, res) => {
   try {
     const currentUser = authenticate(req);
