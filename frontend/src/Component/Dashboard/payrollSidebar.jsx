@@ -26,20 +26,27 @@ const PayrollDashboardSidebar = () => {
         >
           <FaTachometerAlt /> <span>Payroll dashboard</span>
         </NavLink>
-        {hasPermission("departments") ? <NavLink
+         <NavLink
           to="/department"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
           end
         >
           <FaBuilding /> <span>Departments</span>
-        </NavLink> : null}
-        {hasPermission("salaries") ? <NavLink
+        </NavLink>
+         <NavLink
           to="/salary"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
           end
         >
           <FaMoneyBill /> <span>Salaries</span>
-        </NavLink> : null}
+        </NavLink>
+         <NavLink
+          to="/leaveManagement"
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
+        >
+          <FaMoneyBill /> <span>Leave Management</span>
+        </NavLink>
       </div>
     </div>
   );
