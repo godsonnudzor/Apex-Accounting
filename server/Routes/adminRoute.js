@@ -45,7 +45,7 @@ const hasUserPermission = async (user) => {
 };
 
 const readPermissions = async (userId, role) => {
-  if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, leaveManagement: true, reports: true };
+  if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, salaries: true, leaveManagement: true, reports: true };
   const { data, error } = await supabase
     .from("employee_permissions")
     .select("dashboard, write_cheque, bills, payroll, employee_management, departments, salaries, leave_management, reports")

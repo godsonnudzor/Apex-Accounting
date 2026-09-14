@@ -26,12 +26,20 @@ const Login = () => {
         navigate("/dashboard");
       } else if (permissions.dashboard) {
         navigate("/EmployeeDashboard");
+      } else if (permissions.employeeManagement) {
+        navigate("/employees");
       } else if (permissions.bills) {
         navigate("/bill");
       } else if (permissions.writeCheque) {
         navigate("/write-cheque");
       } else if (permissions.payroll) {
         navigate("/PayrollDashboard");
+      } else if (permissions.departments) {
+        navigate("/department");
+      } else if (permissions.salaries) {
+        navigate("/salary");
+      } else if (permissions.leaveManagement) {
+        navigate("/leaveManagement");
       } else {
         setError("Your account does not have access to any workspace.");
       }
