@@ -4,6 +4,7 @@ import { getApiUrl } from "../../context/auth";
 
 const Department = () => {
   const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -11,36 +12,51 @@ const Department = () => {
   const [editDescription, setEditDescription] = useState("");
 
   useEffect(() => {
-    fetch(getApiUrl("/api/departments"), { credentials: "include" })
-      .then(async (response) => {
+    const loadDepartments = async () => {
+      try {
+        const response = await fetch(getApiUrl("/api/departments"), {
+          credentials: "include",
+        });
+
         const result = await response.json();
 
         if (!response.ok) {
           throw new Error(result.message || "Unable to load departments");
         }
 
-        return result.departments || [];
-      })
-      .then(setDepartments)
-      .catch((loadError) => setError(loadError.message));
+        const loadedDepartments = result.departments || [];
+        setDepartments(loadedDepartments);
+        setSelectedDepartment(loadedDepartments[0] || null);
+      } catch (loadError) {
+        setError(loadError.message);
+      }
+    };
+
+    loadDepartments();
   }, []);
 
   const startEdit = (department) => {
     setEditingId(department.id);
     setEditName(department.name);
     setEditDescription(department.description || "");
+    setError("");
   };
 
   const updateDepartment = async (id) => {
+    const name = editName.trim();
+    const description = editDescription.trim();
+
+    if (!name) {
+      setError("Department name is required");
+      return;
+    }
+
     try {
       const response = await fetch(getApiUrl(`/api/departments/${id}`), {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName,
-          description: editDescription,
-        }),
+        body: JSON.stringify({ name, description }),
       });
 
       const result = await response.json();
@@ -49,18 +65,20 @@ const Department = () => {
         throw new Error(result.message || "Unable to update department");
       }
 
+      const updatedDepartment = result.department || {
+        ...selectedDepartment,
+        id,
+        name,
+        description,
+      };
+
       setDepartments((current) =>
         current.map((department) =>
-          department.id === id
-            ? {
-                ...department,
-                name: editName,
-                description: editDescription,
-              }
-            : department,
+          department.id === id ? updatedDepartment : department,
         ),
       );
 
+      setSelectedDepartment(updatedDepartment);
       setEditingId(null);
       setError("");
     } catch (updateError) {
@@ -83,9 +101,14 @@ const Department = () => {
         throw new Error(result.message || "Unable to delete department");
       }
 
-      setDepartments((current) =>
-        current.filter((department) => department.id !== id),
+      const remainingDepartments = departments.filter(
+        (department) => department.id !== id,
       );
+
+      setDepartments(remainingDepartments);
+      setSelectedDepartment(remainingDepartments[0] || null);
+      setEditingId(null);
+      setError("");
     } catch (deleteError) {
       setError(deleteError.message);
     }
@@ -101,90 +124,118 @@ const Department = () => {
         <h3 className="text-2xl font-bold">Manage Departments</h3>
       </div>
 
-      <div className="flex justify-between items-center p-4">
+      <div className="flex items-center justify-between gap-4 p-4">
         <input
           type="text"
           placeholder="Search by department name"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="px-4 py-0.5 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
 
         <Link
           to="/department/add"
-          className="px-4 py-1 bg-teal-500 text-white rounded hover:bg-teal-600"
+          className="rounded bg-teal-500 px-4 py-2 text-white hover:bg-teal-600"
         >
           Add New Department
         </Link>
       </div>
 
-      {error && <p className="px-4 text-red-600">{error}</p>}
+      {error && <p className="px-4 pb-3 text-red-600">{error}</p>}
 
-      <div className="px-4">
-        {filteredDepartments.length ? (
-          filteredDepartments.map((department) => (
-            <article
-              key={department.id}
-              className="border-b border-gray-200 py-4"
-            >
-              {editingId === department.id ? (
-                <>
-                  <input
-                    value={editName}
-                    onChange={(event) => setEditName(event.target.value)}
-                    className=" w-full mb-2 px-3 py-2 border rounded"
-                  />
+      <div className="grid grid-cols-1 gap-6 px-4 md:grid-cols-3">
+        <div className="overflow-hidden rounded-lg border md:col-span-1">
+          {filteredDepartments.length ? (
+            filteredDepartments.map((department) => (
+              <button
+                key={department.id}
+                onClick={() => {
+                  setSelectedDepartment(department);
+                  setEditingId(null);
+                }}
+                className={`block w-full border-b p-4 text-left transition hover:bg-teal-50 ${
+                  selectedDepartment?.id === department.id
+                    ? "border-l-4 border-l-teal-500 bg-teal-50"
+                    : ""
+                }`}
+              >
+                <h4 className="font-semibold">{department.name}</h4>
+                <p className="mt-1 text-sm text-gray-500">
+                  {department.description || "No description"}
+                </p>
+              </button>
+            ))
+          ) : (
+            <p className="p-4 text-gray-600">No departments found.</p>
+          )}
+        </div>
 
-                  <textarea
-                    value={editDescription}
-                    onChange={(event) =>
-                      setEditDescription(event.target.value)
-                    }
-                    className=" w-full mb-2 px-3 py-2 border rounded"
-                  />
+        <div className="rounded-lg border p-6 md:col-span-2">
+          {selectedDepartment ? (
+            editingId === selectedDepartment.id ? (
+              <>
+                <h3 className="mb-4 text-xl font-bold">Update Department</h3>
 
-                  <button
-                    onClick={() => updateDepartment(department.id)}
-                    className="mr-2 px-3 py-1 bg-blue-500 text-white rounded"
-                  >
-                    Save
-                  </button>
+                <input
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  className="mb-3 w-full rounded border px-3 py-2"
+                  placeholder="Department name"
+                />
 
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="px-3 py-1 bg-gray-500 text-white rounded"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <h4 className="font-semibold">{department.name}</h4>
+                <textarea
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                  className="mb-4 w-full rounded border px-3 py-2"
+                  placeholder="Description"
+                  rows="5"
+                />
 
-                  {department.description && (
-                    <p className="text-gray-600">{department.description}</p>
-                  )}
+                <button
+                  onClick={() => updateDepartment(selectedDepartment.id)}
+                  className="mr-2 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+                >
+                  Save
+                </button>
 
-                  <button
-                    onClick={() => startEdit(department)}
-                    className="mt-2 mr-2 px-3 py-1 bg-yellow-500 text-white rounded"
-                  >
-                    Update
-                  </button>
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="mb-3 text-2xl font-bold">
+                  {selectedDepartment.name}
+                </h3>
 
-                  <button
-                    onClick={() => deleteDepartment(department.id)}
-                    className="mt-2 px-3 py-1 bg-red-500 text-white rounded"
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
-            </article>
-          ))
-        ) : (
-          <p className="text-gray-600">No departments found.</p>
-        )}
+                <p className="mb-6 text-gray-600">
+                  {selectedDepartment.description || "No description available."}
+                </p>
+
+                <button
+                  onClick={() => startEdit(selectedDepartment)}
+                  className="mr-2 rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600"
+                >
+                  Update
+                </button>
+
+                <button
+                  onClick={() => deleteDepartment(selectedDepartment.id)}
+                  className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600"
+                >
+                  Delete
+                </button>
+              </>
+            )
+          ) : (
+            <p className="text-gray-600">
+              Select a department to view its details.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
