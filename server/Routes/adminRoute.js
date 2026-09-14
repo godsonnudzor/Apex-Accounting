@@ -48,7 +48,7 @@ const readPermissions = async (userId, role) => {
   if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, salaries: true, leaveManagement: true, reports: true };
   const { data, error } = await supabase
     .from("employee_permissions")
-    .select("dashboard, write_cheque, bills, payroll, departments, salaries, leave_management, reports")
+    .select("dashboard, write_cheque, bills, payroll, employee_management, departments, salaries, leave_management, reports")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) {
@@ -59,6 +59,7 @@ const readPermissions = async (userId, role) => {
     writeCheque: data?.write_cheque ?? false,
     bills: data?.bills ?? false,
     payroll: data?.payroll ?? false,
+    employeeManagement: data?.employee_management ?? false,
     departments: data?.departments ?? false,
     salaries: data?.salaries ?? false,
     leaveManagement: data?.leave_management ?? false,
@@ -417,6 +418,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
       departments = false,
       salaries = false,
       leaveManagement = false,
+      employeeManagement = false,
       reports = false,
       
     } = req.body;
@@ -432,6 +434,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         departments,
         salaries,
         leave_management: leaveManagement,
+        employee_management: employeeManagement,
         reports,
         updated_at: new Date().toISOString(),
       })
@@ -452,6 +455,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         departments: data.departments,
         salaries: data.salaries,
         leaveManagement: data.leave_management,
+        employeeManagement: data.employee_management,
       },
     });
   } catch {
