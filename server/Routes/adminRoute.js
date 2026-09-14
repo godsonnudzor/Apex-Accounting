@@ -294,6 +294,115 @@ router.post("/api/departments", async (req, res) => {
     return res.status(500).json({ message: "Unable to create department" });
   }
 });
+// ...existing code...
+
+router.put("/api/departments/:id", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (!(await hasUserPermission(currentUser))) {
+      return res.status(403).json({ message: "Department permission required" });
+    }
+
+    const id = Number(req.params.id);
+    const name = String(req.body?.name || "").trim();
+    const description = String(req.body?.description || "").trim();
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ message: "Invalid department ID" });
+    }
+
+    if (!name) {
+      return res.status(400).json({ message: "Department name is required" });
+    }
+
+    if (name.length > 100) {
+      return res
+        .status(400)
+        .json({ message: "Department name must be 100 characters or fewer" });
+    }
+
+    const { data, error } = await supabase
+      .from("departments")
+      .update({
+        name,
+        description: description || null,
+      })
+      .eq("id", id)
+      .select("id, name, description, created_at")
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return res.status(404).json({ message: "Department not found" });
+      }
+
+      if (error.code === "23505") {
+        return res
+          .status(409)
+          .json({ message: "A department with that name already exists" });
+      }
+
+      throw error;
+    }
+
+    return res.json({
+      message: "Department updated successfully",
+      department: data,
+    });
+  } catch (error) {
+    console.error("Department update error:", error);
+    return res.status(500).json({ message: "Unable to update department" });
+  }
+});
+
+router.delete("/api/departments/:id", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+
+    if (!currentUser) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (!(await hasUserPermission(currentUser))) {
+      return res.status(403).json({ message: "Department permission required" });
+    }
+
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ message: "Invalid department ID" });
+    }
+
+    const { data, error } = await supabase
+      .from("departments")
+      .delete()
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ message: "Department not found" });
+    }
+
+    return res.json({ message: "Department deleted successfully" });
+  } catch (error) {
+    console.error("Department deletion error:", error);
+    return res.status(500).json({ message: "Unable to delete department" });
+  }
+});
+
+// Remove these incorrect lines:
+// router.put("/:id", updateDepartment);
+// router.delete("/:id", deleteDepartment);
+
+// ...existing code...
 
 router.put("/api/users/:userId/permissions", async (req, res) => {
   try {

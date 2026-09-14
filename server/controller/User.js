@@ -165,3 +165,41 @@ export {
   getAllEmployees,
   getDashboardSummary,
 };
+// ...existing code...
+
+export const updateDepartment = async (req, res) => {
+  try {
+    const department = await Department.findByPk(req.params.id);
+
+    if (!department) {
+      return res.status(404).json({ message: "Department not found" });
+    }
+
+    const { name, description } = req.body;
+
+    await department.update({ name, description });
+
+    res.json({
+      message: "Department updated successfully",
+      department,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const deleteDepartment = async (req, res) => {
+  try {
+    const department = await Department.findByPk(req.params.id);
+
+    if (!department) {
+      return res.status(404).json({ message: "Department not found" });
+    }
+
+    await department.destroy();
+
+    res.json({ message: "Department deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
