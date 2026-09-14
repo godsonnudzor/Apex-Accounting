@@ -16,7 +16,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "./context/auth";
 import PayrollDashboard from "./Pages/PayrollDashboard";
 import Department from "./Component/Department/Department";
-import Employee from "./Component/Employee/Employees";
+import Employees from "./Component/Employee/Employees";
 import Salary from "./Pages/Salary";
 import LeaveManagement from "./Pages/LeaveManagemet";
 import Add from "./Component/Department/Add";
@@ -76,7 +76,7 @@ function App() {
         <Route path="/invoice" element={<PermissionRoute permission="bills"><Bill /></PermissionRoute>} />
         <Route path="/department" element={<PermissionRoute permission="departments"><Department /></PermissionRoute>} />
         <Route path="/department/add" element={<PermissionRoute permission="departments"><Add /></PermissionRoute>} />
-        <Route path="/employees" element={<PermissionRoute permission="employeeManagement"><Employee /></PermissionRoute>} />
+        <Route path="/employees" element={<PermissionRoute permission="employeeManagement"><Employees /></PermissionRoute>} />
         <Route path="/leaveManagement" element={<PermissionRoute permission="leaveManagement"><LeaveManagement /></PermissionRoute>} />
         <Route path="/PayrollDashboard" element={<PermissionRoute permission="payroll"><PayrollDashboard /></PermissionRoute>} />
         </Routes>
