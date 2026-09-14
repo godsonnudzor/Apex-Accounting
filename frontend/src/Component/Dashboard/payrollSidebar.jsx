@@ -33,6 +33,14 @@ const PayrollDashboardSidebar = () => {
         >
           <FaBuilding /> <span>Departments</span>
         </NavLink> : null}
+        {hasPermission("employees") ? <NavLink
+          to="/employees"
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
+        >
+          <FaUsers /> <span>Employees</span>
+        </NavLink> : null}
+
          {hasPermission("salaries") ? <NavLink
           to="/salary"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
