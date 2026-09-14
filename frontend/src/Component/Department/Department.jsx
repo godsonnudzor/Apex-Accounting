@@ -132,7 +132,7 @@ const Department = () => {
                   <input
                     value={editName}
                     onChange={(event) => setEditName(event.target.value)}
-                    className="block w-full mb-2 px-3 py-2 border rounded"
+                    className=" w-full mb-2 px-3 py-2 border rounded"
                   />
 
                   <textarea
@@ -140,7 +140,7 @@ const Department = () => {
                     onChange={(event) =>
                       setEditDescription(event.target.value)
                     }
-                    className="block w-full mb-2 px-3 py-2 border rounded"
+                    className=" w-full mb-2 px-3 py-2 border rounded"
                   />
 
                   <button
