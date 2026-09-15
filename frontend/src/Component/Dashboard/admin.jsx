@@ -220,6 +220,9 @@ function Admin() {
           <Link className="nav-item" to="/PayrollDashboard">
             <span>⊙</span>Payroll
           </Link>
+          <Link className="nav-item" to="/tax-analyzer/brackets">
+            <span>▥</span>Tax brackets
+          </Link>
           <a className="nav-item" href="#reports">
             <span>▥</span>Reports
           </a>
