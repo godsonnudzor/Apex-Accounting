@@ -1,4 +1,8 @@
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+} from "react-router-dom";
 import { useEffect, useState } from "react";
 import Login from "./Pages/Login";
 import SignUp from "./Pages/Signup";
@@ -26,7 +30,11 @@ function AdminRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
-  return String(user.role).toLowerCase() === "admin" ? children : <Navigate to="/EmployeeDashboard" replace />;
+  return String(user.role).toLowerCase() === "admin" ? (
+    children
+  ) : (
+    <Navigate to="/EmployeeDashboard" replace />
+  );
 }
 
 function PermissionRoute({ permission, children }) {
@@ -35,20 +43,34 @@ function PermissionRoute({ permission, children }) {
   const [permissionChecked, setPermissionChecked] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && !hasPermission(permission) && !permissionChecked && !checkingPermission) {
+    if (
+      !loading &&
+      user &&
+      !hasPermission(permission) &&
+      !permissionChecked &&
+      !checkingPermission
+    ) {
       setCheckingPermission(true);
-      refreshUser()
-        .finally(() => {
-          setPermissionChecked(true);
-          setCheckingPermission(false);
-        });
+      refreshUser().finally(() => {
+        setPermissionChecked(true);
+        setCheckingPermission(false);
+      });
     }
-  }, [loading, user, permission, permissionChecked, checkingPermission, hasPermission, refreshUser]);
+  }, [
+    loading,
+    user,
+    permission,
+    permissionChecked,
+    checkingPermission,
+    hasPermission,
+    refreshUser,
+  ]);
 
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
   if (checkingPermission) return <div>Loading...</div>;
-  if (!hasPermission(permission)) return <Navigate to="/EmployeeDashboard" replace />;
+  if (!hasPermission(permission))
+    return <Navigate to="/EmployeeDashboard" replace />;
   return children;
 }
 
@@ -60,19 +82,140 @@ function EmployeeDashboardRoute() {
   );
 }
 
-
 function BracketsPage() {
   const { brackets, demo } = useLoaderData();
-  return <div className="tax-page"><div className="tax-intro"><div><p className="tax-kicker">Tax intelligence</p><h1>Bracket library.</h1><p>Sort and filter the rates behind your estimate.</p></div><div className="tax-status"><span className={demo ? "status-dot demo" : "status-dot"} />{demo ? "Demo data" : "Live Supabase data"}</div></div><TaxDataTable brackets={brackets} /></div>;
+  return (
+    <div className="tax-page">
+      <div className="tax-intro">
+        <div>
+          <p className="tax-kicker">Tax intelligence</p>
+          <h1>Bracket library.</h1>
+          <p>Sort and filter the rates behind your estimate.</p>
+        </div>
+        <div className="tax-status">
+          <span className={demo ? "status-dot demo" : "status-dot"} />
+          {demo ? "Demo data" : "Live Supabase data"}
+        </div>
+      </div>
+      <TaxDataTable brackets={brackets} />
+    </div>
+  );
 }
 
 const router = createBrowserRouter([
-  { path: "/", element: <Login /> }, { path: "/signup", element: <SignUp /> },
-  { path: "/dashboard", element: <AdminRoute><Deshboard /></AdminRoute> }, { path: "/settings", element: <AdminRoute><Setting /></AdminRoute> }, { path: "/EmployeeDashboard", element: <EmployeeDashboardRoute /> }, { path: "/bill", element: <PermissionRoute permission="bills"><Bill /></PermissionRoute> }, { path: "/write-cheque", element: <PermissionRoute permission="writeCheque"><WriteCheque /></PermissionRoute> }, { path: "/salary", element: <PermissionRoute permission="salaries"><Salary /></PermissionRoute> }, { path: "/invoice", element: <PermissionRoute permission="bills"><Bill /></PermissionRoute> }, { path: "/department", element: <PermissionRoute permission="departments"><Department /></PermissionRoute> }, { path: "/department/add", element: <PermissionRoute permission="departments"><Add /></PermissionRoute> }, { path: "/employees", element: <PermissionRoute permission="employeeManagement"><Employees /></PermissionRoute> }, { path: "/leaveManagement", element: <PermissionRoute permission="leaveManagement"><LeaveManagement /></PermissionRoute> }, { path: "/PayrollDashboard", element: <PermissionRoute permission="payroll"><PayrollDashboard /></PermissionRoute> },
-  { path: "/tax-analyzer", element: <TaxRoot />, children: [{ index: true, element: <Calculator />, loader: calculatorLoader, action: calculatorAction }, { path: "brackets", element: <BracketsPage />, loader: bracketsLoader }] },
+  { path: "/", element: <Login /> },
+  { path: "/signup", element: <SignUp /> },
+  {
+    path: "/dashboard",
+    element: (
+      <AdminRoute>
+        <Deshboard />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/settings",
+    element: (
+      <AdminRoute>
+        <Setting />
+      </AdminRoute>
+    ),
+  },
+  { path: "/EmployeeDashboard", element: <EmployeeDashboardRoute /> },
+  {
+    path: "/bill",
+    element: (
+      <PermissionRoute permission="bills">
+        <Bill />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/write-cheque",
+    element: (
+      <PermissionRoute permission="writeCheque">
+        <WriteCheque />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/salary",
+    element: (
+      <PermissionRoute permission="salaries">
+        <Salary />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/invoice",
+    element: (
+      <PermissionRoute permission="bills">
+        <Bill />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/department",
+    element: (
+      <PermissionRoute permission="departments">
+        <Department />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/department/add",
+    element: (
+      <PermissionRoute permission="departments">
+        <Add />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/employees",
+    element: (
+      <PermissionRoute permission="employeeManagement">
+        <Employees />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/leaveManagement",
+    element: (
+      <PermissionRoute permission="leaveManagement">
+        <LeaveManagement />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/PayrollDashboard",
+    element: (
+      <PermissionRoute permission="payroll">
+        <PayrollDashboard />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/tax-analyzer",
+    element: <TaxRoot />,
+    children: [
+      {
+        index: true,
+        element: <Calculator />,
+        loader: calculatorLoader,
+        action: calculatorAction,
+      },
+      { path: "brackets", element: <BracketsPage />, loader: bracketsLoader },
+    ],
+  },
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
 
-function App() { return <AuthProvider><RouterProvider router={router} /></AuthProvider>; }
+function App() {
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
+}
 
-export default App
+export default App;
