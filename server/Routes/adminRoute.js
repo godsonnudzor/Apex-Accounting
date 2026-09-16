@@ -251,6 +251,91 @@ router.get("/api/users", async (req, res) => {
   }
 });
 
+router.get("/api/employees", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser) return res.status(401).json({ message: "Authentication required" });
+
+    if (String(currentUser.role).toLowerCase() !== "admin") {
+      const { data: permissions, error: permissionError } = await supabase
+        .from("employee_permissions")
+        .select("employee_management")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+      if (permissionError) throw permissionError;
+      if (permissions?.employee_management !== true) {
+        return res.status(403).json({ message: "Employee permission required" });
+      }
+    }
+
+    const employees = await sql`
+      SELECT id, name, email, role
+      FROM users
+      WHERE LOWER(role) = 'employee'
+      ORDER BY LOWER(name), id
+    `;
+
+    return res.json({ employees });
+  } catch (error) {
+    console.error("Employees lookup error:", error);
+    const message = error?.message?.includes('relation "users" does not exist')
+      ? "The users table is not present in the connected database."
+      : "Unable to load employees";
+    return res.status(500).json({ message });
+  }
+});
+
+router.post("/api/employees", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const firstName = String(req.body?.firstName || "").trim();
+    const lastName = String(req.body?.lastName || "").trim();
+    const dateOfBirth = String(req.body?.dateOfBirth || "").trim();
+    const sex = String(req.body?.sex || "").trim().toLowerCase();
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    const role = String(req.body?.role || "employee").trim().toLowerCase();
+    const basicPay = Number(req.body?.basicPay);
+
+    if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isFinite(basicPay)) {
+      return res.status(400).json({ message: "First name, last name, date of birth, sex, email, password, and basic pay are required" });
+    }
+    if (!["employee", "admin"].includes(role)) return res.status(400).json({ message: "Invalid role" });
+    if (!["female", "male", "other", "prefer_not_to_say"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
+
+    const { data: existingUser, error: lookupError } = await supabase
+      .from("users")
+      .select("id")
+      .ilike("email", email)
+      .limit(1);
+    if (lookupError) throw lookupError;
+    if (existingUser?.length) return res.status(409).json({ message: "An account with this email already exists" });
+
+    const result = await createUser({
+      ...req.body,
+      firstName,
+      lastName,
+      dateOfBirth,
+      sex,
+      email,
+      password,
+      role,
+      basicPay,
+    });
+    if (!result.success) throw result.error;
+
+    const employee = result.data?.[0];
+    return res.status(201).json({ employee: employee ? { id: employee.id, name: employee.name, email: employee.email, role: employee.role } : null });
+  } catch (error) {
+    console.error("Employee creation error:", error);
+    return res.status(500).json({ message: "Unable to add employee" });
+  }
+});
+
 router.get("/api/departments", async (req, res) => {
   try {
     const currentUser = authenticate(req);

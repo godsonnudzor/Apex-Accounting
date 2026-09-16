@@ -16,6 +16,7 @@ import { useAuth } from "./context/auth";
 import PayrollDashboard from "./Pages/PayrollDashboard";
 import Department from "./Component/Department/Department";
 import Employees from "./Component/Employee/Employees";
+import EmployeeAdd from "./Component/Employee/Add";
 import Salary from "./Pages/Salary";
 import LeaveManagement from "./Pages/LeaveManagemet";
 import Add from "./Component/Department/Add";
@@ -175,6 +176,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="employeeManagement">
         <Employees />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/employees/add",
+    element: (
+      <PermissionRoute permission="employeeManagement">
+        <EmployeeAdd />
       </PermissionRoute>
     ),
   },
