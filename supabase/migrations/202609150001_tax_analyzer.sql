@@ -3,9 +3,9 @@ create extension if not exists "pgcrypto";
 create table if not exists public.jurisdictions (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  country text not null default 'US',
+  country text not null default 'GH',
   tax_year integer not null,
-  currency text not null default 'USD',
+  currency text not null default 'GHS',
   created_at timestamptz not null default now(),
   unique (name, country, tax_year)
 );
@@ -46,15 +46,14 @@ create policy "Users update their saved calculations" on public.user_saved_calcu
 create policy "Users delete their saved calculations" on public.user_saved_calculations for delete using (auth.uid() = user_id);
 
 insert into public.jurisdictions (name, country, tax_year, currency)
-values ('United States Federal', 'US', 2025, 'USD')
+values ('Ghana', 'GH', 2025, 'GHS')
 on conflict (name, country, tax_year) do nothing;
 
 insert into public.tax_brackets (jurisdiction_id, filing_status, min_income, max_income, rate)
 select j.id, seed.filing_status, seed.min_income, seed.max_income, seed.rate
 from public.jurisdictions j
 cross join (values
-  ('single', 0::numeric, 11925::numeric, .10::numeric), ('single', 11925, 48475, .12), ('single', 48475, 103350, .22), ('single', 103350, 197300, .24), ('single', 197300, 250525, .32), ('single', 250525, 626350, .35), ('single', 626350, null, .37),
-  ('married_joint', 0, 23850, .10), ('married_joint', 23850, 96950, .12), ('married_joint', 96950, 206700, .22), ('married_joint', 206700, 394600, .24), ('married_joint', 394600, 501050, .32), ('married_joint', 501050, 751600, .35), ('married_joint', 751600, null, .37)
-) as seed(filing_status, min_income, max_income, rate)
-where j.name = 'United States Federal' and j.tax_year = 2025
+  ('single', 0::numeric, 490::numeric, 0.00::numeric), ('single', 490, 600, 0.05), ('single', 600, 730, 0.10), ('single', 730, 3896.67, 0.175), ('single', 3896.67, 19896.67, 0.25), ('single', 19896.67, 50416.67, 0.30), ('single', 50416.67, null, 0.35),
+  ) as seed(filing_status, min_income, max_income, rate)
+where j.name = 'Ghana' and j.tax_year = 2026
   and not exists (select 1 from public.tax_brackets existing where existing.jurisdiction_id = j.id);
