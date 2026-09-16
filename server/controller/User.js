@@ -17,17 +17,9 @@ async function createUser(userData) {
 
     const userToInsert = {
       name: userData.name || `${userData.firstName} ${userData.lastName}`.trim(),
-      first_name: userData.firstName,
-      last_name: userData.lastName,
-      date_of_birth: userData.dateOfBirth,
-      sex: userData.sex,
       email: userData.email,
       password_hash: hashPassword,
       role: userData.role,
-      qualification: userData.qualification || null,
-      department: userData.department || null,
-      basic_pay: userData.basicPay,
-      profile_image: userData.profileImage || null,
     };
 
     const { data, error } = await supabase

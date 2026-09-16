@@ -269,10 +269,23 @@ router.get("/api/employees", async (req, res) => {
     }
 
     const employees = await sql`
-      SELECT id, name, email, role
-      FROM users
-      WHERE LOWER(role) = 'employee'
-      ORDER BY LOWER(name), id
+      SELECT
+        users.id,
+        users.name,
+        users.email,
+        users.role,
+        employees.first_name,
+        employees.last_name,
+        employees.date_of_birth,
+        employees.sex,
+        employees.qualification,
+        employees.department,
+        employees.basic_pay,
+        employees.profile_image
+      FROM employees
+      INNER JOIN users ON users.id = employees.user_id
+      WHERE LOWER(users.role) = 'employee'
+      ORDER BY LOWER(users.name), users.id
     `;
 
     return res.json({ employees });
@@ -328,8 +341,27 @@ router.post("/api/employees", async (req, res) => {
     });
     if (!result.success) throw result.error;
 
-    const employee = result.data?.[0];
-    return res.status(201).json({ employee: employee ? { id: employee.id, name: employee.name, email: employee.email, role: employee.role } : null });
+    const user = result.data?.[0];
+    if (!user) throw new Error("Employee account was not created");
+
+    const { data: employee, error: employeeError } = await supabase
+      .from("employees")
+      .insert({
+        user_id: user.id,
+        first_name: firstName,
+        last_name: lastName,
+        date_of_birth: dateOfBirth,
+        sex,
+        qualification: req.body?.qualification?.trim() || null,
+        department: req.body?.department?.trim() || null,
+        basic_pay: basicPay,
+        profile_image: req.body?.profileImage?.trim() || null,
+      })
+      .select()
+      .single();
+    if (employeeError) throw employeeError;
+
+    return res.status(201).json({ employee: { ...employee, email: user.email, role: user.role, name: user.name } });
   } catch (error) {
     console.error("Employee creation error:", error);
     return res.status(500).json({ message: "Unable to add employee" });
