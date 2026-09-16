@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getApiUrl } from "../../context/auth";
 
@@ -19,8 +19,29 @@ const initialForm = {
 const Add = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
+  const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const response = await fetch(getApiUrl("/api/departments"), {
+          credentials: "include",
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Unable to load departments");
+        setDepartments(result.departments || []);
+      } catch (loadError) {
+        setError(loadError.message);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    loadDepartments();
+  }, []);
 
   const updateField = (event) => {
     const { name, value } = event.target;
@@ -55,7 +76,6 @@ const Add = () => {
     ["dateOfBirth", "Date of birth", "date"],
     ["email", "Email address", "email"],
     ["qualification", "Qualification", "text"],
-    ["department", "Department", "text"],
     ["basicPay", "Basic pay", "number"],
     ["profileImage", "Profile image URL", "url"],
     ["password", "Password", "password"],
@@ -89,6 +109,23 @@ const Add = () => {
               />
             </div>
           ))}
+          <div>
+            <label htmlFor="department" className="mb-1 block text-sm font-medium text-slate-700">Department</label>
+            <select
+              id="department"
+              name="department"
+              value={form.department}
+              onChange={updateField}
+              required
+              disabled={departmentsLoading}
+              className="w-full rounded-md border border-slate-300 p-2 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100"
+            >
+              <option value="">{departmentsLoading ? "Loading departments..." : "Select department"}</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.name}>{department.name}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label htmlFor="sex" className="mb-1 block text-sm font-medium text-slate-700">Sex</label>
             <select id="sex" name="sex" value={form.sex} onChange={updateField} required className="w-full rounded-md border border-slate-300 p-2 focus:outline-none focus:ring-2 focus:ring-teal-500">
