@@ -276,33 +276,33 @@ router.get("/api/employees", async (req, res) => {
       }
     }
 
-    const employees = await sql`
-      SELECT
-        public.users.id,
-        public.users.name,
-        public.users.email,
-        public.users.role,
-        public.employees.first_name,
-        public.employees.last_name,
-        public.employees.date_of_birth,
-        public.employees.sex,
-        public.employees.qualification,
-        public.employees.department_id,
-        public.departments.name AS department,
-        public.employees.basic_pay,
-        public.employees.profile_image
-      FROM public.employees
-      INNER JOIN public.users ON public.users.id = public.employees.user_id
-      LEFT JOIN public.departments ON public.departments.id = public.employees.department_id
-      ORDER BY LOWER(public.users.name), public.users.id
-    `;
+    const { data: employeeRows, error: employeeError } = await supabase
+      .from("employees")
+      .select("user_id, first_name, last_name, date_of_birth, sex, qualification, department_id, basic_pay, profile_image, users!inner(id, name, email, role), departments(name)")
+      .order("first_name", { ascending: true });
+
+    if (employeeError) throw employeeError;
+
+    const employees = (employeeRows || []).map((employee) => ({
+      id: employee.users.id,
+      name: employee.users.name,
+      email: employee.users.email,
+      role: employee.users.role,
+      first_name: employee.first_name,
+      last_name: employee.last_name,
+      date_of_birth: employee.date_of_birth,
+      sex: employee.sex,
+      qualification: employee.qualification,
+      department_id: employee.department_id,
+      department: employee.departments?.name || null,
+      basic_pay: employee.basic_pay,
+      profile_image: employee.profile_image,
+    }));
 
     return res.json({ employees });
   } catch (error) {
     console.error("Employees lookup error:", error);
-    const message = error?.message?.includes('relation "users" does not exist')
-      ? "The users table is not present in the connected database."
-      : "Unable to load employees";
+    const message = error?.message || "Unable to load employees";
     return res.status(500).json({ message });
   }
 });
