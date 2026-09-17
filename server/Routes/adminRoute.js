@@ -328,7 +328,7 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
       return res.status(400).json({ message: "First name, last name, date of birth, sex, department, email, password, and basic pay are required" });
     }
     if (!["employee", "admin", "user", "public"].includes(role)) return res.status(400).json({ message: "Invalid role" });
-    if (!["female", "male"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
+    if (!["female", "male", "other", "prefer_not_to_say"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
 
     const { data: department, error: departmentError } = await supabase
       .from("departments")

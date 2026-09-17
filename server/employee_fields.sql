@@ -7,7 +7,7 @@ create table if not exists public.employees (
   first_name varchar(100) not null,
   last_name varchar(100) not null,
   date_of_birth date not null,
-  sex varchar(30) not null check (sex in ('female', 'male')),
+  sex varchar(30) not null check (sex in ('female', 'male', 'other', 'prefer_not_to_say')),
   qualification varchar(200),
   department_id bigint references public.departments(id) on delete set null,
   -- Kept for compatibility with existing employee rows; use department_id for new data.

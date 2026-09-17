@@ -13,7 +13,7 @@ create table if not exists public.employees (
   first_name varchar(100) not null,
   last_name varchar(100) not null,
   date_of_birth date not null,
-  sex varchar(30) not null check (sex in ('female', 'male')),
+  sex varchar(30) not null check (sex in ('female', 'male', 'other', 'prefer_not_to_say')),
   qualification varchar(200),
   department varchar(100),
   basic_pay numeric(14, 2) not null default 0 check (basic_pay >= 0),
