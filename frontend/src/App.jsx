@@ -83,6 +83,15 @@ function EmployeeDashboardRoute() {
   );
 }
 
+function TaxAnalyzerRoute() {
+  const { hasPermission } = useAuth();
+  return hasPermission("taxJurisdictions") || hasPermission("userScenarios") ? (
+    <TaxRoot />
+  ) : (
+    <Navigate to="/EmployeeDashboard" replace />
+  );
+}
+
 function BracketsPage() {
   const { brackets, demo } = useLoaderData();
   return (
@@ -205,7 +214,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/tax-analyzer",
-    element: <TaxRoot />,
+    element: <TaxAnalyzerRoute />,
     children: [
       {
         index: true,
@@ -213,7 +222,15 @@ const router = createBrowserRouter([
         loader: calculatorLoader,
         action: calculatorAction,
       },
-      { path: "brackets", element: <BracketsPage />, loader: bracketsLoader },
+      {
+        path: "brackets",
+        element: (
+          <PermissionRoute permission="taxBrackets">
+            <BracketsPage />
+          </PermissionRoute>
+        ),
+        loader: bracketsLoader,
+      },
     ],
   },
   { path: "*", element: <Navigate to="/" replace /> },

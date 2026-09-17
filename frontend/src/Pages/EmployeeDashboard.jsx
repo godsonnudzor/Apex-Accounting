@@ -12,7 +12,9 @@ const EmployeeDashboard = () => {
         {hasPermission("bills") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/bill">Bills</Link> : null}
         {hasPermission("writeCheque") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/write-cheque">Write cheque</Link> : null}
         {hasPermission("payroll") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/PayrollDashboard">Payroll</Link> : null}
-       {hasPermission("reports") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/Reports">Reports</Link> : null}
+        {hasPermission("taxJurisdictions") || hasPermission("userScenarios") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/tax-analyzer">Tax analyzer</Link> : null}
+        {hasPermission("taxBrackets") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/tax-analyzer/brackets">Tax brackets</Link> : null}
+        {hasPermission("reports") ? <Link className="rounded bg-white px-5 py-3 shadow" to="/Reports">Reports</Link> : null}
 
       </div>
     </div>
