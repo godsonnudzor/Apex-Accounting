@@ -1,11 +1,16 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import multer from "multer";
 import sql from "../db.js";
 import { supabase } from "../lib/supabaseClient.js";
 import { createUser } from "../controller/User.js";
 
 const router = express.Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 const fallbackAdmin = {
   id: 1,
@@ -302,7 +307,7 @@ router.get("/api/employees", async (req, res) => {
   }
 });
 
-router.post("/api/employees", async (req, res) => {
+router.post("/api/employees", upload.single("profile_image"), async (req, res) => {
   try {
     const currentUser = authenticate(req);
     if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
@@ -368,7 +373,7 @@ router.post("/api/employees", async (req, res) => {
         qualification: req.body?.qualification?.trim() || null,
         department_id: departmentId,
         basic_pay: basicPay,
-        profile_image: req.body?.profileImage?.trim() || null,
+        profile_image: req.file?.originalname || null,
       })
       .select()
       .single();
