@@ -282,11 +282,13 @@ router.get("/api/employees", async (req, res) => {
         public.employees.date_of_birth,
         public.employees.sex,
         public.employees.qualification,
-        public.employees.department,
+        public.employees.department_id,
+        public.departments.name AS department,
         public.employees.basic_pay,
         public.employees.profile_image
       FROM public.employees
       INNER JOIN public.users ON public.users.id = public.employees.user_id
+      LEFT JOIN public.departments ON public.departments.id = public.employees.department_id
       ORDER BY LOWER(public.users.name), public.users.id
     `;
 
@@ -314,13 +316,22 @@ router.post("/api/employees", async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const role = String(req.body?.role || "employee").trim().toLowerCase();
+    const departmentId = Number(req.body?.departmentId);
     const basicPay = Number(req.body?.basicPay);
 
-    if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isFinite(basicPay)) {
-      return res.status(400).json({ message: "First name, last name, date of birth, sex, email, password, and basic pay are required" });
+    if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isInteger(departmentId) || !Number.isFinite(basicPay)) {
+      return res.status(400).json({ message: "First name, last name, date of birth, sex, department, email, password, and basic pay are required" });
     }
     if (!["employee", "admin", "user", "public"].includes(role)) return res.status(400).json({ message: "Invalid role" });
     if (!["female", "male"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
+
+    const { data: department, error: departmentError } = await supabase
+      .from("departments")
+      .select("id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (departmentError) throw departmentError;
+    if (!department) return res.status(400).json({ message: "Selected department does not exist" });
 
     const { data: existingUser, error: lookupError } = await supabase
       .from("users")
@@ -355,7 +366,7 @@ router.post("/api/employees", async (req, res) => {
         date_of_birth: dateOfBirth,
         sex,
         qualification: req.body?.qualification?.trim() || null,
-        department: req.body?.department?.trim() || null,
+        department_id: departmentId,
         basic_pay: basicPay,
         profile_image: req.body?.profileImage?.trim() || null,
       })

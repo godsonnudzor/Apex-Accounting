@@ -10,7 +10,7 @@ const initialForm = {
   email: "",
   qualification: "",
   role: "employee",
-  department: "",
+  departmentId: "",
   basicPay: "",
   password: "",
   confirmPassword: "",
@@ -206,13 +206,13 @@ const Add = () => {
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <label htmlFor="department" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <label htmlFor="departmentId" className="mb-1.5 block text-sm font-medium text-slate-700">
                     Department
                   </label>
                   <select
-                    id="department"
-                    name="department"
-                    value={form.department}
+                    id="departmentId"
+                    name="departmentId"
+                    value={form.departmentId}
                     onChange={updateField}
                     required
                     disabled={departmentsLoading}
@@ -222,7 +222,7 @@ const Add = () => {
                       {departmentsLoading ? "Loading..." : "Select department"}
                     </option>
                     {departments.map((department) => (
-                      <option key={department.id} value={department.name}>
+                      <option key={department.id} value={department.id}>
                         {department.name}
                       </option>
                     ))}

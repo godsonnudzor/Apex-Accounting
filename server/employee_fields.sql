@@ -7,8 +7,10 @@ create table if not exists public.employees (
   first_name varchar(100) not null,
   last_name varchar(100) not null,
   date_of_birth date not null,
-  sex varchar(30) not null check (sex in ('female', 'male', 'other', 'prefer_not_to_say')),
+  sex varchar(30) not null check (sex in ('female', 'male')),
   qualification varchar(200),
+  department_id bigint references public.departments(id) on delete set null,
+  -- Kept for compatibility with existing employee rows; use department_id for new data.
   department varchar(100),
   basic_pay numeric(14, 2) not null default 0 check (basic_pay >= 0),
   profile_image text,
@@ -17,6 +19,11 @@ create table if not exists public.employees (
 );
 
 create index if not exists employees_department_idx on public.employees (department);
+
+alter table public.employees
+  add column if not exists department_id bigint references public.departments(id) on delete set null;
+
+create index if not exists employees_department_id_idx on public.employees (department_id);
 
 alter table public.users
   add column if not exists first_name varchar(100),
