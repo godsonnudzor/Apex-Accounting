@@ -270,22 +270,22 @@ router.get("/api/employees", async (req, res) => {
 
     const employees = await sql`
       SELECT
-        users.id,
-        users.name,
-        users.email,
-        users.role,
-        employees.first_name,
-        employees.last_name,
-        employees.date_of_birth,
-        employees.sex,
-        employees.qualification,
-        employees.department,
-        employees.basic_pay,
-        employees.profile_image
-      FROM employees
-      INNER JOIN users ON users.id = employees.user_id
-      WHERE LOWER(users.role) = 'employee'
-      ORDER BY LOWER(users.name), users.id
+        public.users.id,
+        public.users.name,
+        public.users.email,
+        public.users.role,
+        public.employees.first_name,
+        public.employees.last_name,
+        public.employees.date_of_birth,
+        public.employees.sex,
+        public.employees.qualification,
+        public.employees.department,
+        public.employees.basic_pay,
+        public.employees.profile_image
+      FROM public.employees
+      INNER JOIN public.users ON public.users.id = public.employees.user_id
+      WHERE LOWER(public.users.role) = 'employee'
+      ORDER BY LOWER(public.users.name), public.users.id
     `;
 
     return res.json({ employees });
