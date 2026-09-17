@@ -61,7 +61,7 @@ function AuthProvider({ children }) {
   };
 
   const getPermissions = (employee = user) => {
-    if (String(employee?.role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, salaries: true, leaveManagement: true, reports: true };
+    if (String(employee?.role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, taxBrackets: true, taxJurisdictions: true, userScenarios: true, salaries: true, leaveManagement: true, reports: true };
     const permissions = employee?.permissions || {};
     return {
       dashboard: asBoolean(permissions.dashboard, true),
@@ -70,6 +70,9 @@ function AuthProvider({ children }) {
       payroll: asBoolean(permissions.payroll),
       departments: asBoolean(permissions.departments),
       employeeManagement: asBoolean(permissions.employeeManagement ?? permissions.employee_management),
+      taxBrackets: asBoolean(permissions.taxBrackets ?? permissions.tax_brackets),
+      taxJurisdictions: asBoolean(permissions.taxJurisdictions ?? permissions.tax_jurisdictions),
+      userScenarios: asBoolean(permissions.userScenarios ?? permissions.user_scenarios),
       salaries: asBoolean(permissions.salaries),
       leaveManagement: asBoolean(permissions.leaveManagement ?? permissions.leave_management),
       reports: asBoolean(permissions.reports),

@@ -45,10 +45,10 @@ const hasUserPermission = async (user) => {
 };
 
 const readPermissions = async (userId, role) => {
-  if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, salaries: true, leaveManagement: true, reports: true };
+  if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, taxBrackets: true, taxJurisdictions: true, userScenarios: true, salaries: true, leaveManagement: true, reports: true };
   const { data, error } = await supabase
     .from("employee_permissions")
-    .select("dashboard, write_cheque, bills, payroll, employee_management, departments, salaries, leave_management, reports")
+    .select("dashboard, write_cheque, bills, payroll, employee_management, tax_brackets, tax_jurisdictions, user_scenarios, departments, salaries, leave_management, reports")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) {
@@ -60,6 +60,9 @@ const readPermissions = async (userId, role) => {
     bills: data?.bills ?? false,
     payroll: data?.payroll ?? false,
     employeeManagement: data?.employee_management ?? false,
+    taxBrackets: data?.tax_brackets ?? false,
+    taxJurisdictions: data?.tax_jurisdictions ?? false,
+    userScenarios: data?.user_scenarios ?? false,
     departments: data?.departments ?? false,
     salaries: data?.salaries ?? false,
     leaveManagement: data?.leave_management ?? false,
@@ -535,6 +538,9 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
       salaries = false,
       leaveManagement = false,
       employeeManagement = false,
+      taxBrackets = false,
+      taxJurisdictions = false,
+      userScenarios = false,
       reports = false,
       
     } = req.body;
@@ -551,6 +557,9 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         salaries,
         leave_management: leaveManagement,
         employee_management: employeeManagement,
+        tax_brackets: taxBrackets,
+        tax_jurisdictions: taxJurisdictions,
+        user_scenarios: userScenarios,
         reports,
         updated_at: new Date().toISOString(),
       })
@@ -572,6 +581,9 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         salaries: data.salaries,
         leaveManagement: data.leave_management,
         employeeManagement: data.employee_management,
+        taxBrackets: data.tax_brackets,
+        taxJurisdictions: data.tax_jurisdictions,
+        userScenarios: data.user_scenarios,
       },
     });
   } catch {

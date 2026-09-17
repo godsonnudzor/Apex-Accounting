@@ -35,6 +35,21 @@ const permissionLabels = [
     description: "Manage employee information and records",
   },
   {
+    key: "taxBrackets",
+    label: "Tax Brackets",
+    description: "Manage tax bracket calculations",
+  },
+  {
+    key: "taxJurisdictions",
+    label: "Tax Jurisdictions",
+    description: "Manage tax jurisdictions",
+  },
+  {
+    key: "userScenarios",
+    label: "User Scenarios",
+    description: "Manage saved user tax scenarios",
+  },
+  {
     key: "salaries",
     label: "Salaries",
     description: "Manage employee salary records",
@@ -53,6 +68,9 @@ const defaults = {
   payroll: false,
   departments: false,
   employeeManagement: false,
+  taxBrackets: false,
+  taxJurisdictions: false,
+  userScenarios: false,
   salaries: false,
   leaveManagement: false,
   reports: false,
