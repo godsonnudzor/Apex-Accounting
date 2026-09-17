@@ -1,5 +1,7 @@
 -- Run this once in the Supabase SQL Editor.
 -- Employee accounts stay in users; employee profile data lives in employees.
+alter type public.roles add value if not exists 'employee';
+
 create table if not exists public.employees (
   user_id bigint primary key references public.users(id) on delete cascade,
   first_name varchar(100) not null,
