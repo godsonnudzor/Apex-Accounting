@@ -181,7 +181,7 @@ router.post("/api/signup", async (req, res) => {
       return res.status(409).json({ message: "An account with this email already exists" });
     }
 
-    const result = await createUser({ name, email, password, role: "employee" });
+    const result = await createUser({ name, email, password, role: "user" });
     if (!result.success) {
       return res.status(500).json({ message: "Unable to create account" });
     }
@@ -320,14 +320,14 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
     const sex = String(req.body?.sex || "").trim().toLowerCase();
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const role = String(req.body?.role || "employee").trim().toLowerCase();
+    const role = String(req.body?.role || "user").trim().toLowerCase();
     const departmentId = Number(req.body?.departmentId);
     const basicPay = Number(req.body?.basicPay);
 
     if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isInteger(departmentId) || !Number.isFinite(basicPay)) {
       return res.status(400).json({ message: "First name, last name, date of birth, sex, department, email, password, and basic pay are required" });
     }
-    if (!["employee", "admin", "user", "public"].includes(role)) return res.status(400).json({ message: "Invalid role" });
+    if (!["admin", "user", "public"].includes(role)) return res.status(400).json({ message: "Invalid role. Use admin, user, or public." });
     if (!["female", "male", "other", "prefer_not_to_say"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
 
     const { data: department, error: departmentError } = await supabase

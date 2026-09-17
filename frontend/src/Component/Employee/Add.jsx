@@ -9,7 +9,7 @@ const initialForm = {
   sex: "",
   email: "",
   qualification: "",
-  role: "employee",
+  role: "user",
   departmentId: "",
   basicPay: "",
   password: "",
@@ -260,7 +260,6 @@ const Add = () => {
                     onChange={updateField}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                   >
-                    <option value="employee">Employee</option>
                     <option value="admin">Admin</option>
                     <option value="user">User</option>
                     <option value="public">Public</option>
