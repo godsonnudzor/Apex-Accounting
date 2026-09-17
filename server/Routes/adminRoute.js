@@ -382,7 +382,12 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
     return res.status(201).json({ employee: { ...employee, email: user.email, role: user.role, name: user.name } });
   } catch (error) {
     console.error("Employee creation error:", error);
-    return res.status(500).json({ message: "Unable to add employee" });
+    const message = error?.code === "22P02"
+      ? "The selected role is not available in the users table. Apply the employee role migration."
+      : error?.code === "23503"
+      ? "The selected department is not available. Refresh departments and try again."
+      : error?.message || "Unable to add employee";
+    return res.status(500).json({ message });
   }
 });
 
