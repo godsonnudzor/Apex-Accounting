@@ -260,6 +260,8 @@ const Add = () => {
                   >
                     <option value="employee">Employee</option>
                     <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="public">Public</option>
                   </select>
                 </div>
               </div>

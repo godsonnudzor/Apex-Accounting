@@ -284,7 +284,6 @@ router.get("/api/employees", async (req, res) => {
         public.employees.profile_image
       FROM public.employees
       INNER JOIN public.users ON public.users.id = public.employees.user_id
-      WHERE LOWER(public.users.role) = 'employee'
       ORDER BY LOWER(public.users.name), public.users.id
     `;
 
@@ -317,8 +316,8 @@ router.post("/api/employees", async (req, res) => {
     if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isFinite(basicPay)) {
       return res.status(400).json({ message: "First name, last name, date of birth, sex, email, password, and basic pay are required" });
     }
-    if (!["employee", "admin"].includes(role)) return res.status(400).json({ message: "Invalid role" });
-    if (!["female", "male", "other", "prefer_not_to_say"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
+    if (!["employee", "admin", "user", "public"].includes(role)) return res.status(400).json({ message: "Invalid role" });
+    if (!["female", "male"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
 
     const { data: existingUser, error: lookupError } = await supabase
       .from("users")
