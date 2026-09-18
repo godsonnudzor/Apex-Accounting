@@ -278,7 +278,7 @@ router.get("/api/employees", async (req, res) => {
 
     const { data: employeeRows, error: employeeError } = await supabase
       .from("employees")
-      .select("user_id, first_name, last_name, date_of_birth, sex, qualification, department_id, basic_pay, profile_image, users!inner(id, name, email, role), departments(name)")
+      .select("user_id, first_name, last_name, date_of_birth, sex, qualification, tin_no, ssni_no, position, department_id, basic_pay, allowance, bank_name, account_name, profile_image, users!inner(id, name, email, role), departments(name)")
       .order("first_name", { ascending: true });
 
     if (employeeError) throw employeeError;
@@ -293,9 +293,15 @@ router.get("/api/employees", async (req, res) => {
       date_of_birth: employee.date_of_birth,
       sex: employee.sex,
       qualification: employee.qualification,
+      tin_no: employee.tin_no,
+      ssni_no: employee.ssni_no,
+      position: employee.position,
       department_id: employee.department_id,
       department: employee.departments?.name || null,
       basic_pay: employee.basic_pay,
+      allowance: employee.allowance,
+      bank_name: employee.bank_name,
+      account_name: employee.account_name,
       profile_image: employee.profile_image,
     }));
 
@@ -323,10 +329,12 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
     const role = String(req.body?.role || "user").trim().toLowerCase();
     const departmentId = Number(req.body?.departmentId);
     const basicPay = Number(req.body?.basicPay);
+    const allowance = Number(req.body?.allowance || 0);
 
-    if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isInteger(departmentId) || !Number.isFinite(basicPay)) {
+    if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isInteger(departmentId) || !Number.isFinite(basicPay) || !Number.isFinite(allowance)) {
       return res.status(400).json({ message: "First name, last name, date of birth, sex, department, email, password, and basic pay are required" });
     }
+    if (basicPay < 0 || allowance < 0) return res.status(400).json({ message: "Basic pay and allowance cannot be negative" });
     if (!["admin", "user", "public"].includes(role)) return res.status(400).json({ message: "Invalid role. Use admin, user, or public." });
     if (!["female", "male", "other", "prefer_not_to_say"].includes(sex)) return res.status(400).json({ message: "Invalid sex" });
 
@@ -371,8 +379,14 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
         date_of_birth: dateOfBirth,
         sex,
         qualification: req.body?.qualification?.trim() || null,
+        tin_no: req.body?.tinNo?.trim() || null,
+        ssni_no: req.body?.ssniNo?.trim() || null,
+        position: req.body?.position?.trim() || null,
         department_id: departmentId,
         basic_pay: basicPay,
+        allowance,
+        bank_name: req.body?.bankName?.trim() || null,
+        account_name: req.body?.accountName?.trim() || null,
         profile_image: req.file?.originalname || null,
       })
       .select()

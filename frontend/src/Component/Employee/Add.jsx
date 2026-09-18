@@ -9,9 +9,15 @@ const initialForm = {
   sex: "",
   email: "",
   qualification: "",
+  tinNo: "",
+  ssniNo: "",
+  position: "",
   role: "user",
   departmentId: "",
   basicPay: "",
+  allowance: "",
+  bankName: "",
+  accountName: "",
   password: "",
   confirmPassword: "",
 };
@@ -173,7 +179,13 @@ const Add = () => {
                   ["dateOfBirth", "Date of birth", "date"],
                   ["email", "Email address", "email"],
                   ["qualification", "Qualification", "text"],
+                  ["position", "Position", "text"],
+                  ["tinNo", "TIN No", "text"],
+                  ["ssniNo", "SSNI No", "text"],
+                  ["bankName", "Bank name", "text"],
+                  ["accountName", "Account name", "text"],
                   ["basicPay", "Basic pay", "number"],
+                  ["allowance", "Allowance", "number"],
                 ].map(([name, label, type]) => (
                   <div key={name}>
                     <label
@@ -183,13 +195,13 @@ const Add = () => {
                       {label}
                     </label>
 
-                    <input
+                      <input
                       id={name}
                       name={name}
                       type={type}
                       value={form[name]}
                       onChange={updateField}
-                      required={!["qualification"].includes(name)}
+                        required={!["qualification", "position", "tinNo", "ssniNo", "bankName", "accountName", "allowance"].includes(name)}
                       min={type === "number" ? "0" : undefined}
                       step={type === "number" ? "0.01" : undefined}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
