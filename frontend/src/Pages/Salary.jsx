@@ -10,6 +10,7 @@ const Salary = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
 
   useEffect(() => {
     fetch(getApiUrl("/api/employees"), { credentials: "include" })
@@ -69,14 +70,40 @@ const Salary = () => {
         {message && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">{message}</p>}
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{["Employee", "Gross", "PAYE", "SSNIT employee", "Tier 2 employee", "Net pay", "SSNIT employer", "Tier 2 employer", "Employer cost"].map((heading) => <th className="border-b border-slate-200 px-4 py-3" key={heading}>{heading}</th>)}</tr></thead>
-            <tbody>{entries.length ? entries.map((entry) => { const employee = employees.find((item) => item.id === entry.employeeId); return <tr className="hover:bg-slate-50" key={entry.employeeId}><td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">{employee?.name || "Unnamed employee"}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.grossPay)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.paye)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.ssnitEmployee)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.tier2Employee)}</td><td className="border-b border-slate-100 px-4 py-4 font-semibold text-teal-700">{formatCurrency(entry.netPay)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.ssnitEmployer)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.tier2Employer)}</td><td className="border-b border-slate-100 px-4 py-4 font-semibold">{formatCurrency(entry.employerCost)}</td></tr>; }) : <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="9">No employees available for payroll.</td></tr>}</tbody>
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{["Employee", "Gross", "PAYE", "SSNIT employee", "Tier 2 employee", "Net pay", "SSNIT employer", "Tier 2 employer", "Employer cost", "Payslip"].map((heading) => <th className="border-b border-slate-200 px-4 py-3" key={heading}>{heading}</th>)}</tr></thead>
+            <tbody>{entries.length ? entries.map((entry) => { const employee = employees.find((item) => item.id === entry.employeeId); return <tr className="hover:bg-slate-50" key={entry.employeeId}><td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">{employee?.name || "Unnamed employee"}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.grossPay)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.paye)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.ssnitEmployee)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.tier2Employee)}</td><td className="border-b border-slate-100 px-4 py-4 font-semibold text-teal-700">{formatCurrency(entry.netPay)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.ssnitEmployer)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.tier2Employer)}</td><td className="border-b border-slate-100 px-4 py-4 font-semibold">{formatCurrency(entry.employerCost)}</td><td className="border-b border-slate-100 px-4 py-4"><button className="font-semibold text-teal-700 hover:text-teal-900" onClick={() => setSelectedPayslip({ employee, entry })}>View payslip</button></td></tr>; }) : <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="10">No employees available for payroll.</td></tr>}</tbody>
           </table>
         </div>
         <p className="mt-4 text-xs text-slate-500">Rates used: employee SSNIT 5.5%, employer SSNIT 13%, employer Tier 2 5%. PAYE uses the Ghana monthly bracket library. Tier 2 employee rate is configurable and currently 0%.</p>
       </div>
+
+      {selectedPayslip && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-4 print:static print:overflow-visible print:bg-white print:p-0" role="dialog" aria-modal="true" aria-label="Employee payslip">
+          <article className="mx-auto my-8 max-w-2xl bg-white p-6 shadow-2xl print:my-0 print:max-w-none print:p-8 print:shadow-none">
+            <div className="mb-8 flex items-start justify-between border-b border-slate-200 pb-5">
+              <div><p className="text-sm font-semibold uppercase tracking-wider text-teal-600">Apex ERP</p><h2 className="mt-1 text-2xl font-bold text-slate-900">Employee payslip</h2><p className="mt-1 text-sm text-slate-500">{periodStart} to {periodEnd}</p></div>
+              <div className="flex gap-2 print:hidden"><button className="rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700" onClick={() => setSelectedPayslip(null)}>Close</button><button className="rounded bg-teal-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => window.print()}>Print</button></div>
+            </div>
+            <div className="mb-6 grid gap-4 border-b border-slate-200 pb-6 sm:grid-cols-2">
+              <div><p className="text-xs uppercase tracking-wide text-slate-500">Employee</p><p className="mt-1 font-semibold text-slate-900">{selectedPayslip.employee?.name || "Unnamed employee"}</p><p className="text-sm text-slate-600">{selectedPayslip.employee?.position || "Employee"}</p><p className="text-sm text-slate-600">{selectedPayslip.employee?.email || ""}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-slate-500">Payment details</p><p className="mt-1 text-sm text-slate-700">Bank: {selectedPayslip.employee?.bank_name || "Not provided"}</p><p className="text-sm text-slate-700">Account: {selectedPayslip.employee?.account_name || "Not provided"}</p><p className="text-sm text-slate-700">TIN: {selectedPayslip.employee?.tin_no || "Not provided"}</p></div>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <section><h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Earnings</h3><PayslipLine label="Basic pay" value={selectedPayslip.entry.basicPay} /><PayslipLine label="Allowance" value={selectedPayslip.entry.allowance} /><PayslipLine label="Gross pay" value={selectedPayslip.entry.grossPay} strong /></section>
+              <section><h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Employee deductions</h3><PayslipLine label="PAYE" value={selectedPayslip.entry.paye} /><PayslipLine label="SSNIT (5.5%)" value={selectedPayslip.entry.ssnitEmployee} /><PayslipLine label="Tier 2" value={selectedPayslip.entry.tier2Employee} /><PayslipLine label="Total deductions" value={selectedPayslip.entry.totalEmployeeDeductions} strong /></section>
+            </div>
+            <div className="mt-6 border-t-2 border-slate-900 pt-4"><PayslipLine label="Net pay" value={selectedPayslip.entry.netPay} strong large /></div>
+            <div className="mt-8 border-t border-slate-200 pt-5"><h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Employer contributions</h3><div className="grid gap-2 sm:grid-cols-3"><PayslipLine label="SSNIT (13%)" value={selectedPayslip.entry.ssnitEmployer} /><PayslipLine label="Tier 2 (5%)" value={selectedPayslip.entry.tier2Employer} /><PayslipLine label="Total employer cost" value={selectedPayslip.entry.employerCost} strong /></div></div>
+            <p className="mt-8 text-xs text-slate-400">Generated by Apex ERP. Currency: GHS.</p>
+          </article>
+        </div>
+      )}
     </main>
   );
 };
+
+function PayslipLine({ label, value, strong = false, large = false }) {
+  return <div className={`flex justify-between gap-4 py-1.5 ${strong ? "font-bold text-slate-900" : "text-slate-600"} ${large ? "text-xl" : "text-sm"}`}><span>{label}</span><span>{formatCurrency(value)}</span></div>;
+}
 
 export default Salary;
