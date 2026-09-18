@@ -313,6 +313,67 @@ router.get("/api/employees", async (req, res) => {
   }
 });
 
+router.post("/api/payroll/runs", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser) return res.status(401).json({ message: "Authentication required" });
+    if (String(currentUser.role).toLowerCase() !== "admin") {
+      const { data: permissions, error: permissionError } = await supabase
+        .from("employee_permissions")
+        .select("salaries")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+      if (permissionError) throw permissionError;
+      if (permissions?.salaries !== true) return res.status(403).json({ message: "Salary permission required" });
+    }
+
+    const { periodStart, periodEnd, rates, totals, entries } = req.body || {};
+    if (!periodStart || !periodEnd || !Array.isArray(entries) || !entries.length) {
+      return res.status(400).json({ message: "Payroll period and at least one employee are required" });
+    }
+
+    const { data: run, error: runError } = await supabase.from("payroll_runs").insert({
+      period_start: periodStart,
+      period_end: periodEnd,
+      created_by: currentUser.id,
+      ssnit_employee_rate: rates?.ssnitEmployee ?? 0.055,
+      tier2_employee_rate: rates?.tier2Employee ?? 0,
+      ssnit_employer_rate: rates?.ssnitEmployer ?? 0.13,
+      tier2_employer_rate: rates?.tier2Employer ?? 0.05,
+      total_gross: totals?.gross ?? 0,
+      total_paye: totals?.paye ?? 0,
+      total_employee_deductions: totals?.deductions ?? 0,
+      total_net: totals?.net ?? 0,
+      total_employer_contributions: totals?.employerContributions ?? 0,
+      total_employer_cost: totals?.employerCost ?? 0,
+    }).select("id").single();
+    if (runError) throw runError;
+
+    const rows = entries.map((entry) => ({
+      payroll_run_id: run.id,
+      employee_id: entry.employeeId,
+      basic_pay: entry.basicPay,
+      allowance: entry.allowance,
+      gross_pay: entry.grossPay,
+      ssnit_employee: entry.ssnitEmployee,
+      tier2_employee: entry.tier2Employee,
+      paye: entry.paye,
+      total_employee_deductions: entry.totalEmployeeDeductions,
+      net_pay: entry.netPay,
+      ssnit_employer: entry.ssnitEmployer,
+      tier2_employer: entry.tier2Employer,
+      total_employer_contributions: entry.totalEmployerContributions,
+      employer_cost: entry.employerCost,
+    }));
+    const { error: entriesError } = await supabase.from("payroll_entries").insert(rows);
+    if (entriesError) throw entriesError;
+    return res.status(201).json({ runId: run.id });
+  } catch (error) {
+    console.error("Payroll run creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to save payroll run" });
+  }
+});
+
 router.post("/api/employees", upload.single("profile_image"), async (req, res) => {
   try {
     const currentUser = authenticate(req);
