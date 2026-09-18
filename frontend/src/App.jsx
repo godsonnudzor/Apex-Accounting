@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import Login from "./Pages/Login";
 import SignUp from "./Pages/Signup";
 import Deshboard from "./Pages/Deshboard";
-import EmployeeDashboard from "./Pages/EmployeeDashboard";
+import EmployeeCenter from "./Pages/EmployeeCenter";
 import Bill from "./Pages/Bill";
 import WriteCheque from "./Pages/WriteCheque";
 import AuthProvider from "./context/authContext";
@@ -78,7 +78,7 @@ function PermissionRoute({ permission, children }) {
 function EmployeeDashboardRoute() {
   return (
     <PermissionRoute permission="dashboard">
-      <EmployeeDashboard />
+      <EmployeeCenter />
     </PermissionRoute>
   );
 }
@@ -132,6 +132,7 @@ const router = createBrowserRouter([
     ),
   },
   { path: "/EmployeeDashboard", element: <EmployeeDashboardRoute /> },
+  { path: "/employee-center", element: <EmployeeDashboardRoute /> },
   {
     path: "/bill",
     element: (
