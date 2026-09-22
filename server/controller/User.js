@@ -87,15 +87,14 @@ async function loginUser(email, password) {
 async function getAllEmployees() {
   try {
     const { data, error } = await supabase
-      .from("users")
-      .select("id, name, email, role, profile_image")
-      .eq("role", "employee");
+      .from("employees")
+      .select("user_id, users!inner(id, name, email, role, profile_image)");
 
     if (error) {
       console.log("error", error);
       return { success: false, error };
     } else {
-      return { success: true, data };
+      return { success: true, data: (data || []).map(({ users }) => users) };
     }
   } catch (error) {
     console.log("Fetch employees error:", error);
@@ -107,9 +106,8 @@ async function getDashboardSummary() {
   try {
     // Total Employees
     const { count: totalEmployees, error: empError } = await supabase
-      .from("users")
+      .from("employees")
       .select("*", { count: "exact", head: true })
-      .eq("role", "employee");
 
     if (empError) throw empError;
 

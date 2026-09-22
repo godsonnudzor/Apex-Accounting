@@ -387,7 +387,7 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
     const sex = String(req.body?.sex || "").trim().toLowerCase();
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const role = String(req.body?.role || "employee").trim().toLowerCase();
+    const role = "user";
     const departmentId = Number(req.body?.departmentId);
     const basicPay = Number(req.body?.basicPay);
     const allowance = Number(req.body?.allowance || 0);
@@ -396,7 +396,6 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
       return res.status(400).json({ message: "First name, last name, date of birth, sex, department, email, password, and basic pay are required" });
     }
     if (basicPay < 0 || allowance < 0) return res.status(400).json({ message: "Basic pay and allowance cannot be negative" });
-    if (!["admin", "user", "public", "employee"].includes(role)) return res.status(400).json({ message: "Invalid role. Use admin, user, public, or employee." });
     if (!["female", "male"].includes(sex)) return res.status(400).json({ message: "Invalid sex. Use female or male." });
 
     const { data: department, error: departmentError } = await supabase
@@ -458,7 +457,7 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
   } catch (error) {
     console.error("Employee creation error:", error);
     const message = error?.code === "22P02"
-      ? "The selected role is not available in the users table. Apply the employee role migration."
+      ? "The employee account could not be created because the users table role is invalid."
       : error?.code === "23503"
       ? "The selected department is not available. Refresh departments and try again."
       : error?.message || "Unable to add employee";

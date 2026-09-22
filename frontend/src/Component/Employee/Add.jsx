@@ -12,7 +12,6 @@ const initialForm = {
   tinNo: "",
   ssniNo: "",
   position: "",
-  role: "employee",
   departmentId: "",
   basicPay: "",
   allowance: "",
@@ -260,24 +259,6 @@ const Add = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label htmlFor="role" className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Role
-                  </label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={form.role}
-                    onChange={updateField}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="user">User</option>
-                    <option value="public">Public</option>
-                    <option value="employee">Employee</option>
-                    
-                  </select>
-                </div>
               </div>
             </section>
 
