@@ -3,7 +3,7 @@ import { calculateTax } from "./taxCalculator";
 export const GHANA_PAYROLL_RATES = {
   ssnitEmployee: 0.055,
   tier2Employee: 0,
-  ssnitEmployer: 0.13,
+  ssnitEmployer: 0.08,
   tier2Employer: 0.05,
 };
 
@@ -37,7 +37,9 @@ export function calculateGhanaPayroll(employee, rates = GHANA_PAYROLL_RATES) {
   const netPay = money(grossPay - totalEmployeeDeductions);
   const ssnitEmployer = money(basicPay * rates.ssnitEmployer);
   const tier2Employer = money(basicPay * rates.tier2Employer);
+  const totalSsnitContribution = money(ssnitEmployee + ssnitEmployer);
   const totalEmployerContributions = money(ssnitEmployer + tier2Employer);
+  const totalStatutoryContributions = money(totalSsnitContribution + tier2Employer);
 
   return {
     employeeId: employee.id,
@@ -51,7 +53,9 @@ export function calculateGhanaPayroll(employee, rates = GHANA_PAYROLL_RATES) {
     netPay,
     ssnitEmployer,
     tier2Employer,
+    totalSsnitContribution,
     totalEmployerContributions,
+    totalStatutoryContributions,
     employerCost: money(grossPay + totalEmployerContributions),
   };
 }

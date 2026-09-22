@@ -340,7 +340,7 @@ router.post("/api/payroll/runs", async (req, res) => {
       created_by: currentUser.id,
       ssnit_employee_rate: rates?.ssnitEmployee ?? 0.055,
       tier2_employee_rate: rates?.tier2Employee ?? 0,
-      ssnit_employer_rate: rates?.ssnitEmployer ?? 0.13,
+      ssnit_employer_rate: rates?.ssnitEmployer ?? 0.08,
       tier2_employer_rate: rates?.tier2Employer ?? 0.05,
       total_gross: totals?.gross ?? 0,
       total_paye: totals?.paye ?? 0,
