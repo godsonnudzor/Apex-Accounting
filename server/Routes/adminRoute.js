@@ -372,7 +372,10 @@ router.post("/api/payroll/runs", async (req, res) => {
     return res.status(201).json({ runId: run.id });
   } catch (error) {
     console.error("Payroll run creation error:", error);
-    return res.status(500).json({ message: error?.message || "Unable to save payroll run" });
+    const message = error?.code === "23503"
+      ? "Payroll employee records are not linked correctly. Apply the payroll employee ID migration in Supabase."
+      : error?.message || "Unable to save payroll run";
+    return res.status(500).json({ message });
   }
 });
 
