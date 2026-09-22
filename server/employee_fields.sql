@@ -12,6 +12,12 @@ create table if not exists public.employees (
   -- Kept for compatibility with existing employee rows; use department_id for new data.
   department varchar(100),
   basic_pay numeric(14, 2) not null default 0 check (basic_pay >= 0),
+  tin_no varchar(100),
+  ssni_no varchar(100),
+  position varchar(150),
+  allowance numeric(14, 2) not null default 0 check (allowance >= 0),
+  bank_name varchar(150),
+  account_name varchar(150),
   profile_image text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
