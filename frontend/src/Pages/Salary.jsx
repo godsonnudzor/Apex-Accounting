@@ -111,7 +111,7 @@ const Salary = () => {
 
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-7xl print:hidden">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-teal-600">
