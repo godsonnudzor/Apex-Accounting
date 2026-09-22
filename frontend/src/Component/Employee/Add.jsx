@@ -17,6 +17,7 @@ const initialForm = {
   allowance: "",
   bankName: "",
   accountName: "",
+  accountType: "software_user",
   password: "",
   confirmPassword: "",
 };
@@ -90,7 +91,7 @@ const Add = () => {
     event.preventDefault();
     setError("");
 
-    if (form.password !== form.confirmPassword) {
+    if (form.accountType === "software_user" && form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
@@ -176,7 +177,6 @@ const Add = () => {
                   ["firstName", "First name", "text"],
                   ["lastName", "Last name", "text"],
                   ["dateOfBirth", "Date of birth", "date"],
-                  ["email", "Email address", "email"],
                   ["qualification", "Qualification", "text"],
                   ["position", "Position", "text"],
                   ["tinNo", "TIN No", "text"],
@@ -215,7 +215,22 @@ const Add = () => {
                 Work details
               </h3>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <label htmlFor="accountType" className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Employee access
+                  </label>
+                  <select
+                    id="accountType"
+                    name="accountType"
+                    value={form.accountType}
+                    onChange={updateField}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  >
+                    <option value="software_user">Software user</option>
+                    <option value="payroll_only">Payroll only</option>
+                  </select>
+                </div>
                 <div>
                   <label htmlFor="departmentId" className="mb-1.5 block text-sm font-medium text-slate-700">
                     Department
@@ -291,39 +306,58 @@ const Add = () => {
                   )}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Password
-                    </label>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      value={form.password}
-                      onChange={updateField}
-                      required
-                      minLength="6"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                    />
+                {form.accountType === "software_user" ? (
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Email address
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={form.email}
+                        onChange={updateField}
+                        required
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Password
+                      </label>
+                      <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        value={form.password}
+                        onChange={updateField}
+                        required
+                        minLength="6"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Confirm password
+                      </label>
+                      <input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        value={form.confirmPassword}
+                        onChange={updateField}
+                        required
+                        minLength="6"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                      />
+                    </div>
                   </div>
-
-                  <div>
-                    <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Confirm password
-                    </label>
-                    <input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      value={form.confirmPassword}
-                      onChange={updateField}
-                      required
-                      minLength="6"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                    />
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    This employee will be available for payroll but will not have a software login.
                   </div>
-                </div>
+                )}
               </div>
             </section>
 

@@ -88,13 +88,23 @@ async function getAllEmployees() {
   try {
     const { data, error } = await supabase
       .from("employees")
-      .select("user_id, users!inner(id, name, email, role, profile_image)");
+      .select("id, user_id, first_name, last_name, users(id, name, email, role, profile_image)");
 
     if (error) {
       console.log("error", error);
       return { success: false, error };
     } else {
-      return { success: true, data: (data || []).map(({ users }) => users) };
+      return {
+        success: true,
+        data: (data || []).map(({ id, user_id, first_name, last_name, users }) => ({
+          id,
+          user_id,
+          name: users?.name || `${first_name} ${last_name}`.trim(),
+          email: users?.email || null,
+          role: users?.role || null,
+          profile_image: users?.profile_image || null,
+        })),
+      };
     }
   } catch (error) {
     console.log("Fetch employees error:", error);

@@ -36,7 +36,7 @@ const Employees = () => {
     const query = search.trim().toLowerCase();
     if (!query) return employees;
     return employees.filter((employee) =>
-      [employee.name, employee.email, employee.role]
+      [employee.name, employee.email, employee.role, employee.account_type]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query)),
     );
@@ -71,7 +71,7 @@ const Employees = () => {
           <tr className="bg-slate-50 text-left text-sm text-slate-600">
             <th className="border-b border-slate-200 px-4 py-3">Name</th>
             <th className="border-b border-slate-200 px-4 py-3">Email</th>
-            <th className="border-b border-slate-200 px-4 py-3">Role</th>
+            <th className="border-b border-slate-200 px-4 py-3">Account</th>
           </tr>
         </thead>
 
@@ -83,7 +83,7 @@ const Employees = () => {
               <tr key={employee.id} className="hover:bg-slate-50">
                 <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">{employee.name || "Unnamed employee"}</td>
                 <td className="border-b border-slate-100 px-4 py-4 text-slate-600">{employee.email}</td>
-                <td className="border-b border-slate-100 px-4 py-4 capitalize text-slate-600">{employee.role}</td>
+                <td className="border-b border-slate-100 px-4 py-4 capitalize text-slate-600">{employee.account_type === "payroll_only" ? "Payroll only" : "Software user"}</td>
               </tr>
             ))
           ) : (

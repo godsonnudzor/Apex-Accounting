@@ -278,16 +278,18 @@ router.get("/api/employees", async (req, res) => {
 
     const { data: employeeRows, error: employeeError } = await supabase
       .from("employees")
-      .select("user_id, first_name, last_name, date_of_birth, sex, qualification, tin_no, ssni_no, position, department_id, basic_pay, allowance, bank_name, account_name, profile_image, users!inner(id, name, email, role), departments(name)")
+      .select("id, user_id, first_name, last_name, date_of_birth, sex, qualification, tin_no, ssni_no, position, department_id, basic_pay, allowance, bank_name, account_name, profile_image, users(id, name, email, role), departments(name)")
       .order("first_name", { ascending: true });
 
     if (employeeError) throw employeeError;
 
     const employees = (employeeRows || []).map((employee) => ({
-      id: employee.users.id,
-      name: employee.users.name,
-      email: employee.users.email,
-      role: employee.users.role,
+      id: employee.id,
+      user_id: employee.user_id,
+      name: employee.users?.name || `${employee.first_name} ${employee.last_name}`.trim(),
+      email: employee.users?.email || null,
+      role: employee.users?.role || null,
+      account_type: employee.user_id ? "software_user" : "payroll_only",
       first_name: employee.first_name,
       last_name: employee.last_name,
       date_of_birth: employee.date_of_birth,
@@ -388,15 +390,18 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const role = "user";
+    const accountType = String(req.body?.accountType || "software_user").trim().toLowerCase();
     const departmentId = Number(req.body?.departmentId);
     const basicPay = Number(req.body?.basicPay);
     const allowance = Number(req.body?.allowance || 0);
 
-    if (!firstName || !lastName || !dateOfBirth || !sex || !email || !password || !Number.isInteger(departmentId) || !Number.isFinite(basicPay) || !Number.isFinite(allowance)) {
-      return res.status(400).json({ message: "First name, last name, date of birth, sex, department, email, password, and basic pay are required" });
+    if (!firstName || !lastName || !dateOfBirth || !sex || !Number.isInteger(departmentId) || !Number.isFinite(basicPay) || !Number.isFinite(allowance)) {
+      return res.status(400).json({ message: "First name, last name, date of birth, sex, department, and basic pay are required" });
     }
     if (basicPay < 0 || allowance < 0) return res.status(400).json({ message: "Basic pay and allowance cannot be negative" });
     if (!["female", "male"].includes(sex)) return res.status(400).json({ message: "Invalid sex. Use female or male." });
+    if (!["software_user", "payroll_only"].includes(accountType)) return res.status(400).json({ message: "Invalid employee account type" });
+    if (accountType === "software_user" && (!email || !password)) return res.status(400).json({ message: "Email and password are required for a software user" });
 
     const { data: department, error: departmentError } = await supabase
       .from("departments")
@@ -406,34 +411,36 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
     if (departmentError) throw departmentError;
     if (!department) return res.status(400).json({ message: "Selected department does not exist" });
 
-    const { data: existingUser, error: lookupError } = await supabase
-      .from("users")
-      .select("id")
-      .ilike("email", email)
-      .limit(1);
-    if (lookupError) throw lookupError;
-    if (existingUser?.length) return res.status(409).json({ message: "An account with this email already exists" });
+    let user = null;
+    if (accountType === "software_user") {
+      const { data: existingUser, error: lookupError } = await supabase
+        .from("users")
+        .select("id")
+        .ilike("email", email)
+        .limit(1);
+      if (lookupError) throw lookupError;
+      if (existingUser?.length) return res.status(409).json({ message: "An account with this email already exists" });
 
-    const result = await createUser({
-      ...req.body,
-      firstName,
-      lastName,
-      dateOfBirth,
-      sex,
-      email,
-      password,
-      role,
-      basicPay,
-    });
-    if (!result.success) throw result.error;
-
-    const user = result.data?.[0];
-    if (!user) throw new Error("Employee account was not created");
+      const result = await createUser({
+        ...req.body,
+        firstName,
+        lastName,
+        dateOfBirth,
+        sex,
+        email,
+        password,
+        role,
+        basicPay,
+      });
+      if (!result.success) throw result.error;
+      user = result.data?.[0];
+      if (!user) throw new Error("Employee account was not created");
+    }
 
     const { data: employee, error: employeeError } = await supabase
       .from("employees")
       .insert({
-        user_id: user.id,
+        user_id: user?.id || null,
         first_name: firstName,
         last_name: lastName,
         date_of_birth: dateOfBirth,
@@ -453,7 +460,7 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
       .single();
     if (employeeError) throw employeeError;
 
-    return res.status(201).json({ employee: { ...employee, email: user.email, role: user.role, name: user.name } });
+    return res.status(201).json({ employee: { ...employee, email: user?.email || null, role: user?.role || null, name: user?.name || `${firstName} ${lastName}`.trim(), account_type: accountType } });
   } catch (error) {
     console.error("Employee creation error:", error);
     const message = error?.code === "22P02"
