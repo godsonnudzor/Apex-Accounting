@@ -12,7 +12,7 @@ const initialForm = {
   tinNo: "",
   ssniNo: "",
   position: "",
-  role: "user",
+  role: "employee",
   departmentId: "",
   basicPay: "",
   allowance: "",
@@ -274,7 +274,7 @@ const Add = () => {
                     <option value="admin">Admin</option>
                     <option value="user">User</option>
                     <option value="public">Public</option>
-                     <option value="employee">Employee</option>
+                    <option value="employee">Employee</option>
                     
                   </select>
                 </div>
