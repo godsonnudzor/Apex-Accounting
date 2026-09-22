@@ -37,7 +37,7 @@ export function calculateGhanaPayroll(employee, rates = GHANA_PAYROLL_RATES) {
   const netPay = money(grossPay - totalEmployeeDeductions);
   const ssnitEmployer = money(basicPay * rates.ssnitEmployer);
   const tier2Employer = money(basicPay * rates.tier2Employer);
-  const totalEmployerContributions = money(ssnitEmployer + tier2Employer);
+  const totalEmployerContributions = money(ssnitEmployer );
 
   return {
     employeeId: employee.id,
