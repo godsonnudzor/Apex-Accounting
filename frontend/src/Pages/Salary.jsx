@@ -3,6 +3,17 @@ import { getApiUrl } from "../context/auth";
 import { formatCurrency } from "../utils/taxCalculator";
 import { calculateGhanaPayroll, calculatePayrollTotals, GHANA_PAYROLL_RATES } from "../utils/ghanaPayroll";
 
+const PAYROLL_COLUMNS = [
+  { key: "grossPay", label: "Gross", value: (entry) => entry.grossPay },
+  { key: "paye", label: "PAYE", value: (entry) => entry.paye },
+  { key: "ssnitEmployee", label: "SSNIT employee", value: (entry) => entry.ssnitEmployee },
+  { key: "tier2Employee", label: "Tier 2 employee", value: (entry) => entry.tier2Employee },
+  { key: "netPay", label: "Net pay", value: (entry) => entry.netPay, emphasis: true },
+  { key: "ssnitEmployer", label: "SSNIT employer", value: (entry) => entry.ssnitEmployer },
+  { key: "tier2Employer", label: "Tier 2 employer", value: (entry) => entry.tier2Employer },
+  { key: "employerCost", label: "Employer cost", value: (entry) => entry.employerCost, emphasis: true },
+];
+
 const Salary = () => {
   const [employees, setEmployees] = useState([]);
   const [periodStart, setPeriodStart] = useState("2026-09-01");
@@ -11,6 +22,10 @@ const Salary = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState(() =>
+    Object.fromEntries(PAYROLL_COLUMNS.map((column) => [column.key, true])),
+  );
 
   useEffect(() => {
     fetch(getApiUrl("/api/employees"), { credentials: "include" })
@@ -24,6 +39,11 @@ const Salary = () => {
 
   const entries = useMemo(() => employees.map((employee) => calculateGhanaPayroll(employee)), [employees]);
   const totals = useMemo(() => calculatePayrollTotals(entries), [entries]);
+  const activeColumns = PAYROLL_COLUMNS.filter((column) => visibleColumns[column.key]);
+
+  const toggleColumn = (key) => {
+    setVisibleColumns((current) => ({ ...current, [key]: !current[key] }));
+  };
 
   const savePayrollRun = async () => {
     setSaving(true);
@@ -68,10 +88,61 @@ const Salary = () => {
 
         {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         {message && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">{message}</p>}
+        <div className="mb-2 flex justify-end">
+          <div className="relative">
+            <button
+              type="button"
+              aria-expanded={columnsOpen}
+              onClick={() => setColumnsOpen((current) => !current)}
+              className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Customize columns
+            </button>
+            {columnsOpen && (
+              <div className="absolute right-0 z-10 mt-2 w-60 rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Visible columns</p>
+                {PAYROLL_COLUMNS.map((column) => (
+                  <label key={column.key} className="flex cursor-pointer items-center gap-2 px-1 py-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns[column.key]}
+                      onChange={() => toggleColumn(column.key)}
+                      className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                    />
+                    {column.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{["Employee", "Gross", "PAYE", "SSNIT employee", "Tier 2 employee", "Net pay", "SSNIT employer", "Tier 2 employer", "Employer cost", "Payslip"].map((heading) => <th className="border-b border-slate-200 px-4 py-3" key={heading}>{heading}</th>)}</tr></thead>
-            <tbody>{entries.length ? entries.map((entry) => { const employee = employees.find((item) => item.id === entry.employeeId); return <tr className="hover:bg-slate-50" key={entry.employeeId}><td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">{employee?.name || "Unnamed employee"}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.grossPay)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.paye)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.ssnitEmployee)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.tier2Employee)}</td><td className="border-b border-slate-100 px-4 py-4 font-semibold text-teal-700">{formatCurrency(entry.netPay)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.ssnitEmployer)}</td><td className="border-b border-slate-100 px-4 py-4">{formatCurrency(entry.tier2Employer)}</td><td className="border-b border-slate-100 px-4 py-4 font-semibold">{formatCurrency(entry.employerCost)}</td><td className="border-b border-slate-100 px-4 py-4"><button className="font-semibold text-teal-700 hover:text-teal-900" onClick={() => setSelectedPayslip({ employee, entry })}>View payslip</button></td></tr>; }) : <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="10">No employees available for payroll.</td></tr>}</tbody>
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="border-b border-slate-200 px-4 py-3">Employee</th>
+                {activeColumns.map((column) => <th className="border-b border-slate-200 px-4 py-3" key={column.key}>{column.label}</th>)}
+                <th className="border-b border-slate-200 px-4 py-3">Payslip</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.length ? entries.map((entry) => {
+                const employee = employees.find((item) => item.id === entry.employeeId);
+                return (
+                  <tr className="hover:bg-slate-50" key={entry.employeeId}>
+                    <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">{employee?.name || "Unnamed employee"}</td>
+                    {activeColumns.map((column) => (
+                      <td className={`border-b border-slate-100 px-4 py-4 ${column.emphasis ? "font-semibold text-teal-700" : ""}`} key={column.key}>
+                        {formatCurrency(column.value(entry))}
+                      </td>
+                    ))}
+                    <td className="border-b border-slate-100 px-4 py-4">
+                      <button className="font-semibold text-teal-700 hover:text-teal-900" onClick={() => setSelectedPayslip({ employee, entry })}>View payslip</button>
+                    </td>
+                  </tr>
+                );
+              }) : <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={activeColumns.length + 2}>No employees available for payroll.</td></tr>}
+            </tbody>
           </table>
         </div>
         <p className="mt-4 text-xs text-slate-500">Rates used: employee SSNIT 5.5%, employer SSNIT 8%, employer Tier 2 5%. Employer contributions total 13%; total statutory contributions are 18.5%. PAYE uses the Ghana monthly bracket library.</p>
