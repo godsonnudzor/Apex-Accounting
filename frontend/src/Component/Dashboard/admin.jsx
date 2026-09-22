@@ -162,6 +162,7 @@ function Admin() {
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
   const [user, setUser] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
@@ -186,7 +187,14 @@ function Admin() {
 
   return (
     <main className={`dashboard ${darkMode ? "dark-mode" : ""}`}>
-      <aside className="sidebar">
+      {mobileMenuOpen && (
+        <button
+          className="mobile-menu-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      <aside className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div className="brand">
           <span className="brand-mark">A</span>
           <span>
@@ -247,6 +255,14 @@ function Admin() {
             <span className="brand-mark">A</span>Apex
           </div>
           <div className="topbar-actions">
+            <button
+              className="mobile-menu-button"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              ☰
+            </button>
             <button
               className="icon-button"
               aria-label="Toggle dark mode"

@@ -334,6 +334,17 @@ button {
 .mobile-brand {
   display: none;
 }
+.mobile-menu-button {
+  display: none;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+}
+.mobile-menu-backdrop {
+  display: none;
+}
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -920,7 +931,28 @@ button {
     display: block;
   }
   .sidebar {
-    display: none;
+    position: fixed;
+    z-index: 20;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: min(82vw, 290px);
+    padding: 24px 15px 18px;
+    transform: translateX(-105%);
+    transition: transform .2s ease;
+    box-shadow: 10px 0 28px #172b3a24;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .mobile-menu-backdrop {
+    position: fixed;
+    z-index: 19;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: #172b3a66;
   }
   .content {
     padding: 0 16px 32px;
@@ -931,6 +963,12 @@ button {
   }
   .mobile-brand {
     display: flex;
+  }
+  .mobile-menu-button {
+    display: block;
+  }
+  .topbar-actions {
+    gap: 12px;
   }
   .page-heading {
     margin: 24px 0;
@@ -951,6 +989,11 @@ button {
   .quick-actions {
     overflow-x: auto;
     margin-bottom: 14px;
+  }
+  .quick-actions,
+  .panel,
+  .metric-card {
+    min-width: 0;
   }
   .quick-label {
     display: none;
