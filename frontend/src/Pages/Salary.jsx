@@ -101,7 +101,7 @@ const Salary = () => {
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.message || "Unable to save payroll run");
-      setMessage(`Payroll run ${result.runId} saved.`);
+      setMessage(`Payroll run ${result.runId} saved and journal entry ${result.journalEntryId} posted.`);
     } catch (saveError) {
       setError(saveError.message);
     } finally {

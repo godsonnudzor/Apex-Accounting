@@ -369,7 +369,48 @@ router.post("/api/payroll/runs", async (req, res) => {
     }));
     const { error: entriesError } = await supabase.from("payroll_entries").insert(rows);
     if (entriesError) throw entriesError;
-    return res.status(201).json({ runId: run.id });
+
+    const payrollLines = [
+      { account: "5600 - Wages expense", debit: Number(totals?.gross || 0), credit: 0, memo: "Gross payroll" },
+      { account: "5610 - Employer SSNIT expense", debit: rows.reduce((sum, entry) => sum + Number(entry.ssnit_employer || 0), 0), credit: 0, memo: "Employer SSNIT contribution" },
+      { account: "5620 - Employer Tier 2 expense", debit: rows.reduce((sum, entry) => sum + Number(entry.tier2_employer || 0), 0), credit: 0, memo: "Employer Tier 2 contribution" },
+      { account: "2130 - Net wages payable", debit: 0, credit: Number(totals?.net || 0), memo: "Net wages owed to employees" },
+      { account: "2100 - PAYE payable", debit: 0, credit: Number(totals?.paye || 0), memo: "PAYE withheld from employees" },
+      { account: "2110 - SSNIT payable", debit: 0, credit: rows.reduce((sum, entry) => sum + Number(entry.ssnit_employee || 0) + Number(entry.ssnit_employer || 0), 0), memo: "Employee and employer SSNIT" },
+      { account: "2120 - Tier 2 payable", debit: 0, credit: rows.reduce((sum, entry) => sum + Number(entry.tier2_employee || 0) + Number(entry.tier2_employer || 0), 0), memo: "Employee and employer Tier 2" },
+    ].filter((line) => line.debit > 0 || line.credit > 0);
+
+    const debitTotal = payrollLines.reduce((sum, line) => sum + line.debit, 0);
+    const creditTotal = payrollLines.reduce((sum, line) => sum + line.credit, 0);
+    if (Math.abs(debitTotal - creditTotal) > 0.005) {
+      throw new Error("Payroll journal entry is not balanced");
+    }
+
+    const { data: journalEntry, error: journalError } = await supabase
+      .from("journal_entries")
+      .insert({
+        entry_date: periodEnd,
+        reference: `PAYROLL-${run.id}`,
+        description: `Payroll accrual for ${periodStart} to ${periodEnd}`,
+        source: "payroll",
+        created_by: currentUser.id,
+      })
+      .select("id")
+      .single();
+    if (journalError) throw journalError;
+
+    const { error: journalLinesError } = await supabase
+      .from("journal_lines")
+      .insert(payrollLines.map((line) => ({ ...line, journal_entry_id: journalEntry.id })));
+    if (journalLinesError) throw journalLinesError;
+
+    const { error: statusError } = await supabase
+      .from("payroll_runs")
+      .update({ status: "processed" })
+      .eq("id", run.id);
+    if (statusError) throw statusError;
+
+    return res.status(201).json({ runId: run.id, journalEntryId: journalEntry.id });
   } catch (error) {
     console.error("Payroll run creation error:", error);
     const message = error?.code === "23503"
