@@ -596,10 +596,8 @@ router.get("/api/ledger/accounts", async (req, res) => {
       .select("account, debit, credit, journal_entries!inner(status)")
       .eq("journal_entries.status", "posted");
     if (linesError) throw linesError;
-    const balances = (entries || []).reduce((summary, entry) => {
-      (entry.journal_lines || []).forEach((line) => {
-        summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
-      });
+    const balances = (lines || []).reduce((summary, line) => {
+      summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
       return summary;
     }, {});
     return res.json({ accounts: (data || []).map((account) => ({
@@ -753,8 +751,10 @@ router.get("/api/reports/financial", async (req, res) => {
       const key = date.toISOString().slice(0, 7);
       return { key, label: date.toLocaleString("en", { month: "short", year: "numeric", timeZone: "UTC" }) };
     });
-    const balances = (lines || []).reduce((summary, line) => {
-      summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+    const balances = (entries || []).reduce((summary, entry) => {
+      (entry.journal_lines || []).forEach((line) => {
+        summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+      });
       return summary;
     }, {});
     const rows = (accounts || []).map((account) => {
