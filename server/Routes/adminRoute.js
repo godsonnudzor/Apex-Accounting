@@ -798,8 +798,10 @@ router.get("/api/reports/financial/details", async (req, res) => {
     const { allowed } = await canUseAccounting(req);
     if (!allowed) return res.status(403).json({ message: "Report permission required" });
     const account = String(req.query?.account || "").trim();
+    const report = String(req.query?.report || "").trim();
     const month = String(req.query?.month || "").trim();
-    if (!account) return res.status(400).json({ message: "Account is required" });
+    const reportTypes = report === "profit-loss" ? ["income", "expense"] : report === "balance-sheet" ? ["asset", "liability", "equity"] : [];
+    if (!account && !reportTypes.length) return res.status(400).json({ message: "Account or report is required" });
     const { data: entries, error } = await supabase
       .from("journal_entries")
       .select("id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo)")
@@ -807,9 +809,11 @@ router.get("/api/reports/financial/details", async (req, res) => {
       .order("entry_date", { ascending: false })
       .order("id", { ascending: false });
     if (error) throw error;
+    const accountNames = reportTypes.length ? (await supabase.from("ledger_accounts").select("code, name").in("account_type", reportTypes)).data || [] : [];
+    const reportAccounts = new Set(accountNames.map((item) => `${item.code} - ${item.name}`));
     const details = (entries || []).filter((entry) => !month || String(entry.entry_date).startsWith(month)).map((entry) => ({
       ...entry,
-      lines: (entry.journal_lines || []).filter((line) => line.account === account),
+      lines: (entry.journal_lines || []).filter((line) => account ? line.account === account : reportAccounts.has(line.account)),
     })).filter((entry) => entry.lines.length);
     return res.json({ account, month, entries: details });
   } catch (error) {
