@@ -11,6 +11,7 @@ import EmployeeCenter from "./Pages/EmployeeCenter";
 import Bill from "./Pages/Bill";
 import WriteCheque from "./Pages/WriteCheque";
 import Journal from "./Pages/Journal";
+import Suppliers from "./Pages/Suppliers";
 import AuthProvider from "./context/authContext";
 import Setting from "./Pages/Setting";
 import { useAuth } from "./context/auth";
@@ -156,6 +157,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="writeCheque">
         <Journal />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/suppliers",
+    element: (
+      <PermissionRoute permission="writeCheque">
+        <Suppliers />
       </PermissionRoute>
     ),
   },

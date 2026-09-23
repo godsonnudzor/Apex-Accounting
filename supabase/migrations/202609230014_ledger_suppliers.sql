@@ -14,6 +14,7 @@ create table if not exists public.suppliers (
   phone varchar(50),
   address text,
   is_active boolean not null default true,
+  created_by bigint references public.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
 

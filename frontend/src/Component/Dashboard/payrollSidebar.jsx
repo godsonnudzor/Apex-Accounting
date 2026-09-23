@@ -5,6 +5,7 @@ import {
   FaMoneyBill,
   FaBalanceScale,
   FaBook,
+  FaTruck,
   FaUsers,
   FaBuilding,
   FaCalendar,
@@ -63,6 +64,13 @@ const PayrollDashboardSidebar = () => {
           end
         >
           <FaBook /> <span>Journal</span>
+        </NavLink> : null}
+        {hasPermission("writeCheque") ? <NavLink
+          to="/suppliers"
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
+        >
+          <FaTruck /> <span>Suppliers</span>
         </NavLink> : null}
          {hasPermission("leaveManagement") ? <NavLink
           to="/leaveManagement"

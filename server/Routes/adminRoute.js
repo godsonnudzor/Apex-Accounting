@@ -574,6 +574,39 @@ router.get("/api/suppliers", async (req, res) => {
   }
 });
 
+router.post("/api/suppliers", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
+
+    const name = String(req.body?.name || "").trim();
+    const email = normalizeEmail(req.body?.email) || null;
+    const phone = String(req.body?.phone || "").trim() || null;
+    const address = String(req.body?.address || "").trim() || null;
+    if (!name) return res.status(400).json({ message: "Supplier name is required" });
+
+    const { data: existing, error: lookupError } = await supabase
+      .from("suppliers")
+      .select("id")
+      .ilike("name", name)
+      .eq("is_active", true)
+      .limit(1);
+    if (lookupError) throw lookupError;
+    if (existing?.length) return res.status(409).json({ message: "A supplier with that name already exists" });
+
+    const { data: supplier, error } = await supabase
+      .from("suppliers")
+      .insert({ name, email, phone, address, is_active: true, created_by: currentUser.id })
+      .select("id, name, email, phone, address, is_active, created_at")
+      .single();
+    if (error) throw error;
+    return res.status(201).json({ supplier });
+  } catch (error) {
+    console.error("Supplier creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to create supplier" });
+  }
+});
+
 router.get("/api/journal", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
