@@ -610,6 +610,35 @@ router.get("/api/ledger/accounts", async (req, res) => {
   }
 });
 
+router.get("/api/cash-bank-accounts", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
+    const { data: accounts, error } = await supabase
+      .from("cash_bank_accounts")
+      .select("id, account_name, account_number, bank_name, account_type, ledger_account_id, ledger_accounts(id, code, name, account_type)")
+      .eq("is_active", true)
+      .order("account_name");
+    if (error) throw error;
+    const { data: lines, error: linesError } = await supabase
+      .from("journal_lines")
+      .select("account, debit, credit, journal_entries!inner(status)")
+      .eq("journal_entries.status", "posted");
+    if (linesError) throw linesError;
+    const balances = (lines || []).reduce((summary, line) => {
+      summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+      return summary;
+    }, {});
+    return res.json({ accounts: (accounts || []).map((account) => ({
+      ...account,
+      balance: balances[`${account.ledger_accounts.code} - ${account.ledger_accounts.name}`] || 0,
+    })) });
+  } catch (error) {
+    console.error("Cash and bank accounts lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load cash and bank accounts" });
+  }
+});
+
 router.get("/api/suppliers", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
@@ -715,26 +744,28 @@ router.post("/api/payments", async (req, res) => {
     const paymentType = String(req.body?.paymentType || "").trim();
     const payee = String(req.body?.payee || "").trim();
     const paymentDate = String(req.body?.paymentDate || "").trim();
-    const bankAccount = String(req.body?.bankAccount || "").trim();
+    const cashBankAccountId = Number(req.body?.cashBankAccountId);
     const amount = Number(req.body?.amount || 0);
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
-    if (!["cheque", "cash", "bank_transfer"].includes(paymentType) || !payee || !paymentDate || !bankAccount || amount <= 0 || !lines.length) return res.status(400).json({ message: "Payment type, date, payee, bank account, amount, and expense lines are required" });
-    const { data: bankAccounts, error: bankAccountError } = await supabase
-      .from("ledger_accounts")
-      .select("code, name")
-      .eq("account_type", "asset")
-      .eq("is_active", true);
-    if (bankAccountError) throw bankAccountError;
-    if (!bankAccounts.some((account) => `${account.code} - ${account.name}` === bankAccount)) return res.status(400).json({ message: "Select an active cash or bank ledger account" });
+    if (!["cheque", "cash", "bank_transfer"].includes(paymentType) || !payee || !paymentDate || !Number.isInteger(cashBankAccountId) || cashBankAccountId <= 0 || amount <= 0 || !lines.length) return res.status(400).json({ message: "Payment type, date, payee, cash or bank account, amount, and expense lines are required" });
+    const { data: cashBankAccount, error: cashBankAccountError } = await supabase
+      .from("cash_bank_accounts")
+      .select("id, account_name, ledger_accounts!inner(code, name, account_type, is_active)")
+      .eq("id", cashBankAccountId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (cashBankAccountError) throw cashBankAccountError;
+    if (!cashBankAccount || cashBankAccount.ledger_accounts.account_type !== "asset" || !cashBankAccount.ledger_accounts.is_active) return res.status(400).json({ message: "Select an active cash or bank account" });
+    const linkedBankAccount = `${cashBankAccount.ledger_accounts.code} - ${cashBankAccount.ledger_accounts.name}`;
     const normalizedLines = lines.map((line) => ({ account: String(line.account || "").trim(), debit: Number(line.amount || 0), credit: 0, memo: String(line.memo || "").trim() || null }));
     if (normalizedLines.some((line) => !line.account || line.debit <= 0)) return res.status(400).json({ message: "Every payment line needs an account and amount" });
     const lineTotal = normalizedLines.reduce((sum, line) => sum + line.debit, 0);
     if (Math.abs(lineTotal - amount) > 0.005) return res.status(400).json({ message: "Payment lines must equal the payment amount" });
     const { data: entry, error: entryError } = await supabase.from("journal_entries").insert({ entry_date: paymentDate, reference: req.body?.paymentNumber || null, description: `${paymentType} payment to ${payee}`, source: paymentType, created_by: currentUser.id }).select("id").single();
     if (entryError) throw entryError;
-    const { error: linesError } = await supabase.from("journal_lines").insert([...normalizedLines.map((line) => ({ ...line, journal_entry_id: entry.id })), { journal_entry_id: entry.id, account: bankAccount, debit: 0, credit: amount, memo: req.body?.memo || null }]);
+    const { error: linesError } = await supabase.from("journal_lines").insert([...normalizedLines.map((line) => ({ ...line, journal_entry_id: entry.id })), { journal_entry_id: entry.id, account: linkedBankAccount, debit: 0, credit: amount, memo: req.body?.memo || null }]);
     if (linesError) throw linesError;
-    const { data: payment, error: paymentError } = await supabase.from("payment_records").insert({ journal_entry_id: entry.id, payment_type: paymentType, payment_number: req.body?.paymentNumber || null, payment_date: paymentDate, payee, bank_account: bankAccount, amount, memo: req.body?.memo || null, created_by: currentUser.id }).select("id").single();
+    const { data: payment, error: paymentError } = await supabase.from("payment_records").insert({ journal_entry_id: entry.id, payment_type: paymentType, payment_number: req.body?.paymentNumber || null, payment_date: paymentDate, payee, bank_account: linkedBankAccount, cash_bank_account_id: cashBankAccountId, amount, memo: req.body?.memo || null, created_by: currentUser.id }).select("id").single();
     if (paymentError) throw paymentError;
     return res.status(201).json({ paymentId: payment.id, entryId: entry.id });
   } catch (error) {

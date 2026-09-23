@@ -36,22 +36,26 @@ function WriteCheque() {
 	});
 	const [splits, setSplits] = useState([emptySplit(), emptySplit(), emptySplit()]);
 	const [accounts, setAccounts] = useState([]);
+	const [cashBankAccounts, setCashBankAccounts] = useState([]);
 	const [suppliers, setSuppliers] = useState([]);
 	const [status, setStatus] = useState("");
-	const bankAccounts = accounts.filter((account) => account.account_type === "asset");
 	const amount = useMemo(() => splits.reduce((sum, split) => sum + Number(split.amount || 0), 0), [splits]);
-	const selectedBankAccount = bankAccounts.find((account) => `${account.code} - ${account.name}` === transaction.bank);
+	const selectedBankAccount = cashBankAccounts.find((account) => String(account.id) === transaction.bank);
+	const linkedLedgerAccount = selectedBankAccount?.ledger_accounts;
 	const endingBalance = Number(selectedBankAccount?.balance || 0) - amount;
 
 	useEffect(() => {
 		Promise.all([
 			fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then((response) => response.json()),
+			fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" }).then((response) => response.json()),
 			fetch(getApiUrl("/api/suppliers"), { credentials: "include" }).then((response) => response.json()),
-		]).then(([accountResult, supplierResult]) => {
+		]).then(([accountResult, cashBankResult, supplierResult]) => {
 			if (accountResult.accounts) {
 				setAccounts(accountResult.accounts);
-				const firstBankAccount = accountResult.accounts.find((account) => account.account_type === "asset");
-				if (firstBankAccount) setTransaction((current) => ({ ...current, bank: `${firstBankAccount.code} - ${firstBankAccount.name}` }));
+			}
+			if (cashBankResult.accounts) {
+				setCashBankAccounts(cashBankResult.accounts);
+				if (cashBankResult.accounts[0]) setTransaction((current) => ({ ...current, bank: String(cashBankResult.accounts[0].id) }));
 			}
 			if (supplierResult.suppliers) setSuppliers(supplierResult.suppliers);
 		}).catch((loadError) => notify(loadError.message || "Unable to load accounting lists"));
@@ -89,7 +93,8 @@ function WriteCheque() {
 					paymentNumber: transaction.number,
 					paymentDate: transaction.date,
 					payee: transaction.payee,
-					bankAccount: transaction.bank,
+					cashBankAccountId: Number(transaction.bank),
+					bankAccount: linkedLedgerAccount ? `${linkedLedgerAccount.code} - ${linkedLedgerAccount.name}` : "",
 					amount,
 					memo: transaction.memo,
 					lines: splits.filter((split) => split.amount).map((split) => ({ account: split.account, amount: split.amount, memo: split.memo })),
@@ -100,6 +105,9 @@ function WriteCheque() {
 			const accountResponse = await fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" });
 			const accountResult = await accountResponse.json();
 			if (accountResponse.ok && accountResult.accounts) setAccounts(accountResult.accounts);
+			const cashBankResponse = await fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" });
+			const cashBankResult = await cashBankResponse.json();
+			if (cashBankResponse.ok && cashBankResult.accounts) setCashBankAccounts(cashBankResult.accounts);
 			notify(next ? "Payment saved. New transaction started" : `Payment ${result.paymentId} saved`);
 			if (next) clearTransaction();
 		} catch (saveError) {
@@ -120,7 +128,7 @@ function WriteCheque() {
 				<label><input type="radio" name="transactionType" value="cash" checked={transaction.type === "cash"} onChange={updateTransaction} /> Cash</label>
 				<label className="cheque-later"><input name="printLater" type="checkbox" checked={transaction.printLater} onChange={updateTransaction} /> Print Later</label>
 			</div>
-			<div className="cheque-account-bar"><label>BANK ACCOUNT<select name="bank" value={transaction.bank} onChange={updateTransaction} required><option value="">Select cash or bank account</option>{bankAccounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}</select></label><span>ENDING BALANCE <strong>{formatMoney(endingBalance)}</strong></span></div>
+			<div className="cheque-account-bar"><label>BANK ACCOUNT<select name="bank" value={transaction.bank} onChange={updateTransaction} required><option value="">Select cash or bank account</option>{cashBankAccounts.map((account) => <option key={account.id} value={account.id}>{account.account_name} ({account.account_type})</option>)}</select></label><span>ENDING BALANCE <strong>{formatMoney(endingBalance)}</strong></span></div>
 
 			<div className="cheque-layout">
 				<section className="cheque-sheet">
