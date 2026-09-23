@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
+import { getApiUrl } from "../context/auth";
 
-const today = "2026-08-26";
+const today = new Date().toISOString().slice(0, 10);
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 const emptySplit = () => ({ account: "", amount: "", memo: "" });
 
@@ -54,12 +55,34 @@ function WriteCheque() {
 		setSplits([emptySplit(), emptySplit(), emptySplit()]);
 		notify("Transaction cleared");
 	};
-	const save = (next = false) => {
+	const save = async (next = false) => {
 		if (!transaction.payee || amount <= 0 || splits.some((split) => split.amount && !split.account)) {
 			notify("Add a payee, account splits, and an amount first");
 			return;
 		}
-		notify(next ? "Transaction saved. New cheque started" : "Transaction saved");
+		try {
+			const response = await fetch(getApiUrl("/api/payments"), {
+				method: "POST",
+				credentials: "include",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					paymentType: transaction.type,
+					paymentNumber: transaction.number,
+					paymentDate: transaction.date,
+					payee: transaction.payee,
+					bankAccount: transaction.bank,
+					amount,
+					memo: transaction.memo,
+					lines: splits.filter((split) => split.amount).map((split) => ({ account: split.account, amount: split.amount, memo: split.memo })),
+				}),
+			});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.message || "Unable to save payment");
+			notify(next ? "Payment saved. New transaction started" : `Payment ${result.paymentId} saved`);
+			if (next) clearTransaction();
+		} catch (saveError) {
+			notify(saveError.message);
+		}
 	};
 
 	return (

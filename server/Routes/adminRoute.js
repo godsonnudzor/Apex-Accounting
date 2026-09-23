@@ -531,6 +531,90 @@ router.get("/api/payroll/liabilities", async (req, res) => {
   }
 });
 
+const canUseAccounting = async (req, permission = "write_cheque") => {
+  const currentUser = authenticate(req);
+  if (!currentUser) return { currentUser: null, allowed: false };
+  if (String(currentUser.role).toLowerCase() === "admin") return { currentUser, allowed: true };
+  const { data, error } = await supabase.from("employee_permissions").select(permission).eq("user_id", currentUser.id).maybeSingle();
+  if (error) throw error;
+  return { currentUser, allowed: data?.[permission] === true };
+};
+
+router.get("/api/journal", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Journal permission required" });
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .select("id, entry_date, reference, description, source, status, created_at, journal_lines(id, account, debit, credit, memo), payment_records(id, payment_type, payment_number, payee, amount, bank_account)")
+      .order("entry_date", { ascending: false })
+      .order("id", { ascending: false });
+    if (error) throw error;
+    return res.json({ entries: data || [] });
+  } catch (error) {
+    console.error("Journal lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load journal entries" });
+  }
+});
+
+router.post("/api/journal", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Journal permission required" });
+    const entryDate = String(req.body?.entryDate || "").trim();
+    const description = String(req.body?.description || "").trim();
+    const reference = String(req.body?.reference || "").trim() || null;
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const normalizedLines = lines.map((line) => ({
+      account: String(line.account || "").trim(),
+      debit: Number(line.debit || 0),
+      credit: Number(line.credit || 0),
+      memo: String(line.memo || "").trim() || null,
+    }));
+    const debitTotal = normalizedLines.reduce((sum, line) => sum + line.debit, 0);
+    const creditTotal = normalizedLines.reduce((sum, line) => sum + line.credit, 0);
+    if (!entryDate || !description || normalizedLines.length < 2 || normalizedLines.some((line) => !line.account || line.debit < 0 || line.credit < 0 || (line.debit > 0 && line.credit > 0) || (line.debit === 0 && line.credit === 0))) {
+      return res.status(400).json({ message: "Date, description, and valid journal lines are required" });
+    }
+    if (Math.abs(debitTotal - creditTotal) > 0.005) return res.status(400).json({ message: "Debits and credits must balance" });
+    const { data: entry, error: entryError } = await supabase.from("journal_entries").insert({ entry_date: entryDate, reference, description, source: "manual", created_by: currentUser.id }).select("id").single();
+    if (entryError) throw entryError;
+    const { error: linesError } = await supabase.from("journal_lines").insert(normalizedLines.map((line) => ({ ...line, journal_entry_id: entry.id })));
+    if (linesError) throw linesError;
+    return res.status(201).json({ entryId: entry.id });
+  } catch (error) {
+    console.error("Journal creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to save journal entry" });
+  }
+});
+
+router.post("/api/payments", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Payment permission required" });
+    const paymentType = String(req.body?.paymentType || "").trim();
+    const payee = String(req.body?.payee || "").trim();
+    const paymentDate = String(req.body?.paymentDate || "").trim();
+    const amount = Number(req.body?.amount || 0);
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    if (!["cheque", "cash", "bank_transfer"].includes(paymentType) || !payee || !paymentDate || amount <= 0 || !lines.length) return res.status(400).json({ message: "Payment type, date, payee, amount, and expense lines are required" });
+    const normalizedLines = lines.map((line) => ({ account: String(line.account || "").trim(), debit: Number(line.amount || 0), credit: 0, memo: String(line.memo || "").trim() || null }));
+    if (normalizedLines.some((line) => !line.account || line.debit <= 0)) return res.status(400).json({ message: "Every payment line needs an account and amount" });
+    const lineTotal = normalizedLines.reduce((sum, line) => sum + line.debit, 0);
+    if (Math.abs(lineTotal - amount) > 0.005) return res.status(400).json({ message: "Payment lines must equal the payment amount" });
+    const { data: entry, error: entryError } = await supabase.from("journal_entries").insert({ entry_date: paymentDate, reference: req.body?.paymentNumber || null, description: `${paymentType} payment to ${payee}`, source: paymentType, created_by: currentUser.id }).select("id").single();
+    if (entryError) throw entryError;
+    const { error: linesError } = await supabase.from("journal_lines").insert([...normalizedLines.map((line) => ({ ...line, journal_entry_id: entry.id })), { journal_entry_id: entry.id, account: String(req.body?.bankAccount || "Cash / bank"), debit: 0, credit: amount, memo: req.body?.memo || null }]);
+    if (linesError) throw linesError;
+    const { data: payment, error: paymentError } = await supabase.from("payment_records").insert({ journal_entry_id: entry.id, payment_type: paymentType, payment_number: req.body?.paymentNumber || null, payment_date: paymentDate, payee, bank_account: req.body?.bankAccount || null, amount, memo: req.body?.memo || null, created_by: currentUser.id }).select("id").single();
+    if (paymentError) throw paymentError;
+    return res.status(201).json({ paymentId: payment.id, entryId: entry.id });
+  } catch (error) {
+    console.error("Payment creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to save payment" });
+  }
+});
+
 router.put("/api/employees/:id", upload.single("profile_image"), async (req, res) => {
   try {
     const currentUser = authenticate(req);
