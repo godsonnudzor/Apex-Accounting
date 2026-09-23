@@ -689,6 +689,27 @@ router.post("/api/suppliers", async (req, res) => {
   }
 });
 
+router.get("/api/payments/history", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Payment permission required" });
+    const payee = String(req.query?.payee || "").trim();
+    if (!payee) return res.json({ payments: [] });
+    const { data, error } = await supabase
+      .from("payment_records")
+      .select("id, payment_type, payment_number, payment_date, payee, amount, memo, bank_account, journal_entry_id")
+      .ilike("payee", payee)
+      .order("payment_date", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return res.json({ payments: data || [] });
+  } catch (error) {
+    console.error("Payment history lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load payment history" });
+  }
+});
+
 router.get("/api/journal", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);

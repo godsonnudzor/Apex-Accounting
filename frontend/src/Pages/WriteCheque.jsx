@@ -38,6 +38,9 @@ function WriteCheque() {
 	const [accounts, setAccounts] = useState([]);
 	const [cashBankAccounts, setCashBankAccounts] = useState([]);
 	const [suppliers, setSuppliers] = useState([]);
+	const [employees, setEmployees] = useState([]);
+	const [paymentHistory, setPaymentHistory] = useState([]);
+	const [historyLoading, setHistoryLoading] = useState(false);
 	const [status, setStatus] = useState("");
 	const amount = useMemo(() => splits.reduce((sum, split) => sum + Number(split.amount || 0), 0), [splits]);
 	const selectedBankAccount = cashBankAccounts.find((account) => String(account.id) === transaction.bank);
@@ -49,7 +52,8 @@ function WriteCheque() {
 			fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then((response) => response.json()),
 			fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" }).then((response) => response.json()),
 			fetch(getApiUrl("/api/suppliers"), { credentials: "include" }).then((response) => response.json()),
-		]).then(([accountResult, cashBankResult, supplierResult]) => {
+			fetch(getApiUrl("/api/employees"), { credentials: "include" }).then((response) => response.json()),
+		]).then(([accountResult, cashBankResult, supplierResult, employeeResult]) => {
 			if (accountResult.accounts) {
 				setAccounts(accountResult.accounts);
 			}
@@ -58,8 +62,27 @@ function WriteCheque() {
 				if (cashBankResult.accounts[0]) setTransaction((current) => ({ ...current, bank: String(cashBankResult.accounts[0].id) }));
 			}
 			if (supplierResult.suppliers) setSuppliers(supplierResult.suppliers);
+			if (employeeResult.employees) setEmployees(employeeResult.employees);
 		}).catch((loadError) => notify(loadError.message || "Unable to load accounting lists"));
 	}, []);
+
+	useEffect(() => {
+		if (!transaction.payee) {
+			setPaymentHistory([]);
+			return undefined;
+		}
+		let cancelled = false;
+		setHistoryLoading(true);
+		fetch(`${getApiUrl("/api/payments/history")}?payee=${encodeURIComponent(transaction.payee)}`, { credentials: "include" })
+			.then(async (response) => {
+				const result = await response.json();
+				if (!response.ok) throw new Error(result.message || "Unable to load payment history");
+				if (!cancelled) setPaymentHistory(result.payments || []);
+			})
+			.catch((loadError) => { if (!cancelled) notify(loadError.message); })
+			.finally(() => { if (!cancelled) setHistoryLoading(false); });
+		return () => { cancelled = true; };
+	}, [transaction.payee]);
 
 	const updateTransaction = (event) => {
 		const { name, value, type, checked } = event.target;
@@ -135,7 +158,7 @@ function WriteCheque() {
 					<div className="cheque-paper">
 						<div className="cheque-paper-title"><Link to="/dashboard">Back to dashboard</Link><h1>{transaction.type === "cheque" ? "Write Cheque" : "Cash Payment"}</h1></div>
 						<div className="cheque-meta"><label>NO. <input name="number" value={transaction.number} onChange={updateTransaction} placeholder="To print" /></label><label>DATE <input name="date" type="date" value={transaction.date} onChange={updateTransaction} /></label><label>AMOUNT <output>{formatMoney(amount)}</output></label></div>
-						<label className="payee-field">PAY TO THE ORDER OF<select name="payee" value={transaction.payee} onChange={updateTransaction}><option value="">Select supplier</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}</select></label>
+						<label className="payee-field">PAY TO THE ORDER OF<select name="payee" value={transaction.payee} onChange={updateTransaction}><option value="">Select supplier or employee</option><optgroup label="Suppliers">{suppliers.map((supplier) => <option key={`supplier-${supplier.id}`} value={supplier.name}>{supplier.name}</option>)}</optgroup><optgroup label="Employees">{employees.map((employee) => <option key={`employee-${employee.id}`} value={employee.name}>{employee.name}</option>)}</optgroup></select></label>
 						<label className="address-field">ADDRESS<textarea name="address" value={transaction.address} onChange={updateTransaction} placeholder="Payee address" /></label>
 						<label className="cheque-memo">MEMO<input name="memo" value={transaction.memo} onChange={updateTransaction} placeholder="Purpose of payment" /></label>
 						<div className="amount-words"><span>AMOUNT IN WORDS</span><strong>{numberWords(amount)}</strong></div>
@@ -149,7 +172,7 @@ function WriteCheque() {
 					<div className="journal-check"><span>Journal status</span><strong className={amount > 0 && !splits.some((split) => split.amount && !split.account) ? "balanced" : "pending"}>{amount > 0 && !splits.some((split) => split.amount && !split.account) ? "Ready to post" : "Needs account and amount"}</strong><span>Credit bank {formatMoney(amount)} | Debit expenses {formatMoney(amount)}</span></div>
 					<div className="cheque-footer"><span>Exchange rate 1 GHC = <input defaultValue="1" aria-label="Exchange rate" /> GHC</span><div><button onClick={() => save()}>Save &amp; Close</button><button className="cheque-primary" onClick={() => save(true)}>Save &amp; New</button><button onClick={clearTransaction}>Clear</button></div></div>
 				</section>
-				<aside className="cheque-sidebar"><h2>TRANSACTION SUMMARY</h2><div className="cheque-side-total">{formatMoney(amount)}</div><p>{transaction.payee || "No payee selected"}</p><p>{transaction.type === "cheque" ? "Cheque payment" : "Cash payment"}</p><hr /><h2>ACCOUNTING EFFECT</h2><div className="effect-row"><span>Bank / cash</span><strong>-{formatMoney(amount)}</strong></div><div className="effect-row"><span>Expense splits</span><strong>+{formatMoney(amount)}</strong></div><hr /><h2>NOTES</h2><p className="side-muted">Saved transaction notes will appear here.</p></aside>
+				<aside className="cheque-sidebar"><h2>TRANSACTION SUMMARY</h2><div className="cheque-side-total">{formatMoney(amount)}</div><p>{transaction.payee || "No payee selected"}</p><p>{transaction.type === "cheque" ? "Cheque payment" : "Cash payment"}</p>{transaction.payee ? <><hr /><h2>PAYEE DETAILS</h2>{(() => { const supplier = suppliers.find((item) => item.name === transaction.payee); const employee = employees.find((item) => item.name === transaction.payee); const details = supplier || employee; return details ? <><p>{supplier ? "Supplier" : "Employee"}</p><p>{details.email || details.phone || details.position || "No contact details"}</p><p>{details.address || details.bank_name || ""}</p></> : <p className="side-muted">Payee details unavailable.</p>; })()}</> : null}<hr /><h2>PAYMENT HISTORY</h2>{historyLoading ? <p className="side-muted">Loading history...</p> : paymentHistory.length ? paymentHistory.slice(0, 5).map((payment) => <div className="effect-row" key={payment.id}><span>{payment.payment_date}<br />{payment.payment_type}</span><strong>{formatMoney(payment.amount)}</strong></div>) : <p className="side-muted">No previous payments.</p>}<hr /><h2>ACCOUNTING EFFECT</h2><div className="effect-row"><span>Bank / cash</span><strong>-{formatMoney(amount)}</strong></div><div className="effect-row"><span>Expense splits</span><strong>+{formatMoney(amount)}</strong></div><hr /><h2>NOTES</h2><p className="side-muted">Saved transaction notes will appear here.</p></aside>
 			</div>
 			{status ? <div className="cheque-toast">{status}</div> : null}
 		</main>
