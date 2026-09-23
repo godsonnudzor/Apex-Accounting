@@ -1,6 +1,80 @@
-import React from 'react'
+import { useEffect, useState } from "react";
+import { getApiUrl } from "../context/auth";
+
+const blankLine = () => ({ account: "", debit: "", credit: "", memo: "" });
 
 const Journal = () => {
+  const [entries, setEntries] = useState([]);
+  const [form, setForm] = useState({
+    entryDate: new Date().toISOString().slice(0, 10),
+    reference: "",
+    description: "",
+  });
+  const [lines, setLines] = useState([blankLine(), blankLine()]);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const loadEntries = async () => {
+    const response = await fetch(getApiUrl("/api/journal"), {
+      credentials: "include",
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || "Unable to load journal entries");
+    }
+    setEntries(result.entries || []);
+  };
+
+  useEffect(() => {
+    loadEntries().catch((loadError) => setError(loadError.message));
+  }, []);
+
+  const updateForm = (event) => {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  };
+
+  const updateLine = (index, event) => {
+    setLines((current) => current.map((line, lineIndex) => (
+      lineIndex === index
+        ? { ...line, [event.target.name]: event.target.value }
+        : line
+    )));
+  };
+
+  const totals = lines.reduce(
+    (summary, line) => ({
+      debit: summary.debit + Number(line.debit || 0),
+      credit: summary.credit + Number(line.credit || 0),
+    }),
+    { debit: 0, credit: 0 },
+  );
+
+  const saveEntry = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(getApiUrl("/api/journal"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, lines }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to save journal entry");
+      }
+
+      setMessage(`Journal entry ${result.entryId} posted.`);
+      setLines([blankLine(), blankLine()]);
+      setForm((current) => ({ ...current, reference: "", description: "" }));
+      await loadEntries();
+    } catch (saveError) {
+      setError(saveError.message);
+    }
+  };
+
   return (
         <main className="min-h-screen bg-slate-100 p-4 md:p-8">
           <div className="mx-auto max-w-7xl">
