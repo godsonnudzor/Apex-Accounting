@@ -74,6 +74,13 @@ const PayrollDashboardSidebar = () => {
           <FaList /> <span>Chart of accounts</span>
         </NavLink> : null}
         {hasPermission("writeCheque") ? <NavLink
+          to="/financial-reports"
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
+        >
+          <FaBook /> <span>Financial reports</span>
+        </NavLink> : null}
+        {hasPermission("writeCheque") ? <NavLink
           to="/suppliers"
           className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
           end

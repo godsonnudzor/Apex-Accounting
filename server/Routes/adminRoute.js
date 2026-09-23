@@ -736,6 +736,42 @@ router.get("/api/payments/history", async (req, res) => {
   }
 });
 
+router.get("/api/reports/financial", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Report permission required" });
+    const { data: accounts, error: accountError } = await supabase.from("ledger_accounts").select("id, code, name, account_type").eq("is_active", true).order("code");
+    if (accountError) throw accountError;
+    const { data: lines, error: linesError } = await supabase.from("journal_lines").select("account, debit, credit, journal_entries!inner(status)").eq("journal_entries.status", "posted");
+    if (linesError) throw linesError;
+    const balances = (lines || []).reduce((summary, line) => {
+      summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+      return summary;
+    }, {});
+    const rows = (accounts || []).map((account) => {
+      const rawBalance = balances[`${account.code} - ${account.name}`] || 0;
+      const balance = ["liability", "equity", "income"].includes(account.account_type) ? -rawBalance : rawBalance;
+      return { ...account, balance };
+    });
+    const profitLoss = rows.filter((account) => ["income", "expense"].includes(account.account_type));
+    const balanceSheet = rows.filter((account) => ["asset", "liability", "equity"].includes(account.account_type));
+    return res.json({ profitLoss, netProfit: profitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.balance : -account.balance), 0), balanceSheet, balanceSheetTotal: balanceSheet.reduce((sum, account) => sum + account.balance, 0) });
+  } catch (error) {
+    console.error("Financial report lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load financial reports" });
+  }
+});
+
+router.get("/api/reports/aging", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Report permission required" });
+    return res.json({ suppliers: [], customers: [], message: "Bills and invoices are not persisted yet." });
+  } catch (error) {
+    return res.status(500).json({ message: error?.message || "Unable to load aging reports" });
+  }
+});
+
 router.get("/api/journal", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
