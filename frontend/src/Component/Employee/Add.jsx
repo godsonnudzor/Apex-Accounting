@@ -29,6 +29,7 @@ const Add = () => {
   const [form, setForm] = useState(initialForm);
   const [profileImage, setProfileImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [existingImage, setExistingImage] = useState("");
   const [departments, setDepartments] = useState([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -88,6 +89,10 @@ const Add = () => {
           accountName: employee.account_name || "",
           accountType: employee.account_type || "payroll_only",
         }));
+        setExistingImage(employee.profile_image || "");
+        if (/^(https?:\/\/|data:image\/)/i.test(employee.profile_image || "")) {
+          setImagePreview(employee.profile_image);
+        }
       } catch (loadError) {
         setError(loadError.message);
       }
@@ -124,6 +129,7 @@ const Add = () => {
 
     setError("");
     setProfileImage(file);
+    setExistingImage("");
     setImagePreview(URL.createObjectURL(file));
   };
 
@@ -336,6 +342,12 @@ const Add = () => {
                     onChange={handleImageChange}
                     className="w-full rounded-lg border border-slate-300 p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-50 file:px-3 file:py-2 file:text-teal-700"
                   />
+
+                  {isEditing && existingImage && (
+                    <p className="mt-2 text-sm text-slate-500">
+                      Current image: <span className="font-medium text-slate-700">{existingImage}</span>
+                    </p>
+                  )}
 
                   {imagePreview && (
                     <img
