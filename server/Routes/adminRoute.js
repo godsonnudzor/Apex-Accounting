@@ -591,7 +591,19 @@ router.get("/api/ledger/accounts", async (req, res) => {
       .eq("is_active", true)
       .order("name");
     if (error) throw error;
-    return res.json({ accounts: data || [] });
+    const { data: lines, error: linesError } = await supabase
+      .from("journal_lines")
+      .select("account, debit, credit, journal_entries!inner(status)")
+      .eq("journal_entries.status", "posted");
+    if (linesError) throw linesError;
+    const balances = (lines || []).reduce((summary, line) => {
+      summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+      return summary;
+    }, {});
+    return res.json({ accounts: (data || []).map((account) => ({
+      ...account,
+      balance: balances[`${account.code} - ${account.name}`] || 0,
+    })) });
   } catch (error) {
     console.error("Ledger accounts lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load ledger accounts" });

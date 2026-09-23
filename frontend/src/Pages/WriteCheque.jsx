@@ -40,6 +40,8 @@ function WriteCheque() {
 	const [status, setStatus] = useState("");
 	const bankAccounts = accounts.filter((account) => account.account_type === "asset");
 	const amount = useMemo(() => splits.reduce((sum, split) => sum + Number(split.amount || 0), 0), [splits]);
+	const selectedBankAccount = bankAccounts.find((account) => `${account.code} - ${account.name}` === transaction.bank);
+	const endingBalance = Number(selectedBankAccount?.balance || 0) - amount;
 
 	useEffect(() => {
 		Promise.all([
@@ -95,6 +97,9 @@ function WriteCheque() {
 			});
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.message || "Unable to save payment");
+			const accountResponse = await fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" });
+			const accountResult = await accountResponse.json();
+			if (accountResponse.ok && accountResult.accounts) setAccounts(accountResult.accounts);
 			notify(next ? "Payment saved. New transaction started" : `Payment ${result.paymentId} saved`);
 			if (next) clearTransaction();
 		} catch (saveError) {
@@ -115,7 +120,7 @@ function WriteCheque() {
 				<label><input type="radio" name="transactionType" value="cash" checked={transaction.type === "cash"} onChange={updateTransaction} /> Cash</label>
 				<label className="cheque-later"><input name="printLater" type="checkbox" checked={transaction.printLater} onChange={updateTransaction} /> Print Later</label>
 			</div>
-			<div className="cheque-account-bar"><label>BANK ACCOUNT<select name="bank" value={transaction.bank} onChange={updateTransaction} required><option value="">Select cash or bank account</option>{bankAccounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}</select></label><span>ENDING BALANCE <strong>{formatMoney(474 - amount)}</strong></span></div>
+			<div className="cheque-account-bar"><label>BANK ACCOUNT<select name="bank" value={transaction.bank} onChange={updateTransaction} required><option value="">Select cash or bank account</option>{bankAccounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}</select></label><span>ENDING BALANCE <strong>{formatMoney(endingBalance)}</strong></span></div>
 
 			<div className="cheque-layout">
 				<section className="cheque-sheet">
