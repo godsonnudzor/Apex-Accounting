@@ -18,6 +18,7 @@ import Department from "./Component/Department/Department";
 import Employees from "./Component/Employee/Employees";
 import EmployeeAdd from "./Component/Employee/Add";
 import Salary from "./Pages/Salary";
+import PayrollLiabilities from "./Pages/PayrollLiabilities";
 import LeaveManagement from "./Pages/LeaveManagemet";
 import Add from "./Component/Department/Add";
 import TaxRoot from "./routes/root";
@@ -154,6 +155,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="salaries">
         <Salary />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/payroll-liabilities",
+    element: (
+      <PermissionRoute permission="salaries">
+        <PayrollLiabilities />
       </PermissionRoute>
     ),
   },

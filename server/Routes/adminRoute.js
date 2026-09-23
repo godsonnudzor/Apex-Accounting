@@ -475,6 +475,62 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
   }
 });
 
+router.get("/api/payroll/liabilities", async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser) return res.status(401).json({ message: "Authentication required" });
+    if (String(currentUser.role).toLowerCase() !== "admin") {
+      const { data: permissions, error: permissionError } = await supabase
+        .from("employee_permissions")
+        .select("salaries")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+      if (permissionError) throw permissionError;
+      if (permissions?.salaries !== true) return res.status(403).json({ message: "Salary permission required" });
+    }
+
+    const { data: runs, error: runsError } = await supabase
+      .from("payroll_runs")
+      .select("id, period_start, period_end, status, currency, total_gross, total_paye, total_employee_deductions, total_net, total_employer_contributions, total_employer_cost, created_at, payroll_entries(ssnit_employee, tier2_employee, ssnit_employer, tier2_employer)")
+      .order("period_start", { ascending: false });
+    if (runsError) throw runsError;
+
+    const liabilities = (runs || []).map((run) => {
+      const entries = run.payroll_entries || [];
+      const total = (field) => entries.reduce((sum, entry) => sum + Number(entry[field] || 0), 0);
+      const ssnitEmployee = total("ssnit_employee");
+      const tier2Employee = total("tier2_employee");
+      const ssnitEmployer = total("ssnit_employer");
+      const tier2Employer = total("tier2_employer");
+
+      return {
+        id: run.id,
+        period_start: run.period_start,
+        period_end: run.period_end,
+        status: run.status,
+        currency: run.currency,
+        gross_pay: Number(run.total_gross || 0),
+        paye: Number(run.total_paye || 0),
+        net_pay: Number(run.total_net || 0),
+        ssnit_employee: ssnitEmployee,
+        tier2_employee: tier2Employee,
+        employee_deductions: Number(run.total_employee_deductions || 0),
+        ssnit_employer: ssnitEmployer,
+        tier2_employer: tier2Employer,
+        employer_contributions: Number(run.total_employer_contributions || 0),
+        employer_cost: Number(run.total_employer_cost || 0),
+        total_payroll_liabilities: Number(run.total_net || 0) + Number(run.total_employee_deductions || 0) + Number(run.total_employer_contributions || 0),
+        created_at: run.created_at,
+      };
+    });
+
+    return res.json({ liabilities });
+  } catch (error) {
+    console.error("Payroll liabilities lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load payroll liabilities" });
+  }
+});
+
 router.put("/api/employees/:id", upload.single("profile_image"), async (req, res) => {
   try {
     const currentUser = authenticate(req);

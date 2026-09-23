@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import {
   FaTachometerAlt,
   FaMoneyBill,
+  FaBalanceScale,
   FaUsers,
   FaBuilding,
   FaCalendar,
@@ -47,6 +48,13 @@ const PayrollDashboardSidebar = () => {
           end
         >
           <FaMoneyBill /> <span>Salaries</span>
+        </NavLink> : null}
+        {hasPermission("salaries") ? <NavLink
+          to="/payroll-liabilities"
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
+        >
+          <FaBalanceScale /> <span>Payroll liabilities</span>
         </NavLink> : null}
          {hasPermission("leaveManagement") ? <NavLink
           to="/leaveManagement"
