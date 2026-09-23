@@ -25,7 +25,7 @@ const numberWords = (amount) => {
 function WriteCheque() {
 	const [transaction, setTransaction] = useState({
 		type: "cheque",
-		bank: "JV CshBks:Cash:PC - Godson",
+		bank: "",
 		currency: "GHC",
 		number: "",
 		date: today,
@@ -38,6 +38,7 @@ function WriteCheque() {
 	const [accounts, setAccounts] = useState([]);
 	const [suppliers, setSuppliers] = useState([]);
 	const [status, setStatus] = useState("");
+	const bankAccounts = accounts.filter((account) => account.account_type === "asset");
 	const amount = useMemo(() => splits.reduce((sum, split) => sum + Number(split.amount || 0), 0), [splits]);
 
 	useEffect(() => {
@@ -45,7 +46,11 @@ function WriteCheque() {
 			fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then((response) => response.json()),
 			fetch(getApiUrl("/api/suppliers"), { credentials: "include" }).then((response) => response.json()),
 		]).then(([accountResult, supplierResult]) => {
-			if (accountResult.accounts) setAccounts(accountResult.accounts);
+			if (accountResult.accounts) {
+				setAccounts(accountResult.accounts);
+				const firstBankAccount = accountResult.accounts.find((account) => account.account_type === "asset");
+				if (firstBankAccount) setTransaction((current) => ({ ...current, bank: `${firstBankAccount.code} - ${firstBankAccount.name}` }));
+			}
 			if (supplierResult.suppliers) setSuppliers(supplierResult.suppliers);
 		}).catch((loadError) => notify(loadError.message || "Unable to load accounting lists"));
 	}, []);
@@ -110,7 +115,7 @@ function WriteCheque() {
 				<label><input type="radio" name="transactionType" value="cash" checked={transaction.type === "cash"} onChange={updateTransaction} /> Cash</label>
 				<label className="cheque-later"><input name="printLater" type="checkbox" checked={transaction.printLater} onChange={updateTransaction} /> Print Later</label>
 			</div>
-			<div className="cheque-account-bar"><label>BANK ACCOUNT<select name="bank" value={transaction.bank} onChange={updateTransaction}><option>JV CshBks:Cash:PC - Godson</option><option>Ecobank Current Account</option><option>Petty Cash</option></select></label><span>ENDING BALANCE <strong>{formatMoney(474 - amount)}</strong></span></div>
+			<div className="cheque-account-bar"><label>BANK ACCOUNT<select name="bank" value={transaction.bank} onChange={updateTransaction} required><option value="">Select cash or bank account</option>{bankAccounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}</select></label><span>ENDING BALANCE <strong>{formatMoney(474 - amount)}</strong></span></div>
 
 			<div className="cheque-layout">
 				<section className="cheque-sheet">
