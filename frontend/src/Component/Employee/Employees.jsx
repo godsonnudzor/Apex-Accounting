@@ -72,23 +72,32 @@ const Employees = () => {
             <th className="border-b border-slate-200 px-4 py-3">Name</th>
             <th className="border-b border-slate-200 px-4 py-3">Email</th>
             <th className="border-b border-slate-200 px-4 py-3">Account</th>
+            <th className="border-b border-slate-200 px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
 
         <tbody>
           {loading ? (
-            <tr><td colSpan="3" className="px-4 py-8 text-center text-slate-500">Loading employees...</td></tr>
+            <tr><td colSpan="4" className="px-4 py-8 text-center text-slate-500">Loading employees...</td></tr>
           ) : filteredEmployees.length ? (
             filteredEmployees.map((employee) => (
               <tr key={employee.id} className="hover:bg-slate-50">
                 <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">{employee.name || "Unnamed employee"}</td>
                 <td className="border-b border-slate-100 px-4 py-4 text-slate-600">{employee.email}</td>
                 <td className="border-b border-slate-100 px-4 py-4 capitalize text-slate-600">{employee.account_type === "payroll_only" ? "Payroll only" : "Software user"}</td>
+                <td className="border-b border-slate-100 px-4 py-4 text-right">
+                  <Link
+                    to={`/employees/${employee.id}`}
+                    className="font-medium text-teal-700 hover:text-teal-900"
+                  >
+                    Edit
+                  </Link>
+                </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="3" className="px-4 py-8 text-center text-slate-500">No employees found.</td>
+              <td colSpan="4" className="px-4 py-8 text-center text-slate-500">No employees found.</td>
             </tr>
           )}
         </tbody>

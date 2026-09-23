@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { getApiUrl } from "../../context/auth";
 
 const initialForm = {
@@ -24,6 +24,8 @@ const initialForm = {
 
 const Add = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const [form, setForm] = useState(initialForm);
   const [profileImage, setProfileImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -55,6 +57,44 @@ const Add = () => {
 
     loadDepartments();
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const loadEmployee = async () => {
+      try {
+        const response = await fetch(getApiUrl("/api/employees"), { credentials: "include" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Unable to load employee");
+
+        const employee = result.employees?.find((item) => String(item.id) === String(id));
+        if (!employee) throw new Error("Employee not found");
+
+        setForm((current) => ({
+          ...current,
+          firstName: employee.first_name || "",
+          lastName: employee.last_name || "",
+          dateOfBirth: employee.date_of_birth || "",
+          sex: employee.sex || "",
+          email: employee.email || "",
+          qualification: employee.qualification || "",
+          tinNo: employee.tin_no || "",
+          ssniNo: employee.ssni_no || "",
+          position: employee.position || "",
+          departmentId: employee.department_id ? String(employee.department_id) : "",
+          basicPay: employee.basic_pay ?? "",
+          allowance: employee.allowance ?? "",
+          bankName: employee.bank_name || "",
+          accountName: employee.account_name || "",
+          accountType: employee.account_type || "payroll_only",
+        }));
+      } catch (loadError) {
+        setError(loadError.message);
+      }
+    };
+
+    loadEmployee();
+  }, [id]);
 
   useEffect(() => {
     return () => {
@@ -111,8 +151,8 @@ const Add = () => {
         formData.append("profile_image", profileImage);
       }
 
-      const response = await fetch(getApiUrl("/api/employees"), {
-        method: "POST",
+      const response = await fetch(getApiUrl(isEditing ? `/api/employees/${id}` : "/api/employees"), {
+        method: isEditing ? "PUT" : "POST",
         credentials: "include",
         body: formData,
       });
@@ -140,7 +180,7 @@ const Add = () => {
               Employee management
             </p>
             <h1 className="mt-1 text-3xl font-bold text-slate-900">
-              Add employee
+              {isEditing ? "Update employee" : "Add employee"}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
               Create a new employee account and profile.
@@ -332,7 +372,7 @@ const Add = () => {
                         type="password"
                         value={form.password}
                         onChange={updateField}
-                        required
+                        required={!isEditing}
                         minLength="6"
                         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                       />
@@ -347,7 +387,7 @@ const Add = () => {
                         type="password"
                         value={form.confirmPassword}
                         onChange={updateField}
-                        required
+                        required={!isEditing}
                         minLength="6"
                         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                       />
@@ -373,7 +413,9 @@ const Add = () => {
                 disabled={saving}
                 className="rounded-lg bg-teal-600 px-6 py-3 font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? "Creating employee..." : "Create employee"}
+                {saving
+                  ? (isEditing ? "Updating employee..." : "Creating employee...")
+                  : (isEditing ? "Update employee" : "Create employee")}
               </button>
             </div>
           </div>

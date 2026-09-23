@@ -198,6 +198,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "/employees/:id",
+    element: (
+      <PermissionRoute permission="employeeManagement">
+        <EmployeeAdd />
+      </PermissionRoute>
+    ),
+  },
+  {
     path: "/leaveManagement",
     element: (
       <PermissionRoute permission="leaveManagement">

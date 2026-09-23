@@ -475,6 +475,83 @@ router.post("/api/employees", upload.single("profile_image"), async (req, res) =
   }
 });
 
+router.put("/api/employees/:id", upload.single("profile_image"), async (req, res) => {
+  try {
+    const currentUser = authenticate(req);
+    if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const id = Number(req.params.id);
+    const firstName = String(req.body?.firstName || "").trim();
+    const lastName = String(req.body?.lastName || "").trim();
+    const dateOfBirth = String(req.body?.dateOfBirth || "").trim();
+    const sex = String(req.body?.sex || "").trim().toLowerCase();
+    const departmentId = Number(req.body?.departmentId);
+    const basicPay = Number(req.body?.basicPay);
+    const allowance = Number(req.body?.allowance || 0);
+
+    if (!Number.isInteger(id) || !firstName || !lastName || !dateOfBirth || !sex || !Number.isInteger(departmentId) || !Number.isFinite(basicPay) || !Number.isFinite(allowance)) {
+      return res.status(400).json({ message: "First name, last name, date of birth, sex, department, and basic pay are required" });
+    }
+    if (basicPay < 0 || allowance < 0) return res.status(400).json({ message: "Basic pay and allowance cannot be negative" });
+    if (!["female", "male"].includes(sex)) return res.status(400).json({ message: "Invalid sex. Use female or male." });
+
+    const { data: existingEmployee, error: lookupError } = await supabase
+      .from("employees")
+      .select("id, user_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!existingEmployee) return res.status(404).json({ message: "Employee not found" });
+
+    const { data: department, error: departmentError } = await supabase
+      .from("departments")
+      .select("id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (departmentError) throw departmentError;
+    if (!department) return res.status(400).json({ message: "Selected department does not exist" });
+
+    const { data: employee, error: employeeError } = await supabase
+      .from("employees")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+        date_of_birth: dateOfBirth,
+        sex,
+        qualification: req.body?.qualification?.trim() || null,
+        tin_no: req.body?.tinNo?.trim() || null,
+        ssni_no: req.body?.ssniNo?.trim() || null,
+        position: req.body?.position?.trim() || null,
+        department_id: departmentId,
+        basic_pay: basicPay,
+        allowance,
+        bank_name: req.body?.bankName?.trim() || null,
+        account_name: req.body?.accountName?.trim() || null,
+        ...(req.file ? { profile_image: req.file.originalname } : {}),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    if (employeeError) throw employeeError;
+
+    if (existingEmployee.user_id) {
+      const email = normalizeEmail(req.body?.email);
+      const userUpdate = { name: `${firstName} ${lastName}`.trim() };
+      if (email) userUpdate.email = email;
+      if (req.body?.password) userUpdate.password = await bcrypt.hash(String(req.body.password), 10);
+      const { error: userError } = await supabase.from("users").update(userUpdate).eq("id", existingEmployee.user_id);
+      if (userError) throw userError;
+    }
+
+    return res.json({ employee });
+  } catch (error) {
+    console.error("Employee update error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to update employee" });
+  }
+});
+
 router.get("/api/departments", async (req, res) => {
   try {
     const currentUser = authenticate(req);
