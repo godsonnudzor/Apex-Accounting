@@ -610,6 +610,32 @@ router.get("/api/ledger/accounts", async (req, res) => {
   }
 });
 
+router.post("/api/ledger/accounts", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
+    const code = String(req.body?.code || "").trim();
+    const name = String(req.body?.name || "").trim();
+    const accountType = String(req.body?.accountType || "").trim().toLowerCase();
+    if (!code || !name || !["asset", "liability", "equity", "income", "expense"].includes(accountType)) {
+      return res.status(400).json({ message: "Code, name, and a valid account type are required" });
+    }
+    const { data: account, error } = await supabase
+      .from("ledger_accounts")
+      .insert({ code, name, account_type: accountType })
+      .select("id, code, name, account_type, is_active")
+      .single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ message: "An account with that code already exists" });
+      throw error;
+    }
+    return res.status(201).json({ account: { ...account, balance: 0, created_by: currentUser.id } });
+  } catch (error) {
+    console.error("Ledger account creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to create ledger account" });
+  }
+});
+
 router.get("/api/cash-bank-accounts", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);

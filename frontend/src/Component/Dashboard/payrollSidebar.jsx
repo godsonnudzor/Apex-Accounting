@@ -9,6 +9,7 @@ import {
   FaUsers,
   FaBuilding,
   FaCalendar,
+  FaList,
 } from "react-icons/fa";
 import { useAuth } from "../../context/auth";
 
@@ -64,6 +65,13 @@ const PayrollDashboardSidebar = () => {
           end
         >
           <FaBook /> <span>Journal</span>
+        </NavLink> : null}
+        {hasPermission("writeCheque") ? <NavLink
+          to="/chart-of-accounts"
+          className={({ isActive }) => `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`}
+          end
+        >
+          <FaList /> <span>Chart of accounts</span>
         </NavLink> : null}
         {hasPermission("writeCheque") ? <NavLink
           to="/suppliers"

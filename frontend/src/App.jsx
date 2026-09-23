@@ -21,6 +21,7 @@ import Employees from "./Component/Employee/Employees";
 import EmployeeAdd from "./Component/Employee/Add";
 import Salary from "./Pages/Salary";
 import PayrollLiabilities from "./Pages/PayrollLiabilities";
+import ChartOfAccounts from "./Pages/ChartOfAccounts";
 import LeaveManagement from "./Pages/LeaveManagemet";
 import Add from "./Component/Department/Add";
 import TaxRoot from "./routes/root";
@@ -157,6 +158,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="writeCheque">
         <Journal />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/chart-of-accounts",
+    element: (
+      <PermissionRoute permission="writeCheque">
+        <ChartOfAccounts />
       </PermissionRoute>
     ),
   },
