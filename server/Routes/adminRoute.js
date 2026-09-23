@@ -740,6 +740,7 @@ router.get("/api/reports/financial", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
     if (!allowed) return res.status(403).json({ message: "Report permission required" });
+    const year = /^\d{4}$/.test(String(req.query?.year || "")) ? String(req.query.year) : String(new Date().getUTCFullYear());
     const { data: accounts, error: accountError } = await supabase.from("ledger_accounts").select("id, code, name, account_type").eq("is_active", true).order("code");
     if (accountError) throw accountError;
     const { data: entries, error: entriesError } = await supabase.from("journal_entries").select("id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo)").eq("status", "posted");
@@ -751,7 +752,8 @@ router.get("/api/reports/financial", async (req, res) => {
       const key = date.toISOString().slice(0, 7);
       return { key, label: date.toLocaleString("en", { month: "short", year: "numeric", timeZone: "UTC" }) };
     });
-    const balances = (entries || []).reduce((summary, entry) => {
+    const yearEntries = (entries || []).filter((entry) => String(entry.entry_date || "").startsWith(year));
+    const balances = yearEntries.reduce((summary, entry) => {
       (entry.journal_lines || []).forEach((line) => {
         summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
       });
@@ -766,7 +768,7 @@ router.get("/api/reports/financial", async (req, res) => {
     const balanceSheet = rows.filter((account) => ["asset", "liability", "equity"].includes(account.account_type));
     const monthlyRaw = {};
     months.forEach((month) => { monthlyRaw[month.key] = {}; });
-    (entries || []).forEach((entry) => {
+    yearEntries.forEach((entry) => {
       const month = String(entry.entry_date || "").slice(0, 7);
       if (!monthlyRaw[month]) return;
       (entry.journal_lines || []).forEach((line) => {
@@ -786,7 +788,7 @@ router.get("/api/reports/financial", async (req, res) => {
     const monthlyProfitLoss = monthlyRows(profitLoss, false);
     const monthlyBalanceSheet = monthlyRows(balanceSheet, true);
     const monthlyNetProfit = months.map((_, index) => monthlyProfitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.months[index] : -account.months[index]), 0));
-    return res.json({ months, profitLoss, netProfit: profitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.balance : -account.balance), 0), balanceSheet, balanceSheetTotal: balanceSheet.reduce((sum, account) => sum + account.balance, 0), monthlyProfitLoss, monthlyBalanceSheet, monthlyNetProfit });
+    return res.json({ year, profitLoss, netProfit: profitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.balance : -account.balance), 0), balanceSheet, balanceSheetTotal: balanceSheet.reduce((sum, account) => sum + account.balance, 0), months, monthlyProfitLoss, monthlyBalanceSheet, monthlyNetProfit });
   } catch (error) {
     console.error("Financial report lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load financial reports" });
@@ -799,6 +801,7 @@ router.get("/api/reports/financial/details", async (req, res) => {
     if (!allowed) return res.status(403).json({ message: "Report permission required" });
     const account = String(req.query?.account || "").trim();
     const report = String(req.query?.report || "").trim();
+    const year = /^\d{4}$/.test(String(req.query?.year || "")) ? String(req.query.year) : String(new Date().getUTCFullYear());
     const month = String(req.query?.month || "").trim();
     const reportTypes = report === "profit-loss" ? ["income", "expense"] : report === "balance-sheet" ? ["asset", "liability", "equity"] : [];
     if (!account && !reportTypes.length) return res.status(400).json({ message: "Account or report is required" });
@@ -811,7 +814,7 @@ router.get("/api/reports/financial/details", async (req, res) => {
     if (error) throw error;
     const accountNames = reportTypes.length ? (await supabase.from("ledger_accounts").select("code, name").in("account_type", reportTypes)).data || [] : [];
     const reportAccounts = new Set(accountNames.map((item) => `${item.code} - ${item.name}`));
-    const details = (entries || []).filter((entry) => !month || String(entry.entry_date).startsWith(month)).map((entry) => ({
+    const details = (entries || []).filter((entry) => String(entry.entry_date).startsWith(year) && (!month || String(entry.entry_date).startsWith(month))).map((entry) => ({
       ...entry,
       lines: (entry.journal_lines || []).filter((line) => account ? line.account === account : reportAccounts.has(line.account)),
     })).filter((entry) => entry.lines.length);
