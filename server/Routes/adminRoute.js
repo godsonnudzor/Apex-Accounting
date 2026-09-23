@@ -742,7 +742,7 @@ router.get("/api/reports/financial", async (req, res) => {
     if (!allowed) return res.status(403).json({ message: "Report permission required" });
     const { data: accounts, error: accountError } = await supabase.from("ledger_accounts").select("id, code, name, account_type").eq("is_active", true).order("code");
     if (accountError) throw accountError;
-    const { data: entries, error: entriesError } = await supabase.from("journal_entries").select("entry_date, journal_lines(account, debit, credit)").eq("status", "posted");
+    const { data: entries, error: entriesError } = await supabase.from("journal_entries").select("id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo)").eq("status", "posted");
     if (entriesError) throw entriesError;
     const months = Array.from({ length: 12 }, (_, index) => {
       const date = new Date();
@@ -790,6 +790,31 @@ router.get("/api/reports/financial", async (req, res) => {
   } catch (error) {
     console.error("Financial report lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load financial reports" });
+  }
+});
+
+router.get("/api/reports/financial/details", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Report permission required" });
+    const account = String(req.query?.account || "").trim();
+    const month = String(req.query?.month || "").trim();
+    if (!account) return res.status(400).json({ message: "Account is required" });
+    const { data: entries, error } = await supabase
+      .from("journal_entries")
+      .select("id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo)")
+      .eq("status", "posted")
+      .order("entry_date", { ascending: false })
+      .order("id", { ascending: false });
+    if (error) throw error;
+    const details = (entries || []).filter((entry) => !month || String(entry.entry_date).startsWith(month)).map((entry) => ({
+      ...entry,
+      lines: (entry.journal_lines || []).filter((line) => line.account === account),
+    })).filter((entry) => entry.lines.length);
+    return res.json({ account, month, entries: details });
+  } catch (error) {
+    console.error("Financial report detail lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load report details" });
   }
 });
 

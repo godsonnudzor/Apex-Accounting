@@ -10,6 +10,8 @@ const FinancialReports = () => {
   const [tab, setTab] = useState("profit-loss");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -36,6 +38,22 @@ const FinancialReports = () => {
   const monthlyRows = tab === "profit-loss" ? report?.monthlyProfitLoss || [] : report?.monthlyBalanceSheet || [];
   const monthlyTotal = tab === "profit-loss" ? report?.monthlyNetProfit || [] : (report?.months || []).map((_, index) => monthlyRows.reduce((sum, row) => sum + (row.months[index] || 0), 0));
 
+  const showDetails = async (account, month = "") => {
+    setDetailLoading(true);
+    try {
+      const params = new URLSearchParams({ account: `${account.code} - ${account.name}` });
+      if (month) params.set("month", month);
+      const response = await fetch(`${getApiUrl("/api/reports/financial/details")}?${params}`, { credentials: "include" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Unable to load report details");
+      setDetail(result);
+    } catch (detailError) {
+      setError(detailError.message);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   if (report && !isAging) {
     return (
       <main className="min-h-screen bg-slate-100 p-4 md:p-8">
@@ -50,8 +68,9 @@ const FinancialReports = () => {
           </div>
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between"><div><h2 className="text-xl font-semibold text-slate-900">{tab === "profit-loss" ? "Profit & Loss" : "Balance Sheet"}</h2><p className="mt-1 text-sm text-slate-500">{tab === "profit-loss" ? "Monthly income less expenses." : "Month-end account balances."}</p></div><p className="text-xl font-bold text-emerald-700">{money(total)}</p></div>
-            <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="sticky left-0 bg-slate-50 px-3 py-2">Account</th>{report.months.map((month) => <th key={month.key} className="px-3 py-2 text-right">{month.label}</th>)}</tr></thead><tbody>{monthlyRows.map((row) => <tr key={row.code} className="border-t border-slate-100"><td className="sticky left-0 bg-white px-3 py-2 font-semibold">{row.code} - {row.name}</td>{row.months.map((value, index) => <td key={`${row.code}-${index}`} className="px-3 py-2 text-right">{money(value)}</td>)}</tr>)}<tr className="border-t-2 border-slate-300 font-bold"><td className="sticky left-0 bg-white px-3 py-3">{tab === "profit-loss" ? "Net profit / loss" : "Total balance"}</td>{monthlyTotal.map((value, index) => <td key={`total-${index}`} className="px-3 py-3 text-right">{money(value)}</td>)}</tr></tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="sticky left-0 bg-slate-50 px-3 py-2">Account</th>{report.months.map((month) => <th key={month.key} className="px-3 py-2 text-right">{month.label}</th>)}</tr></thead><tbody>{monthlyRows.map((row) => <tr key={row.code} className="border-t border-slate-100"><td className="sticky left-0 bg-white px-3 py-2 font-semibold"><button type="button" className="text-teal-700 hover:underline" onClick={() => showDetails(row)}>{row.code} - {row.name}</button></td>{row.months.map((value, index) => <td key={`${row.code}-${index}`} className="px-3 py-2 text-right"><button type="button" className="hover:text-teal-700 hover:underline" onClick={() => showDetails(row, report.months[index].key)}>{money(value)}</button></td>)}</tr>)}<tr className="border-t-2 border-slate-300 font-bold"><td className="sticky left-0 bg-white px-3 py-3">{tab === "profit-loss" ? "Net profit / loss" : "Total balance"}</td>{monthlyTotal.map((value, index) => <td key={`total-${index}`} className="px-3 py-3 text-right">{money(value)}</td>)}</tr></tbody></table></div>
           </section>
+          {detail ? <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4" role="presentation" onClick={() => setDetail(null)}><section className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-start justify-between"><div><h2 className="text-xl font-semibold text-slate-900">Entry details</h2><p className="mt-1 text-sm text-slate-500">{detail.account}{detail.month ? ` · ${detail.month}` : ""}</p></div><button type="button" className="rounded border border-slate-300 px-3 py-1 text-sm" onClick={() => setDetail(null)}>Close</button></div>{detailLoading ? <p className="text-slate-500">Loading details...</p> : detail.entries.length ? <div className="space-y-3">{detail.entries.map((entry) => <article key={entry.id} className="rounded border border-slate-200 p-4"><div className="flex flex-wrap justify-between gap-2"><strong>{entry.entry_date}</strong><span className="text-slate-500">{entry.reference || entry.source}</span></div><p className="mt-1 text-sm text-slate-700">{entry.description || "No description"}</p>{entry.lines.map((line) => <div key={`${entry.id}-${line.account}`} className="mt-2 flex justify-between text-sm"><span>{line.memo || line.account}</span><span>Debit {money(line.debit)} · Credit {money(line.credit)}</span></div>)}</article>)}</div> : <p className="text-slate-500">No posted entries found.</p>}</section></div> : null}
         </div>
       </main>
     );
