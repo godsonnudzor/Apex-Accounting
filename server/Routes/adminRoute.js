@@ -596,8 +596,10 @@ router.get("/api/ledger/accounts", async (req, res) => {
       .select("account, debit, credit, journal_entries!inner(status)")
       .eq("journal_entries.status", "posted");
     if (linesError) throw linesError;
-    const balances = (lines || []).reduce((summary, line) => {
-      summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+    const balances = (entries || []).reduce((summary, entry) => {
+      (entry.journal_lines || []).forEach((line) => {
+        summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+      });
       return summary;
     }, {});
     return res.json({ accounts: (data || []).map((account) => ({
@@ -742,8 +744,15 @@ router.get("/api/reports/financial", async (req, res) => {
     if (!allowed) return res.status(403).json({ message: "Report permission required" });
     const { data: accounts, error: accountError } = await supabase.from("ledger_accounts").select("id, code, name, account_type").eq("is_active", true).order("code");
     if (accountError) throw accountError;
-    const { data: lines, error: linesError } = await supabase.from("journal_lines").select("account, debit, credit, journal_entries!inner(status)").eq("journal_entries.status", "posted");
-    if (linesError) throw linesError;
+    const { data: entries, error: entriesError } = await supabase.from("journal_entries").select("entry_date, journal_lines(account, debit, credit)").eq("status", "posted");
+    if (entriesError) throw entriesError;
+    const months = Array.from({ length: 12 }, (_, index) => {
+      const date = new Date();
+      date.setUTCDate(1);
+      date.setUTCMonth(date.getUTCMonth() - (11 - index));
+      const key = date.toISOString().slice(0, 7);
+      return { key, label: date.toLocaleString("en", { month: "short", year: "numeric", timeZone: "UTC" }) };
+    });
     const balances = (lines || []).reduce((summary, line) => {
       summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
       return summary;
@@ -755,7 +764,29 @@ router.get("/api/reports/financial", async (req, res) => {
     });
     const profitLoss = rows.filter((account) => ["income", "expense"].includes(account.account_type));
     const balanceSheet = rows.filter((account) => ["asset", "liability", "equity"].includes(account.account_type));
-    return res.json({ profitLoss, netProfit: profitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.balance : -account.balance), 0), balanceSheet, balanceSheetTotal: balanceSheet.reduce((sum, account) => sum + account.balance, 0) });
+    const monthlyRaw = {};
+    months.forEach((month) => { monthlyRaw[month.key] = {}; });
+    (entries || []).forEach((entry) => {
+      const month = String(entry.entry_date || "").slice(0, 7);
+      if (!monthlyRaw[month]) return;
+      (entry.journal_lines || []).forEach((line) => {
+        monthlyRaw[month][line.account] = (monthlyRaw[month][line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
+      });
+    });
+    const monthlyRows = (sourceRows, closing) => sourceRows.map((account) => {
+      let cumulative = 0;
+      const values = months.map((month) => {
+        const raw = monthlyRaw[month.key][`${account.code} - ${account.name}`] || 0;
+        const signed = ["liability", "equity", "income"].includes(account.account_type) ? -raw : raw;
+        cumulative += signed;
+        return closing ? cumulative : signed;
+      });
+      return { ...account, months: values };
+    });
+    const monthlyProfitLoss = monthlyRows(profitLoss, false);
+    const monthlyBalanceSheet = monthlyRows(balanceSheet, true);
+    const monthlyNetProfit = months.map((_, index) => monthlyProfitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.months[index] : -account.months[index]), 0));
+    return res.json({ months, profitLoss, netProfit: profitLoss.reduce((sum, account) => sum + (account.account_type === "income" ? account.balance : -account.balance), 0), balanceSheet, balanceSheetTotal: balanceSheet.reduce((sum, account) => sum + account.balance, 0), monthlyProfitLoss, monthlyBalanceSheet, monthlyNetProfit });
   } catch (error) {
     console.error("Financial report lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load financial reports" });
