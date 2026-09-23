@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
 import { getApiUrl } from "../context/auth";
@@ -35,8 +35,20 @@ function WriteCheque() {
 		printLater: false,
 	});
 	const [splits, setSplits] = useState([emptySplit(), emptySplit(), emptySplit()]);
+	const [accounts, setAccounts] = useState([]);
+	const [suppliers, setSuppliers] = useState([]);
 	const [status, setStatus] = useState("");
 	const amount = useMemo(() => splits.reduce((sum, split) => sum + Number(split.amount || 0), 0), [splits]);
+
+	useEffect(() => {
+		Promise.all([
+			fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then((response) => response.json()),
+			fetch(getApiUrl("/api/suppliers"), { credentials: "include" }).then((response) => response.json()),
+		]).then(([accountResult, supplierResult]) => {
+			if (accountResult.accounts) setAccounts(accountResult.accounts);
+			if (supplierResult.suppliers) setSuppliers(supplierResult.suppliers);
+		}).catch((loadError) => notify(loadError.message || "Unable to load accounting lists"));
+	}, []);
 
 	const updateTransaction = (event) => {
 		const { name, value, type, checked } = event.target;
@@ -105,7 +117,7 @@ function WriteCheque() {
 					<div className="cheque-paper">
 						<div className="cheque-paper-title"><Link to="/dashboard">Back to dashboard</Link><h1>{transaction.type === "cheque" ? "Write Cheque" : "Cash Payment"}</h1></div>
 						<div className="cheque-meta"><label>NO. <input name="number" value={transaction.number} onChange={updateTransaction} placeholder="To print" /></label><label>DATE <input name="date" type="date" value={transaction.date} onChange={updateTransaction} /></label><label>AMOUNT <output>{formatMoney(amount)}</output></label></div>
-						<label className="payee-field">PAY TO THE ORDER OF<select name="payee" value={transaction.payee} onChange={updateTransaction}><option value="">Select payee</option><option>Northstar Studio</option><option>Apex Office Supply</option><option>Figma Professional</option><option>Marlow &amp; Co.</option></select></label>
+						<label className="payee-field">PAY TO THE ORDER OF<select name="payee" value={transaction.payee} onChange={updateTransaction}><option value="">Select supplier</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}</select></label>
 						<label className="address-field">ADDRESS<textarea name="address" value={transaction.address} onChange={updateTransaction} placeholder="Payee address" /></label>
 						<label className="cheque-memo">MEMO<input name="memo" value={transaction.memo} onChange={updateTransaction} placeholder="Purpose of payment" /></label>
 						<div className="amount-words"><span>AMOUNT IN WORDS</span><strong>{numberWords(amount)}</strong></div>
@@ -113,7 +125,7 @@ function WriteCheque() {
 
 					<div className="cheque-section-bar"><strong>Expenses</strong><span>{formatMoney(amount)}</span><strong>Items</strong><span>{formatMoney(amount)}</span></div>
 					<div className="cheque-table" role="table" aria-label="Cheque expense splits"><div className="cheque-table-head"><span>ACCOUNT</span><span>AMOUNT (GHC)</span><span>MEMO</span><span /></div>
-						{splits.map((split, index) => <div className="cheque-table-row" key={index}><select name="account" value={split.account} onChange={(event) => updateSplit(index, event)} aria-label={`Account ${index + 1}`}><option value="">Choose account</option><option>Office supplies</option><option>Software subscriptions</option><option>Professional fees</option><option>Utilities</option><option>Travel and meals</option></select><input name="amount" type="number" min="0" step="0.01" value={split.amount} onChange={(event) => updateSplit(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" /><input name="memo" value={split.memo} onChange={(event) => updateSplit(index, event)} aria-label={`Memo ${index + 1}`} /><button aria-label={`Remove split ${index + 1}`} onClick={() => setSplits((current) => current.filter((_, splitIndex) => splitIndex !== index))}>x</button></div>)}
+						{splits.map((split, index) => <div className="cheque-table-row" key={index}><select name="account" value={split.account} onChange={(event) => updateSplit(index, event)} aria-label={`Account ${index + 1}`}><option value="">Choose ledger account</option>{accounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}</select><input name="amount" type="number" min="0" step="0.01" value={split.amount} onChange={(event) => updateSplit(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" /><input name="memo" value={split.memo} onChange={(event) => updateSplit(index, event)} aria-label={`Memo ${index + 1}`} /><button aria-label={`Remove split ${index + 1}`} onClick={() => setSplits((current) => current.filter((_, splitIndex) => splitIndex !== index))}>x</button></div>)}
 					</div>
 					<button className="cheque-add-line" onClick={() => setSplits((current) => [...current, emptySplit()])}>+ Add split</button>
 					<div className="journal-check"><span>Journal status</span><strong className={amount > 0 && !splits.some((split) => split.amount && !split.account) ? "balanced" : "pending"}>{amount > 0 && !splits.some((split) => split.amount && !split.account) ? "Ready to post" : "Needs account and amount"}</strong><span>Credit bank {formatMoney(amount)} | Debit expenses {formatMoney(amount)}</span></div>

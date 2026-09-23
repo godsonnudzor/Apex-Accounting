@@ -540,6 +540,40 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
   return { currentUser, allowed: data?.[permission] === true };
 };
 
+router.get("/api/ledger/accounts", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
+    const { data, error } = await supabase
+      .from("ledger_accounts")
+      .select("id, code, name, account_type")
+      .eq("is_active", true)
+      .order("name");
+    if (error) throw error;
+    return res.json({ accounts: data || [] });
+  } catch (error) {
+    console.error("Ledger accounts lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load ledger accounts" });
+  }
+});
+
+router.get("/api/suppliers", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
+    const { data, error } = await supabase
+      .from("suppliers")
+      .select("id, name, email, phone, address")
+      .eq("is_active", true)
+      .order("name");
+    if (error) throw error;
+    return res.json({ suppliers: data || [] });
+  } catch (error) {
+    console.error("Suppliers lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load suppliers" });
+  }
+});
+
 router.get("/api/journal", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
