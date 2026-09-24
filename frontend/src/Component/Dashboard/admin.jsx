@@ -216,8 +216,8 @@ function Admin() {
             </div>
           </div>
          
-          <Link className="nav-item" to="/bill">
-            <span>▤</span>Customers <b>8</b>
+          <Link className="nav-item" to="/invoices">
+            <span>▤</span>Invoices <b>8</b>
           </Link>
           <Link className="nav-item" to="/write-cheque">
             <span>⊙</span>Banking <b>3</b>

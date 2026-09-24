@@ -140,7 +140,7 @@ const router = createBrowserRouter([
   { path: "/EmployeeDashboard", element: <EmployeeDashboardRoute /> },
   { path: "/employee-center", element: <EmployeeDashboardRoute /> },
   {
-    path: "/bill",
+    path: "/invoices",
     element: (
       <PermissionRoute permission="bills">
         <Bill />
