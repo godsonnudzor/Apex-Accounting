@@ -46,6 +46,8 @@ function AdminRoute({ children }) {
 
 function PermissionRoute({ permission, children }) {
   const { user, loading, hasPermission, refreshUser } = useAuth();
+  const hasRequiredPermission = (Array.isArray(permission) ? permission : [permission])
+    .some((requiredPermission) => hasPermission(requiredPermission));
   const [checkingPermission, setCheckingPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
 
@@ -53,7 +55,7 @@ function PermissionRoute({ permission, children }) {
     if (
       !loading &&
       user &&
-      !hasPermission(permission) &&
+      !hasRequiredPermission &&
       !permissionChecked &&
       !checkingPermission
     ) {
@@ -67,6 +69,7 @@ function PermissionRoute({ permission, children }) {
     loading,
     user,
     permission,
+    hasRequiredPermission,
     permissionChecked,
     checkingPermission,
     hasPermission,
@@ -76,7 +79,7 @@ function PermissionRoute({ permission, children }) {
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
   if (checkingPermission) return <div>Loading...</div>;
-  if (!hasPermission(permission))
+  if (!hasRequiredPermission)
     return <Navigate to="/EmployeeDashboard" replace />;
   return children;
 }
@@ -206,7 +209,7 @@ const router = createBrowserRouter([
   {
     path: "/invoice",
     element: (
-      <PermissionRoute permission="invoice">
+      <PermissionRoute permission={["invoice", "bills"]}>
         <Invoice />
       </PermissionRoute>
     ),
