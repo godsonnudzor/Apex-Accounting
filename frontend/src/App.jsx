@@ -206,7 +206,7 @@ const router = createBrowserRouter([
   {
     path: "/invoice",
     element: (
-      <PermissionRoute permission="bills">
+      <PermissionRoute permission="invoice">
         <Invoice />
       </PermissionRoute>
     ),

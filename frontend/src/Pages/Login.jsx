@@ -30,6 +30,8 @@ const Login = () => {
         navigate("/employees");
       } else if (permissions.bills) {
         navigate("/bill");
+      } else if (permissions.invoice) {
+        navigate("/invoice");
       } else if (permissions.writeCheque) {
         navigate("/write-cheque");
       } else if (permissions.payroll) {

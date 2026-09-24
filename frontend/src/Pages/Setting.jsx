@@ -25,6 +25,11 @@ const permissionLabels = [
     description: "Create and manage supplier bills",
   },
   {
+    key: "invoice",
+    label: "Invoice",
+    description: "Create and manage customer invoices",
+  },
+  {
     key: "departments",
     label: "Departments",
     description: "Manage organizational departments",
@@ -65,6 +70,7 @@ const defaults = {
   dashboard: true,
   writeCheque: false,
   bills: false,
+  invoice: false,
   payroll: false,
   departments: false,
   employeeManagement: false,

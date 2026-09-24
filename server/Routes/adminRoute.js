@@ -50,10 +50,10 @@ const hasUserPermission = async (user) => {
 };
 
 const readPermissions = async (userId, role) => {
-  if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, taxBrackets: true, taxJurisdictions: true, userScenarios: true, salaries: true, leaveManagement: true, reports: true };
+  if (String(role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, invoice: true, payroll: true, departments: true, employeeManagement: true, taxBrackets: true, taxJurisdictions: true, userScenarios: true, salaries: true, leaveManagement: true, reports: true };
   const { data, error } = await supabase
     .from("employee_permissions")
-    .select("dashboard, write_cheque, bills, payroll, employee_management, tax_brackets, tax_jurisdictions, user_scenarios, departments, salaries, leave_management, reports")
+    .select("dashboard, write_cheque, bills, invoice, payroll, employee_management, tax_brackets, tax_jurisdictions, user_scenarios, departments, salaries, leave_management, reports")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) {
@@ -63,6 +63,7 @@ const readPermissions = async (userId, role) => {
     dashboard: data?.dashboard ?? true,
     writeCheque: data?.write_cheque ?? false,
     bills: data?.bills ?? false,
+    invoice: data?.invoice ?? false,
     payroll: data?.payroll ?? false,
     employeeManagement: data?.employee_management ?? false,
     taxBrackets: data?.tax_brackets ?? false,
@@ -588,7 +589,7 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
 
 router.get("/api/ledger/accounts", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills"]);
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
     if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
     const { data, error } = await supabase
       .from("ledger_accounts")
@@ -672,7 +673,7 @@ router.get("/api/cash-bank-accounts", async (req, res) => {
 
 router.get("/api/suppliers", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills"]);
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
     if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
     const { data, error } = await supabase
       .from("suppliers")
@@ -1165,6 +1166,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
       dashboard = true,
       writeCheque = false,
       bills = false,
+      invoice = false,
       payroll = false,
       departments = false,
       salaries = false,
@@ -1184,6 +1186,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         dashboard,
         write_cheque: writeCheque,
         bills,
+        invoice,
         payroll,
         departments,
         salaries,
@@ -1207,6 +1210,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         dashboard: data.dashboard,
         writeCheque: data.write_cheque,
         bills: data.bills,
+        invoice: data.invoice,
         payroll: data.payroll,
         reports: data.reports,
         departments: data.departments,

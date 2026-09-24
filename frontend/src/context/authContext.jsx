@@ -61,12 +61,13 @@ function AuthProvider({ children }) {
   };
 
   const getPermissions = (employee = user) => {
-    if (String(employee?.role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, payroll: true, departments: true, employeeManagement: true, taxBrackets: true, taxJurisdictions: true, userScenarios: true, salaries: true, leaveManagement: true, reports: true };
+    if (String(employee?.role).toLowerCase() === "admin") return { dashboard: true, writeCheque: true, bills: true, invoice: true, payroll: true, departments: true, employeeManagement: true, taxBrackets: true, taxJurisdictions: true, userScenarios: true, salaries: true, leaveManagement: true, reports: true };
     const permissions = employee?.permissions || {};
     return {
       dashboard: asBoolean(permissions.dashboard, true),
       writeCheque: asBoolean(permissions.writeCheque ?? permissions.write_cheque),
       bills: asBoolean(permissions.bills),
+      invoice: asBoolean(permissions.invoice),
       payroll: asBoolean(permissions.payroll),
       departments: asBoolean(permissions.departments),
       employeeManagement: asBoolean(permissions.employeeManagement ?? permissions.employee_management),
