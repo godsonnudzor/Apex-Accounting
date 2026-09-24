@@ -13,6 +13,7 @@ import Invoice from "./Pages/Invoice";
 import WriteCheque from "./Pages/WriteCheque";
 import Journal from "./Pages/Journal";
 import Suppliers from "./Pages/Suppliers";
+import Customers from "./Pages/Customers";
 import AuthProvider from "./context/authContext";
 import Setting from "./Pages/Setting";
 import { useAuth } from "./context/auth";
@@ -143,10 +144,18 @@ const router = createBrowserRouter([
   { path: "/EmployeeDashboard", element: <EmployeeDashboardRoute /> },
   { path: "/employee-center", element: <EmployeeDashboardRoute /> },
   {
-    path: "/invoices",
+    path: "/bill",
     element: (
       <PermissionRoute permission="bills">
         <Bill />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/invoices",
+    element: (
+      <PermissionRoute permission={["invoice", "bills"]}>
+        <Invoice />
       </PermissionRoute>
     ),
   },
@@ -187,6 +196,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="writeCheque">
         <Suppliers />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/customers",
+    element: (
+      <PermissionRoute permission={["invoice", "bills"]}>
+        <Customers />
       </PermissionRoute>
     ),
   },

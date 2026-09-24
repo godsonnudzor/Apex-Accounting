@@ -721,6 +721,56 @@ router.post("/api/suppliers", async (req, res) => {
   }
 });
 
+router.get("/api/customers", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
+    if (!allowed) return res.status(403).json({ message: "Customer permission required" });
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, name, email, phone, address")
+      .eq("is_active", true)
+      .order("name");
+    if (error) throw error;
+    return res.json({ customers: data || [] });
+  } catch (error) {
+    console.error("Customers lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load customers" });
+  }
+});
+
+router.post("/api/customers", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req, ["invoice", "bills"]);
+    if (!allowed) return res.status(403).json({ message: "Invoice permission required" });
+
+    const name = String(req.body?.name || "").trim();
+    const email = normalizeEmail(req.body?.email) || null;
+    const phone = String(req.body?.phone || "").trim() || null;
+    const address = String(req.body?.address || "").trim() || null;
+    if (!name) return res.status(400).json({ message: "Customer name is required" });
+
+    const { data: existing, error: lookupError } = await supabase
+      .from("customers")
+      .select("id")
+      .ilike("name", name)
+      .eq("is_active", true)
+      .limit(1);
+    if (lookupError) throw lookupError;
+    if (existing?.length) return res.status(409).json({ message: "A customer with that name already exists" });
+
+    const { data: customer, error } = await supabase
+      .from("customers")
+      .insert({ name, email, phone, address, is_active: true, created_by: currentUser.id })
+      .select("id, name, email, phone, address, is_active, created_at")
+      .single();
+    if (error) throw error;
+    return res.status(201).json({ customer });
+  } catch (error) {
+    console.error("Customer creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to create customer" });
+  }
+});
+
 router.get("/api/payments/history", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);

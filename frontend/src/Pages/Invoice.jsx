@@ -7,7 +7,7 @@ const emptyLine = () => ({ quantity: 1, item: "", description: "", rate: 0 });
 
 function Invoice() {
   const [invoice, setInvoice] = useState({
-    supplier: "",
+    customer: "",
     taxDate: "2026-08-25",
     invoiceNumber: "24-063004",
     account: "Account Receivable:Trade",
@@ -17,7 +17,7 @@ function Invoice() {
     memo: "",
   });
   const [lines, setLines] = useState([emptyLine()]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [lookupLoading, setLookupLoading] = useState(true);
   const [lookupError, setLookupError] = useState("");
@@ -26,23 +26,23 @@ function Invoice() {
 
   useEffect(() => {
     const loadInvoiceLookups = async () => {
-      const [supplierResponse, accountResponse] = await Promise.all([
-        fetch(getApiUrl("/api/suppliers"), { credentials: "include" }),
+      const [customerResponse, accountResponse] = await Promise.all([
+        fetch(getApiUrl("/api/customers"), { credentials: "include" }),
         fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
       ]);
-      const [supplierResult, accountResult] = await Promise.all([
-        supplierResponse.json(),
+      const [customerResult, accountResult] = await Promise.all([
+        customerResponse.json(),
         accountResponse.json(),
       ]);
 
-      if (!supplierResponse.ok) {
-        throw new Error(supplierResult.message || "Unable to load suppliers");
+      if (!customerResponse.ok) {
+        throw new Error(customerResult.message || "Unable to load customers");
       }
       if (!accountResponse.ok) {
         throw new Error(accountResult.message || "Unable to load ledger accounts");
       }
 
-      setSuppliers(supplierResult.suppliers || []);
+      setCustomers(customerResult.customers || []);
       setAccounts(accountResult.accounts || []);
       setInvoice((current) => ({
         ...current,
@@ -69,6 +69,7 @@ function Invoice() {
       ),
     [lines],
   );
+  const selectedCustomer = customers.find((customer) => customer.name === invoice.customer);
 
   const updateInvoice = (event) => {
     const { name, value } = event.target;
@@ -88,7 +89,7 @@ function Invoice() {
   const clearInvoice = () => {
     setInvoice((current) => ({
       ...current,
-      supplier: "",
+      customer: "",
       message: "",
       memo: "",
     }));
@@ -163,17 +164,17 @@ function Invoice() {
       </header>
 
       <div className="invoice-lookup">
-        <label>SUPPLIER:</label>
+        <label>CUSTOMER:</label>
         <select
-          name="supplier"
-          value={invoice.supplier}
+          name="customer"
+          value={invoice.customer}
           onChange={updateInvoice}
-          aria-label="Supplier"
+          aria-label="Customer"
         >
-          <option value="">{lookupLoading ? "Loading suppliers..." : "Select supplier"}</option>
-          {suppliers.map((supplier) => (
-            <option key={supplier.id} value={supplier.name}>
-              {supplier.name}
+          <option value="">{lookupLoading ? "Loading customers..." : "Select customer"}</option>
+          {customers.map((customer) => (
+            <option key={customer.id} value={customer.name}>
+              {customer.name}
             </option>
           ))}
         </select>
@@ -234,9 +235,9 @@ function Invoice() {
               <label className="invoice-to">
                 INVOICE TO
                 <textarea
-                  name="supplier"
-                  value={invoice.supplier}
-                  onChange={updateInvoice}
+                  name="customer"
+                  value={invoice.customer ? `${invoice.customer}\n${selectedCustomer?.address || "Customer account on file"}` : ""}
+                  readOnly
                 />
               </label>
             </div>

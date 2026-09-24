@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
+import { getApiUrl } from "../context/auth";
 
 const today = "2026-08-26";
 const currency = "GHC";
@@ -22,8 +23,33 @@ function Bill() {
 		billReceived: true,
 	});
 	const [lines, setLines] = useState([newLine(), newLine(), newLine()]);
+	const [suppliers, setSuppliers] = useState([]);
+	const [accounts, setAccounts] = useState([]);
+	const [lookupLoading, setLookupLoading] = useState(true);
+	const [lookupError, setLookupError] = useState("");
 	const [activePanel, setActivePanel] = useState("Name");
 	const [status, setStatus] = useState("");
+
+	useEffect(() => {
+		const loadBillLookups = async () => {
+			const [supplierResponse, accountResponse] = await Promise.all([
+				fetch(getApiUrl("/api/suppliers"), { credentials: "include" }),
+				fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
+			]);
+			const [supplierResult, accountResult] = await Promise.all([
+				supplierResponse.json(),
+				accountResponse.json(),
+			]);
+			if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
+			if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
+			setSuppliers(supplierResult.suppliers || []);
+			setAccounts(accountResult.accounts || []);
+		};
+
+		loadBillLookups()
+			.catch((loadError) => setLookupError(loadError.message))
+			.finally(() => setLookupLoading(false));
+	}, []);
 
 	const subtotal = useMemo(
 		() => lines.reduce((sum, line) => sum + Number(line.amount || 0), 0),
@@ -33,6 +59,7 @@ function Bill() {
 	const taxable = subtotal - discount;
 	const tax = taxable * (Number(bill.taxRate || 0) / 100);
 	const total = taxable + tax;
+	const selectedSupplier = suppliers.find((supplier) => supplier.name === bill.supplier);
 
 	const updateBill = (event) => {
 		const { name, value, type, checked } = event.target;
@@ -100,16 +127,14 @@ function Bill() {
 						<div className="bill-header-grid">
 							<label>SUPPLIER
 								<select name="supplier" value={bill.supplier} onChange={updateBill}>
-									<option value="">Select supplier</option>
-									<option>Northstar Studio</option>
-									<option>Apex Office Supply</option>
-									<option>Figma Professional</option>
+									<option value="">{lookupLoading ? "Loading suppliers..." : "Select supplier"}</option>
+									{suppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}
 								</select>
 							</label>
 							<label>DATE<input name="date" type="date" value={bill.date} onChange={updateBill} /></label>
 							<label>REF. NO.<input name="reference" value={bill.reference} onChange={updateBill} placeholder="Optional" /></label>
 							<label>BILL DUE<input name="dueDate" type="date" value={bill.dueDate} onChange={updateBill} /></label>
-							<label className="bill-address">ADDRESS<textarea value={bill.supplier ? `${bill.supplier}\nSupplier account on file` : ""} readOnly placeholder="Supplier address" /></label>
+							<label className="bill-address">ADDRESS<textarea value={bill.supplier ? `${bill.supplier}\n${selectedSupplier?.address || "Supplier account on file"}` : ""} readOnly placeholder="Supplier address" /></label>
 							<label>TERMS<select name="terms" value={bill.terms} onChange={updateBill}><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></label>
 						</div>
 					</div>
@@ -120,7 +145,7 @@ function Bill() {
 						{lines.map((line, index) => (
 							<div className="bill-table-row" role="row" key={index}>
 								<select name="account" value={line.account} onChange={(event) => updateLine(index, event)} aria-label={`Account ${index + 1}`}>
-									<option value="">Choose account</option><option>Office supplies</option><option>Software subscriptions</option><option>Professional fees</option><option>Utilities</option><option>Travel and meals</option>
+									<option value="">{lookupLoading ? "Loading ledger accounts..." : "Choose account"}</option>{accounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}
 								</select>
 								<input name="amount" type="number" min="0" step="0.01" value={line.amount} onChange={(event) => updateLine(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" />
 								<input name="memo" value={line.memo} onChange={(event) => updateLine(index, event)} aria-label={`Memo ${index + 1}`} />
@@ -148,6 +173,7 @@ function Bill() {
 					{activePanel === "Name" ? <><div className="bill-side-block"><h2>SUMMARY</h2><p>{bill.supplier || "No supplier selected"}</p><strong>{money(total)}</strong><small>Due {bill.dueDate || "not set"}</small></div><div className="bill-side-block"><h2>RECENT TRANSACTIONS</h2><p>Office supplies <span>{money(1280)}</span></p><p>Software subscription <span>{money(240)}</span></p></div><div className="bill-side-block"><h2>NOTES</h2><p className="side-muted">Notes about this bill will appear here.</p></div></> : <div className="bill-side-block"><h2>TRANSACTION DETAILS</h2><p className="side-muted">Save the bill to create transaction details.</p></div>}
 				</aside>
 			</div>
+			{lookupError ? <div className="bill-error" role="alert">{lookupError}</div> : null}
 			{status ? <div className="bill-toast">{status}</div> : null}
 		</main>
 	);
