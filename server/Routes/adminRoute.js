@@ -576,14 +576,19 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
   const currentUser = authenticate(req);
   if (!currentUser) return { currentUser: null, allowed: false };
   if (String(currentUser.role).toLowerCase() === "admin") return { currentUser, allowed: true };
-  const { data, error } = await supabase.from("employee_permissions").select(permission).eq("user_id", currentUser.id).maybeSingle();
+  const permissions = Array.isArray(permission) ? permission : [permission];
+  const { data, error } = await supabase
+    .from("employee_permissions")
+    .select(permissions.join(","))
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
   if (error) throw error;
-  return { currentUser, allowed: data?.[permission] === true };
+  return { currentUser, allowed: permissions.some((name) => data?.[name] === true) };
 };
 
 router.get("/api/ledger/accounts", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills"]);
     if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
     const { data, error } = await supabase
       .from("ledger_accounts")
@@ -667,7 +672,7 @@ router.get("/api/cash-bank-accounts", async (req, res) => {
 
 router.get("/api/suppliers", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills"]);
     if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
     const { data, error } = await supabase
       .from("suppliers")
