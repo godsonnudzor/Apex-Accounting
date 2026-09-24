@@ -9,6 +9,7 @@ import SignUp from "./Pages/Signup";
 import Deshboard from "./Pages/Deshboard";
 import EmployeeCenter from "./Pages/EmployeeCenter";
 import Bill from "./Pages/Bill";
+import Invoice from "./Pages/Invoice";
 import WriteCheque from "./Pages/WriteCheque";
 import Journal from "./Pages/Journal";
 import Suppliers from "./Pages/Suppliers";
@@ -206,7 +207,7 @@ const router = createBrowserRouter([
     path: "/invoice",
     element: (
       <PermissionRoute permission="bills">
-        <Bill />
+        <Invoice />
       </PermissionRoute>
     ),
   },
