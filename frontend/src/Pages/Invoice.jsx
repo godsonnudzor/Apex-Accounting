@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
+import { getApiUrl } from "../context/auth";
 
 const emptyLine = () => ({ quantity: 1, item: "", description: "", rate: 0 });
 
 function Invoice() {
   const [invoice, setInvoice] = useState({
-    customer: "",
+    supplier: "",
     taxDate: "2026-08-25",
     invoiceNumber: "24-063004",
     account: "Account Receivable:Trade",
@@ -16,8 +17,48 @@ function Invoice() {
     memo: "",
   });
   const [lines, setLines] = useState([emptyLine()]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [lookupLoading, setLookupLoading] = useState(true);
+  const [lookupError, setLookupError] = useState("");
   const [activePanel, setActivePanel] = useState("Name");
   const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const loadInvoiceLookups = async () => {
+      const [supplierResponse, accountResponse] = await Promise.all([
+        fetch(getApiUrl("/api/suppliers"), { credentials: "include" }),
+        fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
+      ]);
+      const [supplierResult, accountResult] = await Promise.all([
+        supplierResponse.json(),
+        accountResponse.json(),
+      ]);
+
+      if (!supplierResponse.ok) {
+        throw new Error(supplierResult.message || "Unable to load suppliers");
+      }
+      if (!accountResponse.ok) {
+        throw new Error(accountResult.message || "Unable to load ledger accounts");
+      }
+
+      setSuppliers(supplierResult.suppliers || []);
+      setAccounts(accountResult.accounts || []);
+      setInvoice((current) => ({
+        ...current,
+        account:
+          current.account && (accountResult.accounts || []).some(
+            (account) => `${account.code} - ${account.name}` === current.account,
+          )
+            ? current.account
+            : "",
+      }));
+    };
+
+    loadInvoiceLookups()
+      .catch((loadError) => setLookupError(loadError.message))
+      .finally(() => setLookupLoading(false));
+  }, []);
 
   const total = useMemo(
     () =>
@@ -47,7 +88,7 @@ function Invoice() {
   const clearInvoice = () => {
     setInvoice((current) => ({
       ...current,
-      customer: "",
+      supplier: "",
       message: "",
       memo: "",
     }));
@@ -122,17 +163,19 @@ function Invoice() {
       </header>
 
       <div className="invoice-lookup">
-        <label>CUSTOMER:</label>
+        <label>SUPPLIER:</label>
         <select
-          name="customer"
-          value={invoice.customer}
+          name="supplier"
+          value={invoice.supplier}
           onChange={updateInvoice}
-          aria-label="Customer"
+          aria-label="Supplier"
         >
-          <option value="">Select customer</option>
-          <option>Northstar Studio</option>
-          <option>Marlow &amp; Co.</option>
-          <option>Apex Office Supply</option>
+          <option value="">{lookupLoading ? "Loading suppliers..." : "Select supplier"}</option>
+          {suppliers.map((supplier) => (
+            <option key={supplier.id} value={supplier.name}>
+              {supplier.name}
+            </option>
+          ))}
         </select>
         <label>ACCOUN...</label>
         <select
@@ -141,9 +184,12 @@ function Invoice() {
           onChange={updateInvoice}
           aria-label="Account"
         >
-          <option>Account Receivable:Trade</option>
-          <option>Sales Income</option>
-          <option>Services Income</option>
+          <option value="">{lookupLoading ? "Loading ledger accounts..." : "Select ledger account"}</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={`${account.code} - ${account.name}`}>
+              {account.code} - {account.name}
+            </option>
+          ))}
         </select>
         <label>TEMPLATE</label>
         <select
@@ -157,6 +203,8 @@ function Invoice() {
           <option>Professional Services</option>
         </select>
       </div>
+
+      {lookupError ? <div className="invoice-error" role="alert">{lookupError}</div> : null}
 
       <div className="invoice-body">
         <section className="invoice-sheet">
@@ -186,8 +234,8 @@ function Invoice() {
               <label className="invoice-to">
                 INVOICE TO
                 <textarea
-                  name="customer"
-                  value={invoice.customer}
+                  name="supplier"
+                  value={invoice.supplier}
                   onChange={updateInvoice}
                 />
               </label>
