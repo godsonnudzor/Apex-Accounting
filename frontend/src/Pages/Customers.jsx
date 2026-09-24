@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const initialForm = { name: "", email: "", phone: "", address: "" };
 
@@ -13,7 +13,7 @@ const Customers = () => {
 
   const loadCustomers = async () => {
     const response = await fetch(getApiUrl("/api/customers"), { credentials: "include" });
-    const result = await response.json();
+    const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to load customers");
     setCustomers(result.customers || []);
   };
@@ -36,7 +36,7 @@ const Customers = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const result = await response.json();
+      const result = await readApiResponse(response);
       if (!response.ok) throw new Error(result.message || "Unable to create customer");
       setCustomers((current) => [result.customer, ...current]);
       setForm(initialForm);

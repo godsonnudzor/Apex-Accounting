@@ -9,6 +9,21 @@ export const getApiUrl = (path) => {
   return new URL(path, `${baseUrl}/`).toString();
 };
 
+export const readApiResponse = async (response) => {
+  const body = await response.text();
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return { message: `The API returned invalid JSON (${response.status})` };
+    }
+  }
+  return {
+    message: `The API returned an HTML or text response (${response.status}). Check the Vercel API deployment.`,
+  };
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used inside AuthProvider");

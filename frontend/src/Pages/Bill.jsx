@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const today = "2026-08-26";
 const currency = "GHC";
@@ -37,8 +37,8 @@ function Bill() {
 				fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
 			]);
 			const [supplierResult, accountResult] = await Promise.all([
-				supplierResponse.json(),
-				accountResponse.json(),
+				readApiResponse(supplierResponse),
+				readApiResponse(accountResponse),
 			]);
 			if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
 			if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");

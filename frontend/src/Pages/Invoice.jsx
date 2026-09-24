@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const emptyLine = () => ({ quantity: 1, item: "", description: "", rate: 0 });
 
@@ -31,8 +31,8 @@ function Invoice() {
         fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
       ]);
       const [customerResult, accountResult] = await Promise.all([
-        customerResponse.json(),
-        accountResponse.json(),
+        readApiResponse(customerResponse),
+        readApiResponse(accountResponse),
       ]);
 
       if (!customerResponse.ok) {
