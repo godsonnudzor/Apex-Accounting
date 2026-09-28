@@ -7,6 +7,7 @@ import { IoPeopleSharp } from "react-icons/io5";
 import { BsCash } from "react-icons/bs";
 import { TbTax } from "react-icons/tb";
 import { TbReportAnalyticsFilled } from "react-icons/tb";
+import { MdOutlineKeyboardArrowRight } from "react-icons/md";
 const metrics = [
   {
     label: "Cash flow",
@@ -216,7 +217,7 @@ function Admin() {
           </a>
          
           <Link className="nav-item" to="/invoices">
-            <span><PiInvoice /></span>Invoices <b>8</b>
+            <span><PiInvoice /></span>Invoices <MdOutlineKeyboardArrowRight />
           </Link>
           <Link className="nav-item" to="/bill">
             <span><PiBill /></span>Bills <b>8</b>
