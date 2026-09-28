@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
-import Menu from "../menu";
+import { FaFileInvoice } from "react-icons/fa";
+
 
 const metrics = [
   {
@@ -210,14 +211,9 @@ function Admin() {
           <a className="nav-item" href="#transactions">
             <span>↕</span>Transactions
           </a>
-          <div className="main d-flex">
-            <div className="sidebarWrapper">
-               <Menu />
-            </div>
-          </div>
          
           <Link className="nav-item" to="/invoices">
-            <span>▤</span>Invoices <b>8</b>
+            <span><FaFileInvoice /></span>Invoices <b>8</b>
           </Link>
           <Link className="nav-item" to="/bill">
             <span>▤</span>Bills <b>8</b>
@@ -286,7 +282,7 @@ function Admin() {
           <div>
             <p className="eyebrow">Wednesday, 19 August 2026</p>
             <h1>
-              Good morning, {user?.name || "User"} <span>✦</span>
+              Hello! {user?.name || "User"} <span>✦</span>
             </h1>
             <p className="subtitle">
               Here’s what’s happening with your finances today.
