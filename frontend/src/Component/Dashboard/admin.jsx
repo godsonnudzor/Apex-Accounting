@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
-import { FaFileInvoice } from "react-icons/fa";
+import { PiInvoice } from "react-icons/pi";
+import { PiBill } from "react-icons/pi";
 
 
 const metrics = [
@@ -213,10 +214,10 @@ function Admin() {
           </a>
          
           <Link className="nav-item" to="/invoices">
-            <span><FaFileInvoice /></span>Invoices <b>8</b>
+            <span><PiInvoice /></span>Invoices <b>8</b>
           </Link>
           <Link className="nav-item" to="/bill">
-            <span>▤</span>Bills <b>8</b>
+            <span><PiBill /></span>Bills <b>8</b>
           </Link>
           <Link className="nav-item" to="/write-cheque">
             <span>⊙</span>Banking <b>3</b>
