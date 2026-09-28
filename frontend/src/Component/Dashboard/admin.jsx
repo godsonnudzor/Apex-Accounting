@@ -6,7 +6,6 @@ import { PiBill } from "react-icons/pi";
 import { HiBanknotes } from "react-icons/hi2";
 import { IoIosPeople } from "react-icons/io";
 import { FaPeopleRobbery } from "react-icons/fa6";
-import { TbTaxEuro } from "react-icons/tb";
 import { TbReportMoney } from "react-icons/tb";
 
 
@@ -234,7 +233,7 @@ function Admin() {
             <span><FaPeopleRobbery /></span>Payroll
           </Link>
           <Link className="nav-item" to="/tax-analyzer/brackets">
-            <span><TbTaxEuro /></span>Tax brackets
+            <span></span>Tax brackets
           </Link>
           <a className="nav-item" href="#reports">
             <span><TbReportMoney /></span>Reports
