@@ -4,6 +4,7 @@ import "../../App.css";
 import { LuLayoutDashboard } from "react-icons/lu";
 import { PiInvoice } from "react-icons/pi";
 import { MdOutlineKeyboardArrowRight } from "react-icons/md";
+import { SiInvoiceninja } from "react-icons/si";
 const metrics = [
   {
     label: "Cash flow",
@@ -215,7 +216,7 @@ function Admin() {
             <span><PiInvoice /></span>Invoices <MdOutlineKeyboardArrowRight />
           </Link>
           <Link className="nav-item" to="/bill">
-            <span>900</span>Bills <b>8</b>
+            <span><SiInvoiceninja /></span>Bills <b>8</b>
           </Link>
         </nav>
         <div className="sidebar-bottom">
