@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
 import { LuLayoutDashboard } from "react-icons/lu";
 import { PiInvoice } from "react-icons/pi";
-import { PiBill } from "react-icons/pi";
 import { MdOutlineKeyboardArrowRight } from "react-icons/md";
 const metrics = [
   {
@@ -216,7 +215,7 @@ function Admin() {
             <span><PiInvoice /></span>Invoices <MdOutlineKeyboardArrowRight />
           </Link>
           <Link className="nav-item" to="/bill">
-            <span><PiBill /></span>Bills <b>8</b>
+            <span>900</span>Bills <b>8</b>
           </Link>
         </nav>
         <div className="sidebar-bottom">
