@@ -5,6 +5,12 @@ import { LuLayoutDashboard } from "react-icons/lu";
 import { PiInvoice } from "react-icons/pi";
 import { MdOutlineKeyboardArrowRight } from "react-icons/md";
 import { SiInvoiceninja } from "react-icons/si";
+import { GrLineChart } from "react-icons/gr";
+import { BiStation } from "react-icons/bi";
+import { IoIosPeople } from "react-icons/io";
+import { RxPeople } from "react-icons/rx";
+import { HiOutlineCalculator } from "react-icons/hi";
+
 const metrics = [
   {
     label: "Cash flow",
@@ -216,8 +222,24 @@ function Admin() {
             <span><PiInvoice /></span>Invoices <MdOutlineKeyboardArrowRight />
           </Link>
           <Link className="nav-item" to="/bill">
-            <span><SiInvoiceninja /></span>Bills <b>8</b>
+            <span><SiInvoiceninja /></span>Bills <MdOutlineKeyboardArrowRight />
           </Link>
+          <Link className="nav-item" to="/chatofaccount">
+            <span><GrLineChart /></span>Chart of Account <MdOutlineKeyboardArrowRight />
+          </Link>
+          <Link className="nav-item" to="/write-cheque">
+            <span><BiStation /></span>Write Cheque <MdOutlineKeyboardArrowRight />
+          </Link>
+          <Link className="nav-item" to="/EmployeeDashboard">
+            <span><IoIosPeople /></span>Employees Dashboard <MdOutlineKeyboardArrowRight />
+          </Link>
+          <Link className="nav-item" to="/PayrollDashboard">
+            <span><RxPeople /></span>Payroll <MdOutlineKeyboardArrowRight />
+          </Link>
+          <Link className="nav-item" to="/tax-analyzer/bracket">
+            <span><HiOutlineCalculator /></span>Tax Table info <MdOutlineKeyboardArrowRight />
+          </Link>
+         
         </nav>
         <div className="sidebar-bottom">
           <Link className="nav-item" to="/settings">
