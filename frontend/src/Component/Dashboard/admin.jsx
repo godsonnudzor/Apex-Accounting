@@ -224,8 +224,8 @@ function Admin() {
           <Link className="nav-item" to="/bill">
             <span><SiInvoiceninja /></span>Bills <MdOutlineKeyboardArrowRight />
           </Link>
-          <Link className="nav-item" to="/chatofaccount">
-            <span><GrLineChart /></span>Chart of Account <MdOutlineKeyboardArrowRight />
+          <Link className="nav-item" to="/chart-of-accounts">
+            <span><GrLineChart /></span>Chart of Accounts <MdOutlineKeyboardArrowRight />
           </Link>
           <Link className="nav-item" to="/write-cheque">
             <span><BiStation /></span>Write Cheque <MdOutlineKeyboardArrowRight />
@@ -236,7 +236,7 @@ function Admin() {
           <Link className="nav-item" to="/PayrollDashboard">
             <span><RxPeople /></span>Payroll <MdOutlineKeyboardArrowRight />
           </Link>
-          <Link className="nav-item" to="/tax-analyzer/bracket">
+          <Link className="nav-item" to="/tax-analyzer">
             <span><HiOutlineCalculator /></span>Tax Table info <MdOutlineKeyboardArrowRight />
           </Link>
          
