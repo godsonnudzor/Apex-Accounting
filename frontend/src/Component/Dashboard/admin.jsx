@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
+import { LuLayoutDashboard } from "react-icons/lu";
 import { PiInvoice } from "react-icons/pi";
 import { PiBill } from "react-icons/pi";
 import { IoPeopleSharp } from "react-icons/io5";
@@ -206,11 +207,10 @@ function Admin() {
             Apex<span className="brand-muted"> / finance</span>
           </span>
         </div>
-        /*Sidebar Navigation */
         
         <nav className="nav-list" aria-label="Main navigation">
           <a className="nav-item active" href="#overview">
-            <span>◈</span>Overview
+            <span><LuLayoutDashboard /></span>Dashboard Overview
           </a>
           <a className="nav-item" href="#transactions">
             <span>↕</span>Transactions
@@ -222,18 +222,7 @@ function Admin() {
           <Link className="nav-item" to="/bill">
             <span><PiBill /></span>Bills <b>8</b>
           </Link>
-          <Link className="nav-item" to="/write-cheque">
-            <span><PiBank /></span>Banking <b>3</b>
-          </Link>
-          <Link className="nav-item" to="/EmployeeDashboard">
-            <span><IoPeopleSharp /></span>Employees
-          </Link>
-          <Link className="nav-item" to="/PayrollDashboard">
-            <span><BsCash /></span>Payroll
-          </Link>
-          <Link className="nav-item" to="/tax-analyzer/brackets">
-            <span><TbTax /></span>Tax brackets
-          </Link>
+          
           <a className="nav-item" href="#reports">
             <span><TbReportAnalyticsFilled /></span>Reports
           </a>
