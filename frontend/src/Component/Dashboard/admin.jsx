@@ -4,10 +4,6 @@ import "../../App.css";
 import { LuLayoutDashboard } from "react-icons/lu";
 import { PiInvoice } from "react-icons/pi";
 import { PiBill } from "react-icons/pi";
-import { IoPeopleSharp } from "react-icons/io5";
-import { BsCash } from "react-icons/bs";
-import { TbTax } from "react-icons/tb";
-import { TbReportAnalyticsFilled } from "react-icons/tb";
 import { MdOutlineKeyboardArrowRight } from "react-icons/md";
 const metrics = [
   {
@@ -222,10 +218,6 @@ function Admin() {
           <Link className="nav-item" to="/bill">
             <span><PiBill /></span>Bills <b>8</b>
           </Link>
-          
-          <a className="nav-item" href="#reports">
-            <span><TbReportAnalyticsFilled /></span>Reports
-          </a>
         </nav>
         <div className="sidebar-bottom">
           <Link className="nav-item" to="/settings">
