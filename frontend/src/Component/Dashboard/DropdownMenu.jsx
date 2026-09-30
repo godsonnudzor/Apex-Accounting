@@ -38,6 +38,14 @@ const MENU = [
     ],
   },
   {
+    label: "Employees",
+    items: [
+      { label: "Employees Center", href: "/EmployeeDashboard" },
+      { label: "Payroll", href: "/PayrollDashboard" },
+      { label: "Tax Table Info", href: "/tax-analyzer" },
+    ],
+  },
+  {
     label: "Reports",
     items: [
       { label: "Profit & loss", href: "/reports/pl" },
