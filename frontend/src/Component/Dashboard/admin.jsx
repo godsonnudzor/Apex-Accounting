@@ -203,7 +203,7 @@ function Admin() {
           </span>
         </div>
         
-        <DropdownMenu />
+       
         <div className="sidebar-bottom">
           <Link className="nav-item" to="/settings">
             <span>⚙</span>Settings
@@ -250,7 +250,7 @@ function Admin() {
         </header>
         <div className="page-heading">
           <div>
-            <p className="eyebrow">Wednesday, 19 August 2026</p>
+            <p className="eyebrow"> <DropdownMenu /></p>
             <h1>
               Hello! {user?.name || "User"} <span>✦</span>
             </h1>
