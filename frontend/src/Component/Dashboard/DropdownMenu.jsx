@@ -6,7 +6,7 @@ const MENU = [
   {
     label: "File",
     items: [
-      { label: "Chart of Account", href: "/chart-of-account" },
+      { label: "Chart of Account", href: "/chart-of-accounts" },
       { label: "Journal Entries", href: "/journal-entries" },
       { label: "Account Creation", href: "/account-creation" },
     ],
@@ -48,7 +48,7 @@ const MENU = [
   {
     label: "Reports",
     items: [
-      { label: "Profit & loss", href: "/reports/pl" },
+      { label: "Profit & loss", href: "/financial-reports" },
       { label: "Balance sheet", href: "/reports/bs" },
       { label: "Cash flow", href: "/reports/cf" },
       { label: "Budget Analysis", href: "/reports/budget" },
