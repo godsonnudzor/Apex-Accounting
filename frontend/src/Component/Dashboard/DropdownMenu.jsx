@@ -4,11 +4,37 @@ import "../../App.css";
 const MENU = [
   { label: "Dashboard", href: "/dashboard" },
   {
-    label: "Accounting",
+    label: "File",
     items: [
+      { label: "Chart of Account", href: "/chart-of-account" },
+      { label: "Journal Entries", href: "/journal-entries" },
+      { label: "Account Creation", href: "/account-creation" },
+    ],
+  },
+  {
+    label: "Suppliers",
+    items: [
+      { label: "Center", href: "/suppliersCenter" },
+      { label: "Creation", href: "/supplierCreation" },
+      { label: "Bills", href: "/bills" },
+      { label: "Aging", href: "/suppliersAging" },
+    ],
+  },
+   {
+    label: "Customers",
+    items: [
+      { label: "Center", href: "/customersCenter" },
+      { label: "Customer Creation", href: "/customer-creation" },
       { label: "Invoices", href: "/invoices" },
-      { label: "Payments", href: "/payments" },
-      { label: "Expenses", href: "/expenses" },
+      { label: "Aging List", href: "/customerAging" },
+    ],
+  },
+   {
+    label: "Banking",
+    items: [
+      { label: "Write Cheque", href: "/write-cheque" },
+      { label: "Contra Entries", href: "/contra-entries" },
+      { label: "Reconcile", href: "/reconcile" },
     ],
   },
   {
@@ -17,6 +43,19 @@ const MENU = [
       { label: "Profit & loss", href: "/reports/pl" },
       { label: "Balance sheet", href: "/reports/bs" },
       { label: "Cash flow", href: "/reports/cf" },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [
+      { label: "Profit & loss", href: "/reports/pl" },
+      { label: "Balance sheet", href: "/reports/bs" },
+      { label: "Cash flow", href: "/reports/cf" },
+      { label: "Budget Analysis", href: "/reports/budget" },
+      { label: "Asset Register", href: "/reports/asset-register" },
+      { label: "Audit Trail", href: "/reports/audit-trail" },
+      { label: "Account List", href: "/reports/account-list" },
+     
     ],
   },
   { label: "Settings", href: "/settings" },
