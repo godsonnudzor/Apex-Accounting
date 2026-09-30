@@ -1453,7 +1453,7 @@ button {
     flex-wrap: wrap;
   }
 }
-.dd-nav { font-family: system-ui, sans-serif; font-size: 15px; }
+.dd-nav { font-family: Pacifico, sans-serif; font-size: 15px; }
 .dd-list { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .dd-item { position: relative; }
 .dd-trigger {
