@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
-import { LuLayoutDashboard } from "react-icons/lu";
-import { PiInvoice } from "react-icons/pi";
-import { MdOutlineKeyboardArrowRight } from "react-icons/md";
-import { SiInvoiceninja } from "react-icons/si";
-import { GrLineChart } from "react-icons/gr";
-import { BiStation } from "react-icons/bi";
-import { IoIosPeople } from "react-icons/io";
-import { RxPeople } from "react-icons/rx";
-import { HiOutlineCalculator } from "react-icons/hi";
+import DropdownMenu from "./DropdownMenu";
 
 const metrics = [
   {
@@ -164,6 +156,7 @@ function CashFlowChart({ range }) {
   );
 }
 
+
 function Admin() {
   const navigate = useNavigate();
   const [range, setRange] = useState("30 days");
@@ -210,37 +203,7 @@ function Admin() {
           </span>
         </div>
         
-        <nav className="nav-list" aria-label="Main navigation">
-          <a className="nav-item active" href="#overview">
-            <span><LuLayoutDashboard /></span>Dashboard Overview
-          </a>
-          <a className="nav-item" href="#transactions">
-            <span>↕</span>Transactions
-          </a>
-         
-          <Link className="nav-item" to="/invoices">
-            <span><PiInvoice /></span>Invoices <MdOutlineKeyboardArrowRight />
-          </Link>
-          <Link className="nav-item" to="/bill">
-            <span><SiInvoiceninja /></span>Bills <MdOutlineKeyboardArrowRight />
-          </Link>
-          <Link className="nav-item" to="/chart-of-accounts">
-            <span><GrLineChart /></span>Chart of Accounts <MdOutlineKeyboardArrowRight />
-          </Link>
-          <Link className="nav-item" to="/write-cheque">
-            <span><BiStation /></span>Write Cheque <MdOutlineKeyboardArrowRight />
-          </Link>
-          <Link className="nav-item" to="/EmployeeDashboard">
-            <span><IoIosPeople /></span>Employees Dashboard <MdOutlineKeyboardArrowRight />
-          </Link>
-          <Link className="nav-item" to="/PayrollDashboard">
-            <span><RxPeople /></span>Payroll <MdOutlineKeyboardArrowRight />
-          </Link>
-          <Link className="nav-item" to="/tax-analyzer">
-            <span><HiOutlineCalculator /></span>Tax Table info <MdOutlineKeyboardArrowRight />
-          </Link>
-         
-        </nav>
+        <DropdownMenu />
         <div className="sidebar-bottom">
           <Link className="nav-item" to="/settings">
             <span>⚙</span>Settings

@@ -1453,3 +1453,30 @@ button {
     flex-wrap: wrap;
   }
 }
+.dd-nav { font-family: system-ui, sans-serif; font-size: 15px; }
+.dd-list { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.dd-item { position: relative; }
+.dd-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border: 0; border-radius: 6px;
+  background: transparent; color: #1f2933; font: inherit;
+  text-decoration: none; cursor: pointer;
+}
+.dd-trigger:hover, .dd-trigger[aria-expanded="true"] { background: #eef1f4; }
+.dd-trigger:focus-visible, .dd-panel a:focus-visible {
+  outline: 2px solid #2563eb; outline-offset: 2px;
+}
+.dd-arrow { transition: transform 0.18s ease; }
+.dd-arrow.is-open { transform: rotate(180deg); }
+.dd-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
+  min-width: 180px; margin: 0; padding: 6px; list-style: none;
+  background: #fff; border: 1px solid #d9dee3; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+.dd-panel a {
+  display: block; padding: 8px 10px; border-radius: 5px;
+  color: #1f2933; text-decoration: none;
+}
+.dd-panel a:hover { background: #eef1f4; }
+@media (prefers-reduced-motion: reduce) { .dd-arrow { transition: none; } }
