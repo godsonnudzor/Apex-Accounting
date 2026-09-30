@@ -43,14 +43,6 @@ const MENU = [
       { label: "Profit & loss", href: "/reports/pl" },
       { label: "Balance sheet", href: "/reports/bs" },
       { label: "Cash flow", href: "/reports/cf" },
-    ],
-  },
-  {
-    label: "Reports",
-    items: [
-      { label: "Profit & loss", href: "/reports/pl" },
-      { label: "Balance sheet", href: "/reports/bs" },
-      { label: "Cash flow", href: "/reports/cf" },
       { label: "Budget Analysis", href: "/reports/budget" },
       { label: "Asset Register", href: "/reports/asset-register" },
       { label: "Audit Trail", href: "/reports/audit-trail" },
