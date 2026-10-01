@@ -81,6 +81,7 @@ function WriteCheque() {
   const [employees, setEmployees] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyRefresh, setHistoryRefresh] = useState(0);
   const [status, setStatus] = useState("");
   const amount = useMemo(
     () => splits.reduce((sum, split) => sum + Number(split.amount || 0), 0),
@@ -155,7 +156,7 @@ function WriteCheque() {
     return () => {
       cancelled = true;
     };
-  }, [transaction.payee]);
+  }, [transaction.payee, historyRefresh]);
 
   const updateTransaction = (event) => {
     const { name, value, type, checked } = event.target;
@@ -224,6 +225,7 @@ function WriteCheque() {
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.message || "Unable to save payment");
+      setHistoryRefresh((current) => current + 1);
       const accountResponse = await fetch(getApiUrl("/api/ledger/accounts"), {
         credentials: "include",
       });
