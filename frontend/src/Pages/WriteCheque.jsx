@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const today = new Date().toISOString().slice(0, 10);
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 const emptySplit = () => ({ account: "", amount: "", memo: "" });
+const readApiResult = async (response, fallbackMessage) => {
+  const result = await readApiResponse(response);
+  if (!response.ok)
+    throw new Error(result.message || fallbackMessage);
+  return result;
+};
 
 const numberWords = (amount) => {
   const units = [
@@ -96,16 +102,18 @@ function WriteCheque() {
   useEffect(() => {
     Promise.all([
       fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then(
-        (response) => response.json(),
+        (response) => readApiResult(response, "Unable to load accounts"),
       ),
       fetch(getApiUrl("/api/cash-bank-accounts"), {
         credentials: "include",
-      }).then((response) => response.json()),
+      }).then((response) =>
+        readApiResult(response, "Unable to load cash and bank accounts"),
+      ),
       fetch(getApiUrl("/api/suppliers"), { credentials: "include" }).then(
-        (response) => response.json(),
+        (response) => readApiResult(response, "Unable to load suppliers"),
       ),
       fetch(getApiUrl("/api/employees"), { credentials: "include" }).then(
-        (response) => response.json(),
+        (response) => readApiResult(response, "Unable to load employees"),
       ),
     ])
       .then(
@@ -141,10 +149,10 @@ function WriteCheque() {
       `${getApiUrl("/api/payments/history")}?payee=${encodeURIComponent(transaction.payee)}`,
       { credentials: "include" },
     )
-      .then(async (response) => {
-        const result = await response.json();
-        if (!response.ok)
-          throw new Error(result.message || "Unable to load payment history");
+      .then((response) =>
+        readApiResult(response, "Unable to load payment history"),
+      )
+      .then((result) => {
         if (!cancelled) setPaymentHistory(result.payments || []);
       })
       .catch((loadError) => {
@@ -222,21 +230,19 @@ function WriteCheque() {
             })),
         }),
       });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.message || "Unable to save payment");
+      const result = await readApiResult(response, "Unable to save payment");
       setHistoryRefresh((current) => current + 1);
       const accountResponse = await fetch(getApiUrl("/api/ledger/accounts"), {
         credentials: "include",
       });
-      const accountResult = await accountResponse.json();
+      const accountResult = await readApiResponse(accountResponse);
       if (accountResponse.ok && accountResult.accounts)
         setAccounts(accountResult.accounts);
       const cashBankResponse = await fetch(
         getApiUrl("/api/cash-bank-accounts"),
         { credentials: "include" },
       );
-      const cashBankResult = await cashBankResponse.json();
+      const cashBankResult = await readApiResponse(cashBankResponse);
       if (cashBankResponse.ok && cashBankResult.accounts)
         setCashBankAccounts(cashBankResult.accounts);
       notify(
