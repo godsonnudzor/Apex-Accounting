@@ -34,6 +34,10 @@ const FinancialReports = () => {
 
   const rows = tab === "profit-loss" ? report?.profitLoss || [] : report?.balanceSheet || [];
   const total = tab === "profit-loss" ? report?.netProfit : report?.balanceSheetTotal;
+  const incomeAccounts = report?.profitLoss?.filter((account) => account.account_type === "income") || [];
+  const expenseAccounts = report?.profitLoss?.filter((account) => account.account_type === "expense") || [];
+  const incomeTotal = incomeAccounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+  const expenseTotal = expenseAccounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
   const isAging = tab === "supplier-aging" || tab === "customer-aging";
   const agingRows = tab === "supplier-aging" ? aging.suppliers : aging.customers;
   const showReportDetails = async (reportType) => {
@@ -80,7 +84,40 @@ const FinancialReports = () => {
           </div>
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-8 text-center"><p className="text-xs font-semibold uppercase tracking-widest text-slate-500">{year} · {tab === "profit-loss" ? "Net profit / loss" : "Balance sheet total"}</p><p className={`mt-3 text-5xl font-bold ${Number(total) >= 0 ? "text-emerald-700" : "text-red-700"}`}>{money(total)}</p><button type="button" className="mt-5 rounded bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700" onClick={() => showReportDetails(tab)}>View entry key</button><p className="mt-2 text-xs text-slate-500">Press Enter or click a ledger below for details.</p></div>
-            <div className="mt-5"><h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Ledger accounts</h3><div className="grid gap-2 md:grid-cols-2">{(tab === "profit-loss" ? report.profitLoss : report.balanceSheet).map((account) => <button key={account.code} type="button" className="flex items-center justify-between rounded border border-slate-200 bg-white px-4 py-3 text-left hover:border-teal-500" onClick={() => showLedgerDetails(account)} onKeyDown={(event) => { if (event.key === "Enter") showLedgerDetails(account); }}><span className="font-semibold text-slate-800">{account.code} - {account.name}</span><span className="text-slate-600">{money(account.balance)}</span></button>)}</div></div>
+            <div className="mt-5">
+              {tab === "profit-loss" ? (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {[
+                    { title: "Income", accounts: incomeAccounts, total: incomeTotal },
+                    { title: "Expenses", accounts: expenseAccounts, total: expenseTotal },
+                  ].map((column) => (
+                    <div key={column.title}>
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">{column.title}</h3>
+                        <span className="text-sm font-semibold text-slate-700">{money(column.total)}</span>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {column.accounts.length ? column.accounts.map((account) => (
+                          <button key={account.code} type="button" className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-3 text-left hover:bg-slate-50" onClick={() => showLedgerDetails(account)}>
+                            <span className="min-w-0"><span className="font-semibold text-slate-800">{account.code}</span><span className="ml-2 text-slate-700">{account.name}</span></span>
+                            <span className="text-right text-slate-600">{money(account.balance)}</span>
+                          </button>
+                        )) : <p className="py-4 text-sm text-slate-500">No {column.title.toLowerCase()} accounts.</p>}
+                      </div>
+                      <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-semibold text-slate-800">
+                        <span>Total {column.title}</span>
+                        <span>{money(column.total)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Ledger accounts</h3>
+                  <div className="grid gap-2 md:grid-cols-2">{report.balanceSheet.map((account) => <button key={account.code} type="button" className="flex items-center justify-between rounded border border-slate-200 bg-white px-4 py-3 text-left hover:border-teal-500" onClick={() => showLedgerDetails(account)}><span className="font-semibold text-slate-800">{account.code} - {account.name}</span><span className="text-slate-600">{money(account.balance)}</span></button>)}</div>
+                </div>
+              )}
+            </div>
           </section>
           {detail ? <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4" role="presentation" onClick={() => setDetail(null)}><section className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-start justify-between"><div><h2 className="text-xl font-semibold text-slate-900">Entry details</h2><p className="mt-1 text-sm text-slate-500">{detail.account}{detail.month ? ` · ${detail.month}` : ""}</p></div><button type="button" className="rounded border border-slate-300 px-3 py-1 text-sm" onClick={() => setDetail(null)}>Close</button></div>{detailLoading ? <p className="text-slate-500">Loading details...</p> : detail.entries.length ? <div className="space-y-3">{detail.entries.map((entry) => <article key={entry.id} className="rounded border border-slate-200 p-4"><div className="flex flex-wrap justify-between gap-2"><strong>{entry.entry_date}</strong><span className="text-slate-500">{entry.reference || entry.source}</span></div><p className="mt-1 text-sm text-slate-700">{entry.description || "No description"}</p>{entry.lines.map((line) => <div key={`${entry.id}-${line.account}`} className="mt-2 flex justify-between text-sm"><span>{line.memo || line.account}</span><span>Debit {money(line.debit)} · Credit {money(line.credit)}</span></div>)}</article>)}</div> : <p className="text-slate-500">No posted entries found.</p>}</section></div> : null}
         </div>
