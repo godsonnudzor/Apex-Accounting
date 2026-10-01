@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
 import DropdownMenu from "./DropdownMenu";
+import { getApiUrl, readApiResponse } from "../../context/auth";
 
 const metrics = [
   {
@@ -166,14 +167,9 @@ function Admin() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
-    const apiUrl = import.meta.env.MODE === "development"
-      ? new URL("/api/me", rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000").toString()
-      : "/api/me";
-
-    fetch(apiUrl, { credentials: "include" })
+    fetch(getApiUrl("/api/me"), { credentials: "include" })
       .then(async (response) => {
-        const result = await response.json();
+        const result = await readApiResponse(response);
         if (!response.ok) throw new Error(result.message || "Unable to load user");
         return result;
       })
