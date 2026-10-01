@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const SignUp = () => {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -7,11 +8,6 @@ const SignUp = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
-
-  const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
-  const apiUrl = import.meta.env.MODE === "development"
-    ? new URL("/api/signup", rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:5000").toString()
-    : "/api/signup";
 
   const handleChange = (event) => {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
@@ -24,12 +20,12 @@ const SignUp = () => {
     setSuccess("");
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await fetch(getApiUrl("/api/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const result = await response.json();
+      const result = await readApiResponse(response);
 
       if (!response.ok) {
         throw new Error(result.message || "Unable to create account");
