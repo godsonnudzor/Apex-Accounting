@@ -1,16 +1,23 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import multer from "multer";
 import sql from "../db.js";
 import { supabase } from "../lib/supabaseClient.js";
 import { createUser } from "../controller/User.js";
 
 const router = express.Router();
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
+const uploadProfileImage = async (req, res, next) => {
+  try {
+    const { default: multer } = await import("multer");
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    });
+    upload.single("profile_image")(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
 
 const fallbackAdmin = {
   id: 1,
@@ -421,7 +428,7 @@ router.post("/api/payroll/runs", async (req, res) => {
   }
 });
 
-router.post("/api/employees", upload.single("profile_image"), async (req, res) => {
+router.post("/api/employees", uploadProfileImage, async (req, res) => {
   try {
     const currentUser = authenticate(req);
     if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
@@ -976,7 +983,7 @@ router.post("/api/payments", async (req, res) => {
   }
 });
 
-router.put("/api/employees/:id", upload.single("profile_image"), async (req, res) => {
+router.put("/api/employees/:id", uploadProfileImage, async (req, res) => {
   try {
     const currentUser = authenticate(req);
     if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
