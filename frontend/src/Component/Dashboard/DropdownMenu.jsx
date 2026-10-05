@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useId } from "react";
+import { Link } from "react-router-dom";
 import "../../App.css";
 
 const MENU = [
@@ -138,9 +139,15 @@ function Dropdown({ label, items, open, onToggle, onClose }) {
         <ul id={id} ref={listRef} className="dd-panel" onKeyDown={onListKey}>
           {items.map((it) => (
             <li key={it.href}>
-              <a href={it.href} onClick={onClose}>
-                {it.label}
-              </a>
+              {it.href === "/customers" ? (
+                <Link to={it.href} onClick={onClose}>
+                  {it.label}
+                </Link>
+              ) : (
+                <a href={it.href} onClick={onClose}>
+                  {it.label}
+                </a>
+              )}
             </li>
           ))}
         </ul>
