@@ -24,7 +24,7 @@ const MENU = [
     label: "Customers",
     items: [
       { label: "Center", href: "/customersCenter" },
-      { label: "Customer Creation", href: "/customers" },
+      { label: "Customer Creation", href: "/customer-creation" },
       { label: "Invoices", href: "/invoices" },
       { label: "Aging List", href: "/customerAging" },
     ],
@@ -133,15 +133,9 @@ function Dropdown({ label, items, open, onToggle, onClose }) {
         <ul id={id} ref={listRef} className="dd-panel" onKeyDown={onListKey}>
           {items.map((it) => (
             <li key={it.href}>
-              {it.href === "/customers" ? (
-                <Link to={it.href} onClick={onClose}>
-                  {it.label}
-                </Link>
-              ) : (
-                <a href={it.href} onClick={onClose}>
-                  {it.label}
-                </a>
-              )}
+              <a href={it.href} onClick={onClose}>
+                {it.label}
+              </a>
             </li>
           ))}
         </ul>
