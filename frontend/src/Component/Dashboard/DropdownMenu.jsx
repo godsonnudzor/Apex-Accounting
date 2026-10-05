@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useId } from "react";
-import { Link } from "react-router-dom";
 import "../../App.css";
 
 const MENU = [
@@ -88,12 +87,7 @@ function Dropdown({ label, items, open, onToggle, onClose }) {
   const btnRef = useRef(null);
   const listRef = useRef(null);
 
-  // Focus first item when opened via keyboard
-  const focusItem = (i) => {
-    const links = listRef.current?.querySelectorAll("a");
-    if (!links?.length) return;
-    links[(i + links.length) % links.length].focus();
-  };
+
 
   const onButtonKey = (e) => {
     if (e.key === "ArrowDown") {
