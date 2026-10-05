@@ -24,7 +24,7 @@ const MENU = [
     label: "Customers",
     items: [
       { label: "Center", href: "/customersCenter" },
-      { label: "Customer Creation", href: "/customer-creation" },
+      { label: "Customer Creation", href: "/customers" },
       { label: "Invoices", href: "/invoices" },
       { label: "Aging List", href: "/customerAging" },
     ],
