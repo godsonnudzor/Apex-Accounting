@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabaseClient.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 async function fetchData() {
   const { data, error } = await supabase
