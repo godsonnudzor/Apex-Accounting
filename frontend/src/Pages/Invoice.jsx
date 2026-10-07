@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../App.css";
 import { getApiUrl, readApiResponse } from "../context/auth";
 
 const emptyLine = () => ({ quantity: 1, item: "", description: "", rate: 0 });
+const today = () => new Date().toISOString().slice(0, 10);
+const nextInvoiceNumber = () => `INV-${Date.now()}`;
 
 function Invoice() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [invoice, setInvoice] = useState({
-    customer: "",
-    taxDate: "2026-08-25",
-    invoiceNumber: "24-063004",
-    account: "Account Receivable:Trade",
+    customerId: String(location.state?.customerId || ""),
+    taxDate: today(),
+    invoiceNumber: nextInvoiceNumber(),
+    account: "",
     template: "HJ Green Ent. Service...",
     exchangeRate: 1,
     message: "",
@@ -23,6 +27,8 @@ function Invoice() {
   const [lookupError, setLookupError] = useState("");
   const [activePanel, setActivePanel] = useState("Name");
   const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedInvoiceId, setSavedInvoiceId] = useState(null);
 
   useEffect(() => {
     const loadInvoiceLookups = async () => {
@@ -48,10 +54,10 @@ function Invoice() {
         ...current,
         account:
           current.account && (accountResult.accounts || []).some(
-            (account) => `${account.code} - ${account.name}` === current.account,
+            (account) => String(account.id) === String(current.account),
           )
             ? current.account
-            : "",
+            : String((accountResult.accounts || []).find((account) => account.account_type === "asset")?.id || ""),
       }));
     };
 
@@ -69,7 +75,7 @@ function Invoice() {
       ),
     [lines],
   );
-  const selectedCustomer = customers.find((customer) => customer.name === invoice.customer);
+  const selectedCustomer = customers.find((customer) => String(customer.id) === String(invoice.customerId));
 
   const updateInvoice = (event) => {
     const { name, value } = event.target;
@@ -89,16 +95,102 @@ function Invoice() {
   const clearInvoice = () => {
     setInvoice((current) => ({
       ...current,
-      customer: "",
+      customerId: "",
+      invoiceNumber: nextInvoiceNumber(),
+      taxDate: today(),
       message: "",
       memo: "",
     }));
     setLines([emptyLine()]);
+    setSavedInvoiceId(null);
     setStatus("Invoice cleared");
   };
   const notify = (message) => {
     setStatus(message);
     window.setTimeout(() => setStatus(""), 2400);
+  };
+  const saveInvoice = async (afterSave = "stay") => {
+    if (savedInvoiceId) {
+      if (afterSave === "close") {
+        navigate("/customersCenter");
+        return;
+      }
+      if (afterSave === "new") {
+        setInvoice((current) => ({
+          ...current,
+          invoiceNumber: nextInvoiceNumber(),
+          taxDate: today(),
+          message: "",
+          memo: "",
+        }));
+        setLines([emptyLine()]);
+        setSavedInvoiceId(null);
+        notify("New invoice started.");
+        return;
+      }
+      notify("This invoice has already been saved. Start a new invoice to record another transaction.");
+      return;
+    }
+    const enteredLines = lines.filter((line) => line.item || line.description || Number(line.rate) > 0);
+    if (!invoice.customerId) {
+      setLookupError("Select a customer before saving this invoice.");
+      return;
+    }
+    if (!invoice.account) {
+      setLookupError("Select a receivable account before saving this invoice.");
+      return;
+    }
+    if (!enteredLines.length || enteredLines.some((line) => Number(line.quantity) <= 0 || Number(line.rate) <= 0)) {
+      setLookupError("Each invoice line needs a quantity and rate greater than zero.");
+      return;
+    }
+    setSaving(true);
+    setLookupError("");
+    try {
+      const response = await fetch(getApiUrl("/api/customer-invoices"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: invoice.customerId,
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceDate: invoice.taxDate,
+          receivableAccountId: invoice.account,
+          currency: selectedCustomer?.currency || "GHS",
+          exchangeRate: invoice.exchangeRate,
+          customerMessage: invoice.message,
+          memo: invoice.memo,
+          lines: enteredLines.map((line) => ({
+            quantity: Number(line.quantity),
+            item: line.item,
+            description: line.description,
+            rate: Number(line.rate),
+          })),
+        }),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) throw new Error(result.message || "Unable to save invoice");
+      setSavedInvoiceId(result.invoice.id);
+      notify(`Invoice ${result.invoice.invoice_number} saved`);
+      if (afterSave === "new") {
+        setInvoice((current) => ({
+          ...current,
+          invoiceNumber: nextInvoiceNumber(),
+          taxDate: today(),
+          message: "",
+          memo: "",
+        }));
+        setLines([emptyLine()]);
+        setSavedInvoiceId(null);
+        notify("Invoice saved. New invoice started.");
+      } else if (afterSave === "close") {
+        navigate("/customersCenter");
+      }
+    } catch (saveError) {
+      setLookupError(saveError.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -117,8 +209,8 @@ function Invoice() {
           <button onClick={() => notify("New invoice started")}>
             ▣ <span>New</span>
           </button>
-          <button onClick={() => notify("Invoice saved")}>
-            ▤ <span>Save</span>
+          <button onClick={() => saveInvoice()} disabled={saving || Boolean(savedInvoiceId)}>
+            ▤ <span>{saving ? "Saving..." : savedInvoiceId ? "Saved" : "Save"}</span>
           </button>
           <button onClick={clearInvoice}>
             × <span>Delete</span>
@@ -166,14 +258,14 @@ function Invoice() {
       <div className="invoice-lookup">
         <label>CUSTOMER:</label>
         <select
-          name="customer"
-          value={invoice.customer}
+          name="customerId"
+          value={invoice.customerId}
           onChange={updateInvoice}
           aria-label="Customer"
         >
           <option value="">{lookupLoading ? "Loading customers..." : "Select customer"}</option>
           {customers.map((customer) => (
-            <option key={customer.id} value={customer.name}>
+            <option key={customer.id} value={customer.id}>
               {customer.name}
             </option>
           ))}
@@ -186,8 +278,8 @@ function Invoice() {
           aria-label="Account"
         >
           <option value="">{lookupLoading ? "Loading ledger accounts..." : "Select ledger account"}</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={`${account.code} - ${account.name}`}>
+          {accounts.filter((account) => account.account_type === "asset").map((account) => (
+            <option key={account.id} value={account.id}>
               {account.code} - {account.name}
             </option>
           ))}
@@ -236,7 +328,7 @@ function Invoice() {
                 INVOICE TO
                 <textarea
                   name="customer"
-                  value={invoice.customer ? `${invoice.customer}\n${selectedCustomer?.address || "Customer account on file"}` : ""}
+                  value={selectedCustomer ? `${selectedCustomer.name}\n${selectedCustomer.invoice_address || selectedCustomer.address || "Customer account on file"}` : ""}
                   readOnly
                 />
               </label>
@@ -335,13 +427,15 @@ function Invoice() {
           <div className="invoice-actions">
             <button
               className="save-close"
-              onClick={() => notify("Invoice saved")}
+              onClick={() => saveInvoice("close")}
+              disabled={saving}
             >
               Save &amp; Close
             </button>
             <button
               className="save-new"
-              onClick={() => notify("Invoice saved. New invoice started")}
+              onClick={() => saveInvoice("new")}
+              disabled={saving}
             >
               Save &amp; New
             </button>

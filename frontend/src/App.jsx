@@ -15,6 +15,7 @@ import Journal from "./Pages/Journal";
 import Suppliers from "./Pages/Suppliers";
 import SuppliersCenter from "./Pages/SuppliersCenter";
 import Customers from "./Pages/Customers";
+import CustomersCenter from "./Pages/CustomersCenter";
 import AuthProvider from "./context/authContext";
 import Setting from "./Pages/Setting";
 import { useAuth } from "./context/auth";
@@ -213,6 +214,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission={["invoice", "bills"]}>
         <Customers />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/customersCenter",
+    element: (
+      <PermissionRoute permission={["invoice", "bills"]}>
+        <CustomersCenter />
       </PermissionRoute>
     ),
   },

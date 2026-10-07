@@ -1272,6 +1272,155 @@ router.patch("/api/customers/:id", async (req, res) => {
   }
 });
 
+const customerInvoiceSelect = "id, customer_id, invoice_number, invoice_date, receivable_account_id, currency, exchange_rate, total_amount, customer_message, memo, status, created_at, customer:customers(id, name, currency), receivable_account:ledger_accounts(id, code, name), lines:customer_invoice_lines(id, line_number, item, description, quantity, rate, amount)";
+const formatCustomerInvoice = (invoice) => ({
+  ...invoice,
+  customer: Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer,
+  receivable_account: Array.isArray(invoice.receivable_account)
+    ? invoice.receivable_account[0]
+    : invoice.receivable_account,
+  lines: (invoice.lines || []).sort((left, right) => left.line_number - right.line_number),
+  open_balance: invoice.status === "open" ? Number(invoice.total_amount || 0) : 0,
+});
+
+router.get("/api/customer-invoices", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, ["invoice", "bills"]);
+    if (!allowed) return res.status(403).json({ message: "Invoice permission required" });
+    let query = supabase.from("customer_invoices").select(customerInvoiceSelect);
+    if (req.query.customerId) {
+      if (!/^\d+$/.test(String(req.query.customerId))) {
+        return res.status(400).json({ message: "Invalid customer ID" });
+      }
+      query = query.eq("customer_id", req.query.customerId);
+    }
+    const { data, error } = await query
+      .order("invoice_date", { ascending: false })
+      .order("id", { ascending: false });
+    if (error) throw error;
+    return res.json({ invoices: (data || []).map(formatCustomerInvoice) });
+  } catch (error) {
+    console.error("Customer invoices lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load customer transactions" });
+  }
+});
+
+router.post("/api/customer-invoices", async (req, res) => {
+  let createdInvoiceId = null;
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req, ["invoice", "bills"]);
+    if (!allowed) return res.status(403).json({ message: "Invoice permission required" });
+    const customerId = String(req.body?.customerId ?? "");
+    const invoiceNumber = String(req.body?.invoiceNumber || "").trim();
+    const invoiceDate = String(req.body?.invoiceDate || "");
+    const accountId = String(req.body?.receivableAccountId ?? "");
+    const currencyCode = String(req.body?.currency || "GHS").trim().toUpperCase();
+    const exchangeRate = Number(req.body?.exchangeRate ?? 1);
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    if (!/^\d+$/.test(customerId)) return res.status(400).json({ message: "Select a valid customer" });
+    if (!invoiceNumber) return res.status(400).json({ message: "Invoice number is required" });
+    if (!/^\d+$/.test(accountId)) return res.status(400).json({ message: "Select a valid receivable account" });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)
+      || Number.isNaN(Date.parse(`${invoiceDate}T00:00:00Z`))) {
+      return res.status(400).json({ message: "Enter a valid invoice date" });
+    }
+    if (!/^[A-Z]{3,10}$/.test(currencyCode)) return res.status(400).json({ message: "Enter a valid currency code" });
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      return res.status(400).json({ message: "Exchange rate must be greater than zero" });
+    }
+    if (!lines.length || lines.length > 100) {
+      return res.status(400).json({ message: "Add between 1 and 100 invoice lines" });
+    }
+    const normalizedLines = lines.map((line, index) => {
+      const quantity = Number(line.quantity);
+      const rate = Number(line.rate);
+      return {
+        line_number: index + 1,
+        item: String(line.item || "").trim() || null,
+        description: String(line.description || "").trim() || null,
+        quantity,
+        rate,
+        amount: Number((quantity * rate).toFixed(2)),
+      };
+    });
+    if (normalizedLines.some((line) => !Number.isFinite(line.quantity)
+      || line.quantity <= 0
+      || !Number.isFinite(line.rate)
+      || line.rate < 0
+      || !Number.isFinite(line.amount)
+      || line.amount <= 0)) {
+      return res.status(400).json({ message: "Each invoice line needs a positive quantity and amount" });
+    }
+    const totalAmount = Number(normalizedLines.reduce((sum, line) => sum + line.amount, 0).toFixed(2));
+
+    const { data: customer, error: customerError } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("id", customerId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (customerError) throw customerError;
+    if (!customer) return res.status(400).json({ message: "Choose an active customer" });
+
+    const { data: account, error: accountError } = await supabase
+      .from("ledger_accounts")
+      .select("id")
+      .eq("id", accountId)
+      .eq("is_active", true)
+      .eq("account_type", "asset")
+      .maybeSingle();
+    if (accountError) throw accountError;
+    if (!account) return res.status(400).json({ message: "Choose an active receivable account" });
+
+    const { data: invoice, error: invoiceError } = await supabase
+      .from("customer_invoices")
+      .insert({
+        customer_id: customerId,
+        invoice_number: invoiceNumber,
+        invoice_date: invoiceDate,
+        receivable_account_id: accountId,
+        currency: currencyCode,
+        exchange_rate: exchangeRate,
+        total_amount: totalAmount,
+        customer_message: String(req.body?.customerMessage || "").trim() || null,
+        memo: String(req.body?.memo || "").trim() || null,
+        created_by: currentUser.id,
+      })
+      .select("id")
+      .single();
+    if (invoiceError) {
+      if (invoiceError.code === "23505") {
+        return res.status(409).json({ message: "This invoice number is already used for this customer" });
+      }
+      throw invoiceError;
+    }
+    createdInvoiceId = invoice.id;
+
+    const { error: linesError } = await supabase
+      .from("customer_invoice_lines")
+      .insert(normalizedLines.map((line) => ({ ...line, customer_invoice_id: invoice.id })));
+    if (linesError) throw linesError;
+
+    const { data: savedInvoice, error: savedInvoiceError } = await supabase
+      .from("customer_invoices")
+      .select(customerInvoiceSelect)
+      .eq("id", invoice.id)
+      .single();
+    if (savedInvoiceError) throw savedInvoiceError;
+    return res.status(201).json({ invoice: formatCustomerInvoice(savedInvoice) });
+  } catch (error) {
+    if (createdInvoiceId) {
+      const { error: cleanupError } = await supabase
+        .from("customer_invoices")
+        .delete()
+        .eq("id", createdInvoiceId);
+      if (cleanupError) console.error("Customer invoice cleanup error:", cleanupError);
+    }
+    console.error("Customer invoice creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to save customer invoice" });
+  }
+});
+
 router.get("/api/payments/history", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
@@ -1391,6 +1540,12 @@ router.get("/api/reports/aging", async (req, res) => {
       .select("id, supplier_id, document_type, reference, bill_date, due_date, currency, total_amount, supplier:suppliers(id, name, currency)")
       .order("bill_date", { ascending: true });
     if (error) throw error;
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from("customer_invoices")
+      .select("id, customer_id, invoice_number, invoice_date, currency, total_amount, status, customer:customers(id, name, currency)")
+      .eq("status", "open")
+      .order("invoice_date", { ascending: true });
+    if (invoiceError) throw invoiceError;
     const suppliersById = new Map();
     for (const bill of data || []) {
       const supplier = Array.isArray(bill.supplier) ? bill.supplier[0] : bill.supplier;
@@ -1425,10 +1580,42 @@ router.get("/api/reports/aging", async (req, res) => {
       });
       suppliersById.set(String(supplier.id), summary);
     }
+    const customersById = new Map();
+    for (const invoice of invoiceData || []) {
+      const customer = Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer;
+      if (!customer) continue;
+      const ageDays = daysSinceDate(invoice.invoice_date);
+      const amount = Number(invoice.total_amount || 0);
+      const summary = customersById.get(String(customer.id)) || {
+        customer_id: customer.id,
+        name: customer.name,
+        currency: customer.currency || invoice.currency || "GHS",
+        total: 0,
+        days1to30: 0,
+        days31to60: 0,
+        days61to90: 0,
+        over90: 0,
+        transactions: [],
+      };
+      summary.total += amount;
+      if (ageDays <= 30) summary.days1to30 += amount;
+      else if (ageDays <= 60) summary.days31to60 += amount;
+      else if (ageDays <= 90) summary.days61to90 += amount;
+      else summary.over90 += amount;
+      summary.transactions.push({
+        id: invoice.id,
+        document_type: "invoice",
+        reference: invoice.invoice_number,
+        invoice_date: invoice.invoice_date,
+        age_days: ageDays,
+        amount,
+      });
+      customersById.set(String(customer.id), summary);
+    }
     return res.json({
       suppliers: [...suppliersById.values()].filter((supplier) => supplier.total !== 0),
-      customers: [],
-      message: "Supplier credit age is calculated from each bill date; customer invoices are not persisted yet.",
+      customers: [...customersById.values()].filter((customer) => customer.total !== 0),
+      message: "Supplier and customer aging is calculated from the bill or invoice date. Payment allocations are not yet recorded.",
     });
   } catch (error) {
     console.error("Aging report lookup error:", error);
