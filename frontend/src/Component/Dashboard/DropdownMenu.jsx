@@ -16,7 +16,7 @@ const MENU = [
     items: [
       { label: "Center", href: "/suppliersCenter" },
       { label: "Creation", href: "/suppliers" },
-      { label: "Bills", href: "/bills" },
+      { label: "Bills", href: "/bill" },
       { label: "Aging", href: "/suppliersAging" },
     ],
   },
