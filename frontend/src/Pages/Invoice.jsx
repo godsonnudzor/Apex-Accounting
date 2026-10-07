@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../App.css";
 import { getApiUrl, readApiResponse } from "../context/auth";
 
-const emptyLine = () => ({ quantity: 1, item: "", description: "", rate: 0 });
+const emptyLine = () => ({ quantity: 1, item: "", description: "", rate: 0, incomeAccountId: "" });
 const today = () => new Date().toISOString().slice(0, 10);
 const nextInvoiceNumber = () => `INV-${Date.now()}`;
 
@@ -131,7 +131,7 @@ function Invoice() {
       notify("This invoice has already been saved. Start a new invoice to record another transaction.");
       return;
     }
-    const enteredLines = lines.filter((line) => line.item || line.description || Number(line.rate) > 0);
+    const enteredLines = lines.filter((line) => line.item || line.description || Number(line.rate) > 0 || line.incomeAccountId);
     if (!invoice.customerId) {
       setLookupError("Select a customer before saving this invoice.");
       return;
@@ -140,8 +140,13 @@ function Invoice() {
       setLookupError("Select a receivable account before saving this invoice.");
       return;
     }
-    if (!enteredLines.length || enteredLines.some((line) => Number(line.quantity) <= 0 || Number(line.rate) <= 0)) {
-      setLookupError("Each invoice line needs a quantity and rate greater than zero.");
+    if (!enteredLines.length || enteredLines.some((line) => (
+      Number(line.quantity) <= 0
+      || Number(line.rate) <= 0
+      || !accounts.some((account) => String(account.id) === String(line.incomeAccountId)
+        && account.account_type === "income")
+    ))) {
+      setLookupError("Each invoice line needs a quantity, rate, and income account.");
       return;
     }
     setSaving(true);
@@ -165,6 +170,7 @@ function Invoice() {
             item: line.item,
             description: line.description,
             rate: Number(line.rate),
+            incomeAccountId: line.incomeAccountId,
           })),
         }),
       });
@@ -270,12 +276,12 @@ function Invoice() {
             </option>
           ))}
         </select>
-        <label>ACCOUN...</label>
+        <label>RECEIVABLE ACCOUNT</label>
         <select
           name="account"
           value={invoice.account}
           onChange={updateInvoice}
-          aria-label="Account"
+          aria-label="Receivable account"
         >
           <option value="">{lookupLoading ? "Loading ledger accounts..." : "Select ledger account"}</option>
           {accounts.filter((account) => account.account_type === "asset").map((account) => (
@@ -340,10 +346,12 @@ function Invoice() {
             role="table"
             aria-label="Invoice line items"
           >
+            <p className="side-empty">Choose an income account for each line; saved invoice revenue is posted to Profit &amp; Loss.</p>
             <div className="line-header" role="row">
               <span>QTY</span>
               <span>ITEM</span>
               <span>DESCRIPTION</span>
+              <span>INCOME ACCOUNT</span>
               <span>RATE</span>
               <span>AMOUNT</span>
             </div>
@@ -369,6 +377,17 @@ function Invoice() {
                   value={line.description}
                   onChange={(event) => updateLine(index, event)}
                 />
+                <select
+                  aria-label={`Income account ${index + 1}`}
+                  name="incomeAccountId"
+                  value={line.incomeAccountId}
+                  onChange={(event) => updateLine(index, event)}
+                >
+                  <option value="">{lookupLoading ? "Loading income accounts..." : "Select income account"}</option>
+                  {accounts.filter((account) => account.account_type === "income").map((account) => (
+                    <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                  ))}
+                </select>
                 <input
                   aria-label={`Rate ${index + 1}`}
                   name="rate"

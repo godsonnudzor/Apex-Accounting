@@ -22,7 +22,7 @@ const initialBill = () => ({
 	billReceived: true,
 });
 
-const newLine = () => ({ account: "", amount: "", memo: "" });
+const newLine = () => ({ amount: "", memo: "" });
 
 const money = (value) => `${currency} ${Number(value || 0).toFixed(2)}`;
 
@@ -38,7 +38,6 @@ function Bill() {
 	const [saving, setSaving] = useState(false);
 	const [lines, setLines] = useState([newLine(), newLine(), newLine()]);
 	const [suppliers, setSuppliers] = useState([]);
-	const [accounts, setAccounts] = useState([]);
 	const [lookupLoading, setLookupLoading] = useState(true);
 	const [lookupError, setLookupError] = useState("");
 	const [activePanel, setActivePanel] = useState("Name");
@@ -46,18 +45,10 @@ function Bill() {
 
 	useEffect(() => {
 		const loadBillLookups = async () => {
-			const [supplierResponse, accountResponse] = await Promise.all([
-				fetch(getApiUrl("/api/suppliers"), { credentials: "include" }),
-				fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
-			]);
-			const [supplierResult, accountResult] = await Promise.all([
-				readApiResponse(supplierResponse),
-				readApiResponse(accountResponse),
-			]);
+			const supplierResponse = await fetch(getApiUrl("/api/suppliers"), { credentials: "include" });
+			const supplierResult = await readApiResponse(supplierResponse);
 			if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
-			if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
 			setSuppliers(supplierResult.suppliers || []);
-			setAccounts(accountResult.accounts || []);
 		};
 
 		loadBillLookups()
@@ -86,44 +77,11 @@ function Bill() {
 	const selectSupplier = (event) => {
 		const supplierId = event.target.value;
 		const supplier = suppliers.find((item) => String(item.id) === String(supplierId));
-		const previousSupplier = suppliers.find((item) => String(item.id) === String(bill.supplierId));
 		setBill((current) => ({
 			...current,
 			supplierId,
 			terms: supplier?.payment_terms || current.terms,
 		}));
-
-		const prefilledAccountIds = [
-			supplier?.expense_account_1_id,
-			supplier?.expense_account_2_id,
-			supplier?.expense_account_3_id,
-		];
-		setLines((current) => {
-			const next = [...current];
-			const requiredLines = prefilledAccountIds.reduce((count, accountId, index) => (
-				accountId == null ? count : index + 1
-			), 0);
-			while (next.length < requiredLines) next.push(newLine());
-			const previousPrefilledIds = [
-				previousSupplier?.expense_account_1_id,
-				previousSupplier?.expense_account_2_id,
-				previousSupplier?.expense_account_3_id,
-			];
-			previousPrefilledIds.forEach((accountId, index) => {
-				const account = accounts.find((item) => String(item.id) === String(accountId));
-				if (account && next[index]?.account === String(account.id)) {
-					next[index] = { ...next[index], account: "" };
-				}
-			});
-			prefilledAccountIds.forEach((accountId, index) => {
-				if (accountId == null) return;
-				const account = accounts.find((item) => String(item.id) === String(accountId));
-				if (account && !next[index].account) {
-					next[index] = { ...next[index], account: String(account.id) };
-				}
-			});
-			return next;
-		});
 	};
 
 	const updateLine = (index, event) => {
@@ -156,14 +114,14 @@ function Bill() {
 		}
 		setSaving(true);
 		setLookupError("");
-		const enteredLines = lines.filter((line) => line.account || line.amount || line.memo);
+		const enteredLines = lines.filter((line) => line.amount || line.memo);
 		if (!bill.supplierId) {
 			setLookupError("Select a supplier before saving this transaction.");
 			setSaving(false);
 			return;
 		}
-		if (!enteredLines.length || enteredLines.some((line) => !line.account || Number(line.amount) <= 0)) {
-			setLookupError("Each bill line needs an expense account and an amount greater than zero.");
+		if (!enteredLines.length || enteredLines.some((line) => Number(line.amount) <= 0)) {
+			setLookupError("Each bill line needs an amount greater than zero.");
 			setSaving(false);
 			return;
 		}
@@ -186,7 +144,6 @@ function Bill() {
 					billReceived: bill.billReceived,
 					memo: bill.memo,
 					lines: enteredLines.map((line) => ({
-						ledgerAccountId: line.account,
 						amount: Number(line.amount),
 						memo: line.memo,
 					})),
@@ -260,14 +217,12 @@ function Bill() {
 						</div>
 					</div>
 
-					<div className="bill-section-bar"><strong>Expenses</strong><span>{money(subtotal)}</span><strong>Items</strong><span>{money(total)}</span></div>
-					<div className="bill-table" role="table" aria-label="Bill expense lines">
-						<div className="bill-table-head" role="row"><span>ACCOUNT</span><span>AMOUNT ({currency})</span><span>MEMO</span><span aria-label="remove column" /></div>
+					<div className="bill-section-bar"><strong>Bill items</strong><span>{money(subtotal)}</span><strong>Items</strong><span>{money(total)}</span></div>
+					<p className="side-muted">Assign expense ledger accounts from Supplier Center after saving the bill.</p>
+					<div className="bill-table" role="table" aria-label="Bill lines">
+						<div className="bill-table-head" role="row"><span>AMOUNT ({currency})</span><span>MEMO</span><span aria-label="remove column" /></div>
 						{lines.map((line, index) => (
 							<div className="bill-table-row" role="row" key={index}>
-								<select name="account" value={line.account} onChange={(event) => updateLine(index, event)} aria-label={`Account ${index + 1}`}>
-									<option value="">{lookupLoading ? "Loading ledger accounts..." : "Choose account"}</option>{accounts.filter((account) => account.account_type === "expense").map((account) => <option key={account.id} value={account.id}>{account.code} - {account.name}</option>)}
-								</select>
 								<input name="amount" type="number" min="0" step="0.01" value={line.amount} onChange={(event) => updateLine(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" />
 								<input name="memo" value={line.memo} onChange={(event) => updateLine(index, event)} aria-label={`Memo ${index + 1}`} />
 								<button aria-label={`Remove line ${index + 1}`} onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}>x</button>

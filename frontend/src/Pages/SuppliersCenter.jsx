@@ -373,7 +373,7 @@ const SuppliersCenter = () => {
                                           onChange={(event) => updateLineAccount(bill.id, line.id, event.target.value)}
                                           className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:opacity-60"
                                         >
-                                          <option value="" disabled>Select account</option>
+                                          <option value="" disabled>Unassigned — select expense account</option>
                                           {expenseAccounts.map((account) => (
                                             <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
                                           ))}

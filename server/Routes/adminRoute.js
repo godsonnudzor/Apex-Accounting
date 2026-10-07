@@ -953,23 +953,31 @@ router.post("/api/supplier-bills", async (req, res) => {
     }
 
     const normalizedLines = lines.map((line) => ({
-      ledger_account_id: String(line.ledgerAccountId ?? ""),
+      ledger_account_id: line.ledgerAccountId == null || line.ledgerAccountId === ""
+        ? null
+        : String(line.ledgerAccountId),
       amount: Number(line.amount),
       memo: String(line.memo || "").trim() || null,
     }));
-    if (normalizedLines.some((line) => !/^\d+$/.test(line.ledger_account_id) || !Number.isFinite(line.amount) || line.amount <= 0)) {
-      return res.status(400).json({ message: "Every transaction line needs an expense account and amount greater than zero" });
+    if (normalizedLines.some((line) => (
+      (line.ledger_account_id !== null && !/^\d+$/.test(line.ledger_account_id))
+      || !Number.isFinite(line.amount)
+      || line.amount <= 0
+    ))) {
+      return res.status(400).json({ message: "Every line needs an amount greater than zero, and any supplied expense account must be valid and active" });
     }
-    const accountIds = [...new Set(normalizedLines.map((line) => line.ledger_account_id))];
-    const { data: validAccounts, error: accountError } = await supabase
-      .from("ledger_accounts")
-      .select("id")
-      .in("id", accountIds)
-      .eq("is_active", true)
-      .eq("account_type", "expense");
-    if (accountError) throw accountError;
-    if ((validAccounts || []).length !== accountIds.length) {
-      return res.status(400).json({ message: "Choose active expense ledger accounts for all transaction lines" });
+    const accountIds = [...new Set(normalizedLines.map((line) => line.ledger_account_id).filter(Boolean))];
+    if (accountIds.length) {
+      const { data: validAccounts, error: accountError } = await supabase
+        .from("ledger_accounts")
+        .select("id")
+        .in("id", accountIds)
+        .eq("is_active", true)
+        .eq("account_type", "expense");
+      if (accountError) throw accountError;
+      if ((validAccounts || []).length !== accountIds.length) {
+        return res.status(400).json({ message: "Choose active expense ledger accounts for all assigned transaction lines" });
+      }
     }
 
     const { data: supplier, error: supplierError } = await supabase
@@ -1272,14 +1280,19 @@ router.patch("/api/customers/:id", async (req, res) => {
   }
 });
 
-const customerInvoiceSelect = "id, customer_id, invoice_number, invoice_date, receivable_account_id, currency, exchange_rate, total_amount, customer_message, memo, status, created_at, customer:customers(id, name, currency), receivable_account:ledger_accounts(id, code, name), lines:customer_invoice_lines(id, line_number, item, description, quantity, rate, amount)";
+const customerInvoiceSelect = "id, customer_id, invoice_number, invoice_date, receivable_account_id, currency, exchange_rate, total_amount, customer_message, memo, status, created_at, customer:customers(id, name, currency), receivable_account:ledger_accounts(id, code, name), lines:customer_invoice_lines(id, line_number, item, description, quantity, rate, amount, income_account_id, income_account:ledger_accounts(id, code, name))";
 const formatCustomerInvoice = (invoice) => ({
   ...invoice,
   customer: Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer,
   receivable_account: Array.isArray(invoice.receivable_account)
     ? invoice.receivable_account[0]
     : invoice.receivable_account,
-  lines: (invoice.lines || []).sort((left, right) => left.line_number - right.line_number),
+  lines: (invoice.lines || [])
+    .map((line) => ({
+      ...line,
+      income_account: Array.isArray(line.income_account) ? line.income_account[0] : line.income_account,
+    }))
+    .sort((left, right) => left.line_number - right.line_number),
   open_balance: invoice.status === "open" ? Number(invoice.total_amount || 0) : 0,
 });
 
@@ -1338,6 +1351,7 @@ router.post("/api/customer-invoices", async (req, res) => {
         line_number: index + 1,
         item: String(line.item || "").trim() || null,
         description: String(line.description || "").trim() || null,
+        income_account_id: String(line.incomeAccountId ?? ""),
         quantity,
         rate,
         amount: Number((quantity * rate).toFixed(2)),
@@ -1347,9 +1361,10 @@ router.post("/api/customer-invoices", async (req, res) => {
       || line.quantity <= 0
       || !Number.isFinite(line.rate)
       || line.rate < 0
+      || !/^\d+$/.test(line.income_account_id)
       || !Number.isFinite(line.amount)
       || line.amount <= 0)) {
-      return res.status(400).json({ message: "Each invoice line needs a positive quantity and amount" });
+      return res.status(400).json({ message: "Each invoice line needs a positive quantity and amount, and an income account" });
     }
     const totalAmount = Number(normalizedLines.reduce((sum, line) => sum + line.amount, 0).toFixed(2));
 
@@ -1364,13 +1379,26 @@ router.post("/api/customer-invoices", async (req, res) => {
 
     const { data: account, error: accountError } = await supabase
       .from("ledger_accounts")
-      .select("id")
+      .select("id, code, name")
       .eq("id", accountId)
       .eq("is_active", true)
       .eq("account_type", "asset")
       .maybeSingle();
     if (accountError) throw accountError;
     if (!account) return res.status(400).json({ message: "Choose an active receivable account" });
+
+    const incomeAccountIds = [...new Set(normalizedLines.map((line) => line.income_account_id))];
+    const { data: incomeAccounts, error: incomeAccountsError } = await supabase
+      .from("ledger_accounts")
+      .select("id, code, name")
+      .in("id", incomeAccountIds)
+      .eq("is_active", true)
+      .eq("account_type", "income");
+    if (incomeAccountsError) throw incomeAccountsError;
+    if ((incomeAccounts || []).length !== incomeAccountIds.length) {
+      return res.status(400).json({ message: "Choose an active income account for every invoice line" });
+    }
+    const incomeAccountsById = new Map(incomeAccounts.map((incomeAccount) => [String(incomeAccount.id), incomeAccount]));
 
     const { data: invoice, error: invoiceError } = await supabase
       .from("customer_invoices")
@@ -1400,6 +1428,42 @@ router.post("/api/customer-invoices", async (req, res) => {
       .from("customer_invoice_lines")
       .insert(normalizedLines.map((line) => ({ ...line, customer_invoice_id: invoice.id })));
     if (linesError) throw linesError;
+
+    const { data: journalEntry, error: journalEntryError } = await supabase
+      .from("journal_entries")
+      .insert({
+        entry_date: invoiceDate,
+        reference: invoiceNumber,
+        description: `Customer invoice ${invoiceNumber}`,
+        source: "invoice",
+        customer_invoice_id: invoice.id,
+        created_by: currentUser.id,
+      })
+      .select("id")
+      .single();
+    if (journalEntryError) throw journalEntryError;
+
+    const journalLines = [
+      {
+        journal_entry_id: journalEntry.id,
+        account: `${account.code} - ${account.name}`,
+        debit: totalAmount,
+        credit: 0,
+        memo: `Receivable for invoice ${invoiceNumber}`,
+      },
+      ...normalizedLines.map((line) => {
+        const incomeAccount = incomeAccountsById.get(line.income_account_id);
+        return {
+          journal_entry_id: journalEntry.id,
+          account: `${incomeAccount.code} - ${incomeAccount.name}`,
+          debit: 0,
+          credit: line.amount,
+          memo: line.description || line.item || `Income for invoice ${invoiceNumber}`,
+        };
+      }),
+    ];
+    const { error: journalLinesError } = await supabase.from("journal_lines").insert(journalLines);
+    if (journalLinesError) throw journalLinesError;
 
     const { data: savedInvoice, error: savedInvoiceError } = await supabase
       .from("customer_invoices")

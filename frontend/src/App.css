@@ -30,7 +30,7 @@
 .bill-section-bar strong:nth-of-type(2) { padding: 7px 10px; background: #dbe2e5; font-weight: 400; }
 .bill-section-bar span { font-weight: 700; }
 .bill-table { border: 1px solid #c5cdd1; }
-.bill-table-head, .bill-table-row { display: grid; grid-template-columns: 1.1fr 140px minmax(160px, 1fr) 33px; }
+.bill-table-head, .bill-table-row { display: grid; grid-template-columns: 140px minmax(160px, 1fr) 33px; }
 .bill-table-head { height: 24px; color: #68757b; font-size: 10px; align-items: center; }
 .bill-table-head span { padding-left: 7px; border-right: 1px dotted #adb7ba; }
 .bill-table-row { min-height: 35px; background: #fff; }
@@ -1242,7 +1242,7 @@ button {
 .line-header,
 .line-row {
   display: grid;
-  grid-template-columns: 82px 160px minmax(190px, 1fr) 80px 135px;
+  grid-template-columns: 65px 120px minmax(150px, 1fr) minmax(180px, 1.1fr) 75px 115px;
 }
 .line-header {
   height: 22px;
@@ -1262,6 +1262,7 @@ button {
   background: #e5f0ff;
 }
 .line-row input,
+.line-row select,
 .line-row output {
   width: 100%;
   min-width: 0;
@@ -1444,7 +1445,7 @@ button {
   }
   .line-header,
   .line-row {
-    grid-template-columns: 55px 100px minmax(140px, 1fr) 70px 95px;
+    grid-template-columns: 55px 90px minmax(120px, 1fr) minmax(150px, 1fr) 65px 90px;
   }
   .invoice-actions {
     position: static;
