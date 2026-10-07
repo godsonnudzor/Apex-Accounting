@@ -917,7 +917,7 @@ router.get("/api/supplier-bills", async (req, res) => {
       .order("bill_date", { ascending: false })
       .order("id", { ascending: false });
     if (error) throw error;
-    return res.json({ bills: (data || []).map(formatSupplierBill) });
+    return res.json({ bills: (data || []).map((bill) => formatSupplierBill(bill)) });
   } catch (error) {
     console.error("Supplier bills lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load supplier transactions" });
