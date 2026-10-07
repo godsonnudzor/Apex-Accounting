@@ -8,7 +8,7 @@ const MENU = [
     items: [
       { label: "Chart of Account", href: "/chart-of-accounts" },
       { label: "Journal Entries", href: "/journal-entries" },
-      { label: "Account Creation", href: "/account-creation" },
+      { label: "Ledger Creation", href: "/chart-of-accounts" },
     ],
   },
   {
