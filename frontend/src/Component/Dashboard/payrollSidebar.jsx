@@ -111,7 +111,7 @@ const PayrollDashboardSidebar = () => {
         ) : null}
         {hasPermission("writeCheque") ? (
           <NavLink
-            to="/suppliers"
+            to="/suppliersCenter"
             className={({ isActive }) =>
               `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`
             }

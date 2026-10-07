@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { getApiUrl } from "../context/auth";
 
 const tabs = [
@@ -103,36 +104,35 @@ const toForm = (supplier) => ({
 });
 
 const Suppliers = () => {
-  const [suppliers, setSuppliers] = useState([]);
+  const location = useLocation();
   const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [activeTab, setActiveTab] = useState("address");
   const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
-      const [supplierResponse, accountResponse] = await Promise.all([
-        fetch(getApiUrl("/api/suppliers?includeInactive=true"), { credentials: "include" }),
-        fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
-      ]);
-      const [supplierResult, accountResult] = await Promise.all([
-        supplierResponse.json(),
-        accountResponse.json(),
-      ]);
-      if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
+      const accountResponse = await fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" });
+      const accountResult = await accountResponse.json();
       if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
-      setSuppliers(supplierResult.suppliers || []);
       setAccounts(accountResult.accounts || []);
     };
 
     loadData()
-      .catch((loadError) => setError(loadError.message))
-      .finally(() => setLoading(false));
+      .catch((loadError) => setError(loadError.message));
   }, []);
+
+  useEffect(() => {
+    if (!location.state?.supplier) return;
+    const supplier = location.state.supplier;
+    setForm(toForm(supplier));
+    setEditingId(supplier.id);
+    setError("");
+    setMessage("");
+  }, [location.state]);
 
   const expenseAccounts = useMemo(
     () => accounts.filter((account) => account.account_type === "expense"),
@@ -203,13 +203,6 @@ const Suppliers = () => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Unable to save supplier");
 
-      setSuppliers((current) => {
-        const existingIndex = current.findIndex((supplier) => String(supplier.id) === String(result.supplier.id));
-        if (existingIndex < 0) return [result.supplier, ...current];
-        return current.map((supplier) => (
-          String(supplier.id) === String(result.supplier.id) ? result.supplier : supplier
-        ));
-      });
       resetForm();
       setMessage(editingId ? "Supplier updated successfully." : "Supplier created successfully.");
     } catch (saveError) {
@@ -217,15 +210,6 @@ const Suppliers = () => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const editSupplier = (supplier) => {
-    setForm(toForm(supplier));
-    setEditingId(supplier.id);
-    setActiveTab("address");
-    setError("");
-    setMessage("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const copyBilledAddress = () => {
@@ -422,6 +406,7 @@ const Suppliers = () => {
             <p className="text-sm font-semibold uppercase tracking-wider text-teal-600">Accounting</p>
             <h1 className="mt-1 text-3xl font-bold text-slate-900">Suppliers</h1>
             <p className="mt-2 text-sm text-slate-500">Manage supplier contact, payment, tax, and bill account details.</p>
+            <Link to="/suppliersCenter" className="mt-2 inline-block text-sm font-semibold text-teal-700 hover:underline">Back to supplier center</Link>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current balance</p>
@@ -474,49 +459,6 @@ const Suppliers = () => {
           </div>
         </form>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
-            <h2 className="text-lg font-semibold text-slate-900">Supplier directory</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Address</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-500">Loading suppliers...</td></tr>
-                ) : suppliers.length ? suppliers.map((supplier) => (
-                  <tr key={supplier.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3 font-semibold text-slate-900">{supplier.name}</td>
-                    <td className="px-4 py-3">{supplier.main_email || supplier.email || "-"}</td>
-                    <td className="px-4 py-3">{supplier.main_phone || supplier.phone || "-"}</td>
-                    <td className="max-w-xs truncate px-4 py-3">{supplier.billed_from || supplier.address || "-"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${supplier.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                        {supplier.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button type="button" onClick={() => editSupplier(supplier)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-500">No suppliers found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
       </div>
     </main>
   );
