@@ -16,7 +16,10 @@ const formatMoney = (amount, currency = "GHS") => {
 const SuppliersCenter = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
+  const [bills, setBills] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [updatingLineId, setUpdatingLineId] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [workspaceTab, setWorkspaceTab] = useState("Suppliers");
@@ -25,16 +28,26 @@ const SuppliersCenter = () => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadSuppliers = async () => {
-      const response = await fetch(getApiUrl("/api/suppliers?includeInactive=true"), {
-        credentials: "include",
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Unable to load suppliers");
-      setSuppliers(result.suppliers || []);
+    const loadData = async () => {
+      const [supplierResponse, billResponse, accountResponse] = await Promise.all([
+        fetch(getApiUrl("/api/suppliers?includeInactive=true"), { credentials: "include" }),
+        fetch(getApiUrl("/api/supplier-bills"), { credentials: "include" }),
+        fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
+      ]);
+      const [supplierResult, billResult, accountResult] = await Promise.all([
+        supplierResponse.json(),
+        billResponse.json(),
+        accountResponse.json(),
+      ]);
+      if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
+      if (!billResponse.ok) throw new Error(billResult.message || "Unable to load supplier transactions");
+      if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
+      setSuppliers(supplierResult.suppliers || []);
+      setBills(billResult.bills || []);
+      setAccounts(accountResult.accounts || []);
     };
 
-    loadSuppliers()
+    loadData()
       .catch((loadError) => setError(loadError.message))
       .finally(() => setLoading(false));
   }, []);
@@ -54,10 +67,50 @@ const SuppliersCenter = () => {
   const selectedSupplier = visibleSuppliers.find(
     (supplier) => String(supplier.id) === String(selectedSupplierId),
   ) || visibleSuppliers[0] || null;
+  const selectedBills = useMemo(
+    () => bills.filter((bill) => String(bill.supplier_id) === String(selectedSupplier?.id)),
+    [bills, selectedSupplier?.id],
+  );
+  const expenseAccounts = accounts.filter((account) => account.account_type === "expense");
 
   const editSelectedSupplier = () => {
     if (!selectedSupplier) return;
     navigate("/suppliers", { state: { supplier: selectedSupplier } });
+  };
+
+  const createSupplierTransaction = () => {
+    navigate("/bill", { state: { supplierId: selectedSupplier?.id } });
+  };
+
+  const updateLineAccount = async (billId, lineId, ledgerAccountId) => {
+    setError("");
+    setUpdatingLineId(lineId);
+    try {
+      const response = await fetch(getApiUrl(`/api/supplier-bill-lines/${lineId}`), {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ledgerAccountId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Unable to update ledger account");
+      setBills((current) => current.map((bill) => (
+        String(bill.id) !== String(billId)
+          ? bill
+          : {
+            ...bill,
+            lines: bill.lines.map((line) => (
+              String(line.id) === String(lineId)
+                ? { ...line, ledger_account_id: result.line.ledger_account_id, ledger_account: result.line.ledger_account }
+                : line
+            )),
+          }
+      )));
+    } catch (updateError) {
+      setError(updateError.message);
+    } finally {
+      setUpdatingLineId(null);
+    }
   };
 
   const exportSuppliers = () => {
@@ -95,7 +148,7 @@ const SuppliersCenter = () => {
           <Link to="/suppliers" className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white no-underline hover:bg-teal-800">
             + New Supplier
           </Link>
-          <button type="button" onClick={() => setWorkspaceTab("Transactions")} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-100">
+          <button type="button" onClick={createSupplierTransaction} disabled={!selectedSupplier} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50">
             New Transactions
           </button>
           <button type="button" onClick={() => window.print()} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-100">
@@ -179,7 +232,7 @@ const SuppliersCenter = () => {
                       >
                         <td className="truncate px-3 py-2 font-medium" title={supplier.name}>{supplier.name}</td>
                         <td className="px-2 py-2">{supplier.currency || "GHS"}</td>
-                        <td title="Balance is unavailable until bills and payments are persisted" className="px-2 py-2 text-right tabular-nums">{formatMoney(null, supplier.currency || "GHS")}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{formatMoney(bills.filter((bill) => String(bill.supplier_id) === String(supplier.id)).reduce((sum, bill) => sum + Number(bill.signed_amount || 0), 0), supplier.currency || "GHS")}</td>
                       </tr>
                     );
                   }) : (
@@ -189,8 +242,32 @@ const SuppliersCenter = () => {
               </table>
             </div>
             </> : (
-              <div className="p-5 text-sm text-slate-500">
-                Supplier transactions are not available here until bills and payments are persisted.
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-left text-xs">
+                  <thead className="bg-slate-100 uppercase tracking-wide text-slate-500">
+                    <tr><th className="px-3 py-2">Supplier</th><th className="px-2 py-2">Transaction</th><th className="px-2 py-2">Date</th><th className="px-2 py-2 text-right">Age</th></tr>
+                  </thead>
+                  <tbody>
+                    {bills.length ? bills.map((bill) => (
+                      <tr
+                        key={bill.id}
+                        onClick={() => {
+                          setSelectedSupplierId(String(bill.supplier_id));
+                          setStatusFilter("all");
+                          setWorkspaceTab("Suppliers");
+                        }}
+                        className="cursor-pointer border-t border-slate-200 hover:bg-slate-100"
+                      >
+                        <td className="truncate px-3 py-2 font-medium">{bill.supplier?.name || "Supplier"}</td>
+                        <td className="px-2 py-2 capitalize">{bill.document_type}</td>
+                        <td className="whitespace-nowrap px-2 py-2">{bill.bill_date}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{bill.age_days ?? "—"}d</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="4" className="px-3 py-6 text-center text-slate-500">No supplier transactions recorded.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
           </aside>
@@ -266,14 +343,52 @@ const SuppliersCenter = () => {
                     </div>
                   ) : detailTab === "Transactions" ? (
                     <div className="mt-3 overflow-x-auto rounded-md border border-slate-200">
-                      <div className="grid min-w-[700px] grid-cols-[repeat(7,minmax(100px,1fr))] bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                        {["Type", "Num", "Date", "Due date", "Ageing", `Amount (${selectedSupplier.currency || "GHS"})`, "Open balance"].map((label) => (
-                          <span key={label} className="border-r border-slate-200 px-3 py-2">{label}</span>
-                        ))}
-                      </div>
-                      <div className="flex min-h-64 items-center justify-center bg-white px-4 text-center text-sm text-slate-500">
-                        Supplier transaction history will appear here when bills and payments are persisted.
-                      </div>
+                      <table className="w-full min-w-[1050px] text-left text-sm">
+                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                          <tr>
+                            {["Type", "Num", "Date", "Due date", "Age (days)", `Amount (${selectedSupplier.currency || "GHS"})`, "Open balance", "Ledger account"].map((label) => (
+                              <th key={label} className="border-b border-slate-200 px-3 py-2 font-medium">{label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedBills.length ? selectedBills.map((bill) => (
+                            <tr key={bill.id} className="border-b border-slate-100 align-top last:border-0">
+                              <td className="px-3 py-3 capitalize">{bill.document_type}</td>
+                              <td className="px-3 py-3">{bill.reference || "—"}</td>
+                              <td className="whitespace-nowrap px-3 py-3">{bill.bill_date}</td>
+                              <td className="whitespace-nowrap px-3 py-3">{bill.due_date || "—"}</td>
+                              <td className="px-3 py-3 tabular-nums">{bill.age_days ?? "—"}</td>
+                              <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatMoney(bill.signed_amount, bill.currency || selectedSupplier.currency || "GHS")}</td>
+                              <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatMoney(bill.signed_amount, bill.currency || selectedSupplier.currency || "GHS")}</td>
+                              <td className="min-w-64 px-3 py-2">
+                                {bill.lines?.length ? (
+                                  <div className="space-y-2">
+                                    {bill.lines.map((line) => (
+                                      <label key={line.id} className="block">
+                                        <span className="sr-only">Ledger account for {bill.reference || bill.document_type}</span>
+                                        <select
+                                          value={line.ledger_account_id || ""}
+                                          disabled={updatingLineId === line.id}
+                                          onChange={(event) => updateLineAccount(bill.id, line.id, event.target.value)}
+                                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:opacity-60"
+                                        >
+                                          <option value="" disabled>Select account</option>
+                                          {expenseAccounts.map((account) => (
+                                            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                    ))}
+                                  </div>
+                                ) : <span className="text-slate-400">No line account</span>}
+                              </td>
+                            </tr>
+                          )) : (
+                            <tr><td colSpan="8" className="px-4 py-12 text-center text-slate-500">No bills or credits have been recorded for this supplier.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   ) : (
                     <div className="flex min-h-64 items-center justify-center rounded-b-md border border-t-0 border-slate-300 px-4 text-center text-sm text-slate-500">

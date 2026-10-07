@@ -195,7 +195,7 @@ const router = createBrowserRouter([
   {
     path: "/suppliers",
     element: (
-      <PermissionRoute permission="writeCheque">
+      <PermissionRoute permission={["writeCheque", "bills", "invoice"]}>
         <Suppliers />
       </PermissionRoute>
     ),
@@ -203,7 +203,7 @@ const router = createBrowserRouter([
   {
     path: "/suppliersCenter",
     element: (
-      <PermissionRoute permission="writeCheque">
+      <PermissionRoute permission={["writeCheque", "bills", "invoice"]}>
         <SuppliersCenter />
       </PermissionRoute>
     ),

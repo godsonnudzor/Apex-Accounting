@@ -808,7 +808,7 @@ router.get("/api/suppliers", async (req, res) => {
 
 router.post("/api/suppliers", async (req, res) => {
   try {
-    const { currentUser, allowed } = await canUseAccounting(req);
+    const { currentUser, allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
     if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
 
     const payload = buildSupplierPayload(req.body || {});
@@ -845,7 +845,7 @@ router.post("/api/suppliers", async (req, res) => {
 
 router.patch("/api/suppliers/:id", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
     if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
     if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ message: "Invalid supplier ID" });
 
@@ -886,6 +886,182 @@ router.patch("/api/suppliers/:id", async (req, res) => {
     }
     console.error("Supplier update error:", error);
     return res.status(500).json({ message: error?.message || "Unable to update supplier" });
+  }
+});
+
+const supplierBillSelect = "id, supplier_id, document_type, reference, bill_date, due_date, payment_terms, currency, subtotal, discount_amount, tax_amount, total_amount, bill_received, memo, created_at, supplier:suppliers(id, name, currency), lines:supplier_bill_lines(id, ledger_account_id, amount, memo, ledger_account:ledger_accounts(id, code, name, account_type))";
+const daysSinceDate = (dateValue, now = new Date()) => {
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.max(0, Math.floor((todayUtc - date.getTime()) / 86400000));
+};
+const formatSupplierBill = (bill, now = new Date()) => ({
+  ...bill,
+  age_days: daysSinceDate(bill.bill_date, now),
+  signed_amount: Number(bill.total_amount || 0) * (bill.document_type === "credit" ? -1 : 1),
+  lines: (bill.lines || []).map((line) => ({
+    ...line,
+    ledger_account: Array.isArray(line.ledger_account) ? line.ledger_account[0] : line.ledger_account,
+  })),
+  supplier: Array.isArray(bill.supplier) ? bill.supplier[0] : bill.supplier,
+});
+
+router.get("/api/supplier-bills", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, ["bills", "write_cheque"]);
+    if (!allowed) return res.status(403).json({ message: "Supplier bill permission required" });
+    const { data, error } = await supabase
+      .from("supplier_bills")
+      .select(supplierBillSelect)
+      .order("bill_date", { ascending: false })
+      .order("id", { ascending: false });
+    if (error) throw error;
+    return res.json({ bills: (data || []).map(formatSupplierBill) });
+  } catch (error) {
+    console.error("Supplier bills lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load supplier transactions" });
+  }
+});
+
+router.post("/api/supplier-bills", async (req, res) => {
+  let insertedBillId = null;
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req, ["bills", "write_cheque"]);
+    if (!allowed) return res.status(403).json({ message: "Supplier bill permission required" });
+
+    const supplierId = String(req.body?.supplierId ?? "");
+    const documentType = req.body?.documentType === "credit" ? "credit" : req.body?.documentType === "bill" ? "bill" : "";
+    const billDate = String(req.body?.billDate || "");
+    const dueDate = String(req.body?.dueDate || "") || null;
+    const currencyCode = String(req.body?.currency || "GHS").trim().toUpperCase();
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const discountAmount = Number(req.body?.discountAmount || 0);
+    const taxAmount = Number(req.body?.taxAmount || 0);
+    if (!/^\d+$/.test(supplierId)) return res.status(400).json({ message: "Select a valid supplier" });
+    if (!documentType) return res.status(400).json({ message: "Transaction type must be bill or credit" });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(billDate) || Number.isNaN(Date.parse(`${billDate}T00:00:00Z`))) {
+      return res.status(400).json({ message: "Enter a valid bill date" });
+    }
+    if (dueDate && (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(Date.parse(`${dueDate}T00:00:00Z`)))) {
+      return res.status(400).json({ message: "Enter a valid due date" });
+    }
+    if (!/^[A-Z]{3,10}$/.test(currencyCode)) return res.status(400).json({ message: "Enter a valid currency code" });
+    if (!lines.length || lines.length > 100) return res.status(400).json({ message: "Add between 1 and 100 transaction lines" });
+    if (!Number.isFinite(discountAmount) || discountAmount < 0 || !Number.isFinite(taxAmount) || taxAmount < 0) {
+      return res.status(400).json({ message: "Discount and tax amounts must be non-negative numbers" });
+    }
+
+    const normalizedLines = lines.map((line) => ({
+      ledger_account_id: String(line.ledgerAccountId ?? ""),
+      amount: Number(line.amount),
+      memo: String(line.memo || "").trim() || null,
+    }));
+    if (normalizedLines.some((line) => !/^\d+$/.test(line.ledger_account_id) || !Number.isFinite(line.amount) || line.amount <= 0)) {
+      return res.status(400).json({ message: "Every transaction line needs an expense account and amount greater than zero" });
+    }
+    const accountIds = [...new Set(normalizedLines.map((line) => line.ledger_account_id))];
+    const { data: validAccounts, error: accountError } = await supabase
+      .from("ledger_accounts")
+      .select("id")
+      .in("id", accountIds)
+      .eq("is_active", true)
+      .eq("account_type", "expense");
+    if (accountError) throw accountError;
+    if ((validAccounts || []).length !== accountIds.length) {
+      return res.status(400).json({ message: "Choose active expense ledger accounts for all transaction lines" });
+    }
+
+    const { data: supplier, error: supplierError } = await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("id", supplierId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (supplierError) throw supplierError;
+    if (!supplier) return res.status(400).json({ message: "Choose an active supplier" });
+
+    const subtotal = normalizedLines.reduce((sum, line) => sum + line.amount, 0);
+    if (discountAmount > subtotal) return res.status(400).json({ message: "Discount cannot exceed the transaction subtotal" });
+    const totalAmount = Number((subtotal - discountAmount + taxAmount).toFixed(2));
+    if (totalAmount <= 0) return res.status(400).json({ message: "Transaction total must be greater than zero" });
+
+    const { data: bill, error: billError } = await supabase
+      .from("supplier_bills")
+      .insert({
+        supplier_id: supplierId,
+        document_type: documentType,
+        reference: String(req.body?.reference || "").trim() || null,
+        bill_date: billDate,
+        due_date: dueDate,
+        payment_terms: String(req.body?.paymentTerms || "").trim() || null,
+        currency: currencyCode,
+        subtotal: Number(subtotal.toFixed(2)),
+        discount_amount: Number(discountAmount.toFixed(2)),
+        tax_amount: Number(taxAmount.toFixed(2)),
+        total_amount: totalAmount,
+        bill_received: req.body?.billReceived !== false,
+        memo: String(req.body?.memo || "").trim() || null,
+        created_by: currentUser.id,
+      })
+      .select("id")
+      .single();
+    if (billError) throw billError;
+    insertedBillId = bill.id;
+
+    const { error: linesError } = await supabase
+      .from("supplier_bill_lines")
+      .insert(normalizedLines.map((line) => ({ ...line, supplier_bill_id: bill.id })));
+    if (linesError) throw linesError;
+
+    const { data: savedBill, error: savedBillError } = await supabase
+      .from("supplier_bills")
+      .select(supplierBillSelect)
+      .eq("id", bill.id)
+      .single();
+    if (savedBillError) throw savedBillError;
+    return res.status(201).json({ bill: formatSupplierBill(savedBill) });
+  } catch (error) {
+    if (insertedBillId) {
+      const { error: rollbackError } = await supabase.from("supplier_bills").delete().eq("id", insertedBillId);
+      if (rollbackError) console.error("Supplier bill cleanup error:", rollbackError);
+    }
+    console.error("Supplier bill creation error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to save supplier transaction" });
+  }
+});
+
+router.patch("/api/supplier-bill-lines/:lineId", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, ["bills", "write_cheque"]);
+    if (!allowed) return res.status(403).json({ message: "Supplier bill permission required" });
+    const lineId = String(req.params.lineId || "");
+    const accountId = String(req.body?.ledgerAccountId || "");
+    if (!/^\d+$/.test(lineId) || !/^\d+$/.test(accountId)) {
+      return res.status(400).json({ message: "Select a valid transaction line and ledger account" });
+    }
+    const { data: account, error: accountError } = await supabase
+      .from("ledger_accounts")
+      .select("id, code, name, account_type")
+      .eq("id", accountId)
+      .eq("is_active", true)
+      .eq("account_type", "expense")
+      .maybeSingle();
+    if (accountError) throw accountError;
+    if (!account) return res.status(400).json({ message: "Choose an active expense ledger account" });
+
+    const { data: line, error } = await supabase
+      .from("supplier_bill_lines")
+      .update({ ledger_account_id: accountId })
+      .eq("id", lineId)
+      .select("id, supplier_bill_id, ledger_account_id, amount, memo")
+      .maybeSingle();
+    if (error) throw error;
+    if (!line) return res.status(404).json({ message: "Supplier transaction line not found" });
+    return res.json({ line: { ...line, ledger_account: account } });
+  } catch (error) {
+    console.error("Supplier transaction account update error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to update transaction ledger account" });
   }
 });
 
@@ -1053,8 +1229,52 @@ router.get("/api/reports/aging", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
     if (!allowed) return res.status(403).json({ message: "Report permission required" });
-    return res.json({ suppliers: [], customers: [], message: "Bills and invoices are not persisted yet." });
+    const { data, error } = await supabase
+      .from("supplier_bills")
+      .select("id, supplier_id, document_type, reference, bill_date, due_date, currency, total_amount, supplier:suppliers(id, name, currency)")
+      .order("bill_date", { ascending: true });
+    if (error) throw error;
+    const suppliersById = new Map();
+    for (const bill of data || []) {
+      const supplier = Array.isArray(bill.supplier) ? bill.supplier[0] : bill.supplier;
+      if (!supplier) continue;
+      const ageDays = daysSinceDate(bill.bill_date);
+      const signedAmount = Number(bill.total_amount || 0) * (bill.document_type === "credit" ? -1 : 1);
+      const summary = suppliersById.get(String(supplier.id)) || {
+        supplier_id: supplier.id,
+        name: supplier.name,
+        currency: supplier.currency || bill.currency || "GHS",
+        total: 0,
+        current: 0,
+        days1to30: 0,
+        days31to60: 0,
+        days61to90: 0,
+        over90: 0,
+        transactions: [],
+      };
+      summary.total += signedAmount;
+      if (ageDays <= 30) summary.days1to30 += signedAmount;
+      else if (ageDays <= 60) summary.days31to60 += signedAmount;
+      else if (ageDays <= 90) summary.days61to90 += signedAmount;
+      else summary.over90 += signedAmount;
+      summary.transactions.push({
+        id: bill.id,
+        document_type: bill.document_type,
+        reference: bill.reference,
+        bill_date: bill.bill_date,
+        due_date: bill.due_date,
+        age_days: ageDays,
+        amount: signedAmount,
+      });
+      suppliersById.set(String(supplier.id), summary);
+    }
+    return res.json({
+      suppliers: [...suppliersById.values()].filter((supplier) => supplier.total !== 0),
+      customers: [],
+      message: "Supplier credit age is calculated from each bill date; customer invoices are not persisted yet.",
+    });
   } catch (error) {
+    console.error("Aging report lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load aging reports" });
   }
 });

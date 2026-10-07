@@ -1,27 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../App.css";
 import { getApiUrl, readApiResponse } from "../context/auth";
 
-const today = "2026-08-26";
+const today = new Date().toISOString().slice(0, 10);
 const currency = "GHC";
+const dateAfterDays = (date, days) => {
+	const nextDate = new Date(`${date}T00:00:00Z`);
+	nextDate.setUTCDate(nextDate.getUTCDate() + days);
+	return nextDate.toISOString().slice(0, 10);
+};
+const initialBill = () => ({
+	supplierId: "",
+	date: today,
+	reference: "",
+	dueDate: dateAfterDays(today, 45),
+	terms: "Net 45",
+	taxRate: "0",
+	discount: "0",
+	memo: "",
+	billReceived: true,
+});
 
 const newLine = () => ({ account: "", amount: "", memo: "" });
 
 const money = (value) => `${currency} ${Number(value || 0).toFixed(2)}`;
 
 function Bill() {
-	const [bill, setBill] = useState({
-		supplier: "",
-		date: today,
-		reference: "",
-		dueDate: "2026-10-10",
-		terms: "Net 45",
-		taxRate: "0",
-		discount: "0",
-		memo: "",
-		billReceived: true,
-	});
+	const location = useLocation();
+	const navigate = useNavigate();
+	const [bill, setBill] = useState(() => ({
+		...initialBill(),
+		supplierId: String(location.state?.supplierId || ""),
+	}));
+	const [documentType, setDocumentType] = useState("bill");
+	const [savedBillId, setSavedBillId] = useState(null);
+	const [saving, setSaving] = useState(false);
 	const [lines, setLines] = useState([newLine(), newLine(), newLine()]);
 	const [suppliers, setSuppliers] = useState([]);
 	const [accounts, setAccounts] = useState([]);
@@ -59,7 +73,7 @@ function Bill() {
 	const taxable = subtotal - discount;
 	const tax = taxable * (Number(bill.taxRate || 0) / 100);
 	const total = taxable + tax;
-	const selectedSupplier = suppliers.find((supplier) => supplier.name === bill.supplier);
+	const selectedSupplier = suppliers.find((supplier) => String(supplier.id) === String(bill.supplierId));
 
 	const updateBill = (event) => {
 		const { name, value, type, checked } = event.target;
@@ -70,12 +84,12 @@ function Bill() {
 	};
 
 	const selectSupplier = (event) => {
-		const supplierName = event.target.value;
-		const supplier = suppliers.find((item) => item.name === supplierName);
-		const previousSupplier = suppliers.find((item) => item.name === bill.supplier);
+		const supplierId = event.target.value;
+		const supplier = suppliers.find((item) => String(item.id) === String(supplierId));
+		const previousSupplier = suppliers.find((item) => String(item.id) === String(bill.supplierId));
 		setBill((current) => ({
 			...current,
-			supplier: supplierName,
+			supplierId,
 			terms: supplier?.payment_terms || current.terms,
 		}));
 
@@ -97,7 +111,7 @@ function Bill() {
 			];
 			previousPrefilledIds.forEach((accountId, index) => {
 				const account = accounts.find((item) => String(item.id) === String(accountId));
-				if (account && next[index]?.account === `${account.code} - ${account.name}`) {
+				if (account && next[index]?.account === String(account.id)) {
 					next[index] = { ...next[index], account: "" };
 				}
 			});
@@ -105,7 +119,7 @@ function Bill() {
 				if (accountId == null) return;
 				const account = accounts.find((item) => String(item.id) === String(accountId));
 				if (account && !next[index].account) {
-					next[index] = { ...next[index], account: `${account.code} - ${account.name}` };
+					next[index] = { ...next[index], account: String(account.id) };
 				}
 			});
 			return next;
@@ -127,9 +141,73 @@ function Bill() {
 	};
 
 	const clearBill = () => {
-		setBill((current) => ({ ...current, supplier: "", reference: "", memo: "" }));
+		setBill(initialBill());
+		setDocumentType("bill");
+		setSavedBillId(null);
+		setLookupError("");
 		setLines([newLine(), newLine(), newLine()]);
 		notify("Bill cleared");
+	};
+
+	const saveBill = async (afterSave = "stay") => {
+		if (savedBillId) {
+			notify("This bill is already saved. Start a new bill to record another transaction.");
+			return;
+		}
+		setSaving(true);
+		setLookupError("");
+		const enteredLines = lines.filter((line) => line.account || line.amount || line.memo);
+		if (!bill.supplierId) {
+			setLookupError("Select a supplier before saving this transaction.");
+			setSaving(false);
+			return;
+		}
+		if (!enteredLines.length || enteredLines.some((line) => !line.account || Number(line.amount) <= 0)) {
+			setLookupError("Each bill line needs an expense account and an amount greater than zero.");
+			setSaving(false);
+			return;
+		}
+
+		try {
+			const response = await fetch(getApiUrl("/api/supplier-bills"), {
+				method: "POST",
+				credentials: "include",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					supplierId: bill.supplierId,
+					documentType,
+					reference: bill.reference,
+					billDate: bill.date,
+					dueDate: bill.dueDate,
+					paymentTerms: bill.terms,
+					currency: selectedSupplier?.currency || "GHS",
+					discountAmount: discount,
+					taxAmount: tax,
+					billReceived: bill.billReceived,
+					memo: bill.memo,
+					lines: enteredLines.map((line) => ({
+						ledgerAccountId: line.account,
+						amount: Number(line.amount),
+						memo: line.memo,
+					})),
+				}),
+			});
+			const result = await readApiResponse(response);
+			if (!response.ok) throw new Error(result.message || "Unable to save supplier transaction");
+			setSavedBillId(result.bill.id);
+			notify(`${documentType === "credit" ? "Credit" : "Bill"} saved to supplier transactions`);
+			if (afterSave === "new") {
+				const currentSupplierId = bill.supplierId;
+				clearBill();
+				setBill((current) => ({ ...current, supplierId: currentSupplierId }));
+				notify("Transaction saved; ready for a new bill");
+			}
+			if (afterSave === "close") navigate("/suppliersCenter");
+		} catch (saveError) {
+			setLookupError(saveError.message);
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	return (
@@ -140,9 +218,9 @@ function Bill() {
 					<button className="bill-tab">Reports</button>
 				</div>
 				<div className="bill-tools">
-					<button onClick={() => notify("Ready to find a bill")}>Find</button>
+					<button onClick={() => notify("Saved transactions are listed in Supplier Center")}>Find</button>
 					<button onClick={clearBill}>New</button>
-					<button onClick={() => notify("Bill saved")}>Save</button>
+					<button onClick={() => saveBill()} disabled={saving || Boolean(savedBillId)}>{saving ? "Saving..." : savedBillId ? "Saved" : "Save"}</button>
 					<button onClick={clearBill}>Delete</button>
 					<button onClick={() => notify("Bill memorized")}>Memorise</button>
 					<button onClick={() => window.print()}>Print</button>
@@ -152,8 +230,8 @@ function Bill() {
 			</header>
 
 			<div className="bill-switcher">
-				<label><input type="radio" name="billType" defaultChecked /> Bill</label>
-				<label><input type="radio" name="billType" /> Credit</label>
+				<label><input type="radio" name="billType" checked={documentType === "bill"} onChange={() => setDocumentType("bill")} /> Bill</label>
+				<label><input type="radio" name="billType" checked={documentType === "credit"} onChange={() => setDocumentType("credit")} /> Credit</label>
 				<label className="received-check">
 					<input name="billReceived" type="checkbox" checked={bill.billReceived} onChange={updateBill} /> Bill Received
 				</label>
@@ -163,21 +241,21 @@ function Bill() {
 				<section className="bill-sheet">
 					<div className="bill-heading">
 						<div>
-							<Link className="bill-back" to="/dashboard">Back to dashboard</Link>
-							<h1>Bill</h1>
+							<Link className="bill-back" to="/suppliersCenter">Back to suppliers</Link>
+							<h1>{documentType === "credit" ? "Supplier Credit" : "Bill"}</h1>
 							<p>Record what your business owes and keep every split accounted for.</p>
 						</div>
 						<div className="bill-header-grid">
 							<label>SUPPLIER
-								<select name="supplier" value={bill.supplier} onChange={selectSupplier}>
+								<select name="supplierId" value={bill.supplierId} onChange={selectSupplier}>
 									<option value="">{lookupLoading ? "Loading suppliers..." : "Select supplier"}</option>
-									{suppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}
+									{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
 								</select>
 							</label>
 							<label>DATE<input name="date" type="date" value={bill.date} onChange={updateBill} /></label>
 							<label>REF. NO.<input name="reference" value={bill.reference} onChange={updateBill} placeholder="Optional" /></label>
 							<label>BILL DUE<input name="dueDate" type="date" value={bill.dueDate} onChange={updateBill} /></label>
-							<label className="bill-address">ADDRESS<textarea value={bill.supplier ? `${bill.supplier}\n${selectedSupplier?.address || "Supplier account on file"}` : ""} readOnly placeholder="Supplier address" /></label>
+							<label className="bill-address">ADDRESS<textarea value={selectedSupplier ? `${selectedSupplier.name}\n${selectedSupplier.billed_from || selectedSupplier.address || "Supplier account on file"}` : ""} readOnly placeholder="Supplier address" /></label>
 							<label>TERMS<select name="terms" value={bill.terms} onChange={updateBill}><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></label>
 						</div>
 					</div>
@@ -188,7 +266,7 @@ function Bill() {
 						{lines.map((line, index) => (
 							<div className="bill-table-row" role="row" key={index}>
 								<select name="account" value={line.account} onChange={(event) => updateLine(index, event)} aria-label={`Account ${index + 1}`}>
-									<option value="">{lookupLoading ? "Loading ledger accounts..." : "Choose account"}</option>{accounts.map((account) => <option key={account.id} value={`${account.code} - ${account.name}`}>{account.code} - {account.name}</option>)}
+									<option value="">{lookupLoading ? "Loading ledger accounts..." : "Choose account"}</option>{accounts.filter((account) => account.account_type === "expense").map((account) => <option key={account.id} value={account.id}>{account.code} - {account.name}</option>)}
 								</select>
 								<input name="amount" type="number" min="0" step="0.01" value={line.amount} onChange={(event) => updateLine(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" />
 								<input name="memo" value={line.memo} onChange={(event) => updateLine(index, event)} aria-label={`Memo ${index + 1}`} />
@@ -208,12 +286,12 @@ function Bill() {
 						</div>
 					</div>
 
-					<div className="bill-footer-actions"><span>Exchange rate 1 GHC = <input defaultValue="1" aria-label="Exchange rate" /> GHC</span><div><button onClick={() => notify("Bill saved and closed")}>Save &amp; Close</button><button className="bill-primary" onClick={() => notify("Bill saved. New bill started")}>Save &amp; New</button><button onClick={clearBill}>Clear</button></div></div>
+					<div className="bill-footer-actions"><span>Exchange rate 1 GHC = <input defaultValue="1" aria-label="Exchange rate" /> GHC</span><div><button onClick={() => saveBill("close")} disabled={saving || Boolean(savedBillId)}>Save &amp; Close</button><button className="bill-primary" onClick={() => saveBill("new")} disabled={saving}>Save &amp; New</button><button onClick={clearBill}>Clear</button></div></div>
 				</section>
 
 				<aside className="bill-sidebar">
 					<div className="bill-side-tabs"><button className={activePanel === "Name" ? "selected" : ""} onClick={() => setActivePanel("Name")}>Name</button><button className={activePanel === "Transaction" ? "selected" : ""} onClick={() => setActivePanel("Transaction")}>Transaction</button></div>
-					{activePanel === "Name" ? <><div className="bill-side-block"><h2>SUMMARY</h2><p>{bill.supplier || "No supplier selected"}</p><strong>{money(total)}</strong><small>Due {bill.dueDate || "not set"}</small></div><div className="bill-side-block"><h2>RECENT TRANSACTIONS</h2><p>Office supplies <span>{money(1280)}</span></p><p>Software subscription <span>{money(240)}</span></p></div><div className="bill-side-block"><h2>NOTES</h2><p className="side-muted">Notes about this bill will appear here.</p></div></> : <div className="bill-side-block"><h2>TRANSACTION DETAILS</h2><p className="side-muted">Save the bill to create transaction details.</p></div>}
+					{activePanel === "Name" ? <><div className="bill-side-block"><h2>SUMMARY</h2><p>{selectedSupplier?.name || "No supplier selected"}</p><strong>{money(total)}</strong><small>Due {bill.dueDate || "not set"}</small></div><div className="bill-side-block"><h2>TRANSACTION</h2><p>{savedBillId ? `Saved transaction #${savedBillId}` : "Not saved"}</p></div><div className="bill-side-block"><h2>NOTES</h2><p className="side-muted">{bill.memo || "No notes entered."}</p></div></> : <div className="bill-side-block"><h2>TRANSACTION DETAILS</h2><p className="side-muted">{savedBillId ? `Transaction #${savedBillId}` : "Save the bill to create transaction details."}</p></div>}
 				</aside>
 			</div>
 			{lookupError ? <div className="bill-error" role="alert">{lookupError}</div> : null}
