@@ -69,6 +69,49 @@ function Bill() {
 		}));
 	};
 
+	const selectSupplier = (event) => {
+		const supplierName = event.target.value;
+		const supplier = suppliers.find((item) => item.name === supplierName);
+		const previousSupplier = suppliers.find((item) => item.name === bill.supplier);
+		setBill((current) => ({
+			...current,
+			supplier: supplierName,
+			terms: supplier?.payment_terms || current.terms,
+		}));
+
+		const prefilledAccountIds = [
+			supplier?.expense_account_1_id,
+			supplier?.expense_account_2_id,
+			supplier?.expense_account_3_id,
+		];
+		setLines((current) => {
+			const next = [...current];
+			const requiredLines = prefilledAccountIds.reduce((count, accountId, index) => (
+				accountId == null ? count : index + 1
+			), 0);
+			while (next.length < requiredLines) next.push(newLine());
+			const previousPrefilledIds = [
+				previousSupplier?.expense_account_1_id,
+				previousSupplier?.expense_account_2_id,
+				previousSupplier?.expense_account_3_id,
+			];
+			previousPrefilledIds.forEach((accountId, index) => {
+				const account = accounts.find((item) => String(item.id) === String(accountId));
+				if (account && next[index]?.account === `${account.code} - ${account.name}`) {
+					next[index] = { ...next[index], account: "" };
+				}
+			});
+			prefilledAccountIds.forEach((accountId, index) => {
+				if (accountId == null) return;
+				const account = accounts.find((item) => String(item.id) === String(accountId));
+				if (account && !next[index].account) {
+					next[index] = { ...next[index], account: `${account.code} - ${account.name}` };
+				}
+			});
+			return next;
+		});
+	};
+
 	const updateLine = (index, event) => {
 		const { name, value } = event.target;
 		setLines((current) =>
@@ -126,7 +169,7 @@ function Bill() {
 						</div>
 						<div className="bill-header-grid">
 							<label>SUPPLIER
-								<select name="supplier" value={bill.supplier} onChange={updateBill}>
+								<select name="supplier" value={bill.supplier} onChange={selectSupplier}>
 									<option value="">{lookupLoading ? "Loading suppliers..." : "Select supplier"}</option>
 									{suppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}
 								</select>

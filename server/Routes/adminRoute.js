@@ -678,17 +678,128 @@ router.get("/api/cash-bank-accounts", async (req, res) => {
   }
 });
 
+const supplierSelect = "id, name, company_name, first_name, middle_name, last_name, salutation, job_title, email, main_email, cc_email, phone, main_phone, work_phone, mobile_phone, fax, website, other_email, address, billed_from, shipped_from, currency, account_number, credit_limit, payment_terms, print_name_on_cheque, billing_rate_level, bank_account_name, bank_sort_code, bank_account_number, vat_registration_number, supplier_vat(vat_registration_number), expense_account_1_id, expense_account_2_id, expense_account_3_id, supplier_type, custom_fields, is_active, created_at";
+const formatSupplier = (supplier) => {
+  const { supplier_vat: supplierVat, ...supplierDetails } = supplier;
+  return {
+    ...supplierDetails,
+    vat_registration_number: supplierVat?.vat_registration_number ?? supplierDetails.vat_registration_number,
+  };
+};
+const supplierColumnByField = {
+  companyName: "company_name",
+  firstName: "first_name",
+  middleName: "middle_name",
+  lastName: "last_name",
+  salutation: "salutation",
+  jobTitle: "job_title",
+  mainPhone: "main_phone",
+  workPhone: "work_phone",
+  mobilePhone: "mobile_phone",
+  fax: "fax",
+  mainEmail: "main_email",
+  ccEmail: "cc_email",
+  website: "website",
+  otherEmail: "other_email",
+  billedFrom: "billed_from",
+  shippedFrom: "shipped_from",
+  currency: "currency",
+  accountNumber: "account_number",
+  creditLimit: "credit_limit",
+  paymentTerms: "payment_terms",
+  printNameOnCheque: "print_name_on_cheque",
+  billingRateLevel: "billing_rate_level",
+  bankAccountName: "bank_account_name",
+  bankSortCode: "bank_sort_code",
+  bankAccountNumber: "bank_account_number",
+  vatRegistrationNumber: "vat_registration_number",
+  expenseAccount1Id: "expense_account_1_id",
+  expenseAccount2Id: "expense_account_2_id",
+  expenseAccount3Id: "expense_account_3_id",
+  supplierType: "supplier_type",
+  customFields: "custom_fields",
+};
+const supplierTextFields = new Set(Object.keys(supplierColumnByField).filter((field) => ![
+  "creditLimit",
+  "expenseAccount1Id",
+  "expenseAccount2Id",
+  "expenseAccount3Id",
+  "customFields",
+].includes(field)));
+
+const buildSupplierPayload = (body) => {
+  const payload = {};
+  const rawName = body.supplierName ?? body.name ?? body.companyName;
+  if (rawName !== undefined) payload.name = String(rawName).trim();
+
+  for (const [field, column] of Object.entries(supplierColumnByField)) {
+    if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+    if (supplierTextFields.has(field)) {
+      const value = String(body[field] ?? "").trim();
+      payload[column] = value || null;
+    } else if (field === "creditLimit") {
+      const value = String(body[field] ?? "").trim();
+      if (!value) {
+        payload[column] = null;
+      } else {
+        const amount = Number(value);
+        if (!Number.isFinite(amount) || amount < 0) throw new Error("Credit limit must be a non-negative amount");
+        payload[column] = amount;
+      }
+    } else if (field.startsWith("expenseAccount")) {
+      const value = String(body[field] ?? "").trim();
+      if (!value) {
+        payload[column] = null;
+      } else if (!/^\d+$/.test(value)) {
+        throw new Error("Expense account selections must be valid account IDs");
+      } else {
+        payload[column] = value;
+      }
+    } else if (field === "customFields") {
+      if (!body[field] || typeof body[field] !== "object" || Array.isArray(body[field])) {
+        throw new Error("Custom fields must be an object");
+      }
+      const customFields = Object.entries(body[field])
+        .map(([key, value]) => [String(key).trim(), String(value ?? "").trim()]);
+      if (customFields.some(([key]) => !key)) throw new Error("Custom field names cannot be blank");
+      payload[column] = Object.fromEntries(customFields);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "name") || Object.prototype.hasOwnProperty.call(body, "companyName")) {
+    payload.company_name = String(body.companyName ?? body.name ?? "").trim() || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "email") || Object.prototype.hasOwnProperty.call(body, "mainEmail")) {
+    const email = normalizeEmail(body.mainEmail ?? body.email) || null;
+    payload.main_email = email;
+    payload.email = email;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "phone") || Object.prototype.hasOwnProperty.call(body, "mainPhone")) {
+    const phone = String(body.mainPhone ?? body.phone ?? "").trim() || null;
+    payload.main_phone = phone;
+    payload.phone = phone;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "address") || Object.prototype.hasOwnProperty.call(body, "billedFrom")) {
+    const address = String(body.billedFrom ?? body.address ?? "").trim() || null;
+    payload.billed_from = address;
+    payload.address = address;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "isActive")) {
+    if (typeof body.isActive !== "boolean") throw new Error("Supplier status must be active or inactive");
+    payload.is_active = body.isActive;
+  }
+  return payload;
+};
+
 router.get("/api/suppliers", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
     if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
-    const { data, error } = await supabase
-      .from("suppliers")
-      .select("id, name, email, phone, address")
-      .eq("is_active", true)
-      .order("name");
+    let query = supabase.from("suppliers").select(supplierSelect);
+    if (req.query.includeInactive !== "true") query = query.eq("is_active", true);
+    const { data, error } = await query.order("name");
     if (error) throw error;
-    return res.json({ suppliers: data || [] });
+    return res.json({ suppliers: (data || []).map(formatSupplier) });
   } catch (error) {
     console.error("Suppliers lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load suppliers" });
@@ -700,16 +811,13 @@ router.post("/api/suppliers", async (req, res) => {
     const { currentUser, allowed } = await canUseAccounting(req);
     if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
 
-    const name = String(req.body?.name || "").trim();
-    const email = normalizeEmail(req.body?.email) || null;
-    const phone = String(req.body?.phone || "").trim() || null;
-    const address = String(req.body?.address || "").trim() || null;
-    if (!name) return res.status(400).json({ message: "Supplier name is required" });
+    const payload = buildSupplierPayload(req.body || {});
+    if (!payload.name) return res.status(400).json({ message: "Supplier name is required" });
 
     const { data: existing, error: lookupError } = await supabase
       .from("suppliers")
       .select("id")
-      .ilike("name", name)
+      .ilike("name", payload.name)
       .eq("is_active", true)
       .limit(1);
     if (lookupError) throw lookupError;
@@ -717,14 +825,67 @@ router.post("/api/suppliers", async (req, res) => {
 
     const { data: supplier, error } = await supabase
       .from("suppliers")
-      .insert({ name, email, phone, address, is_active: true, created_by: currentUser.id })
-      .select("id, name, email, phone, address, is_active, created_at")
+      .insert({ ...payload, is_active: payload.is_active ?? true, created_by: currentUser.id })
+      .select(supplierSelect)
       .single();
     if (error) throw error;
-    return res.status(201).json({ supplier });
+    return res.status(201).json({ supplier: formatSupplier(supplier) });
   } catch (error) {
+    if (error.message === "Credit limit must be a non-negative amount"
+      || error.message === "Expense account selections must be valid account IDs"
+      || error.message === "Custom fields must be an object"
+      || error.message === "Custom field names cannot be blank"
+      || error.message === "Supplier status must be active or inactive") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Supplier creation error:", error);
     return res.status(500).json({ message: error?.message || "Unable to create supplier" });
+  }
+});
+
+router.patch("/api/suppliers/:id", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed) return res.status(403).json({ message: "Supplier permission required" });
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ message: "Invalid supplier ID" });
+
+    const payload = buildSupplierPayload(req.body || {});
+    if (!Object.keys(payload).length) return res.status(400).json({ message: "At least one supplier field is required" });
+    if (Object.prototype.hasOwnProperty.call(payload, "name") && !payload.name) {
+      return res.status(400).json({ message: "Supplier name is required" });
+    }
+
+    if (payload.name && payload.is_active !== false) {
+      const { data: existing, error: lookupError } = await supabase
+        .from("suppliers")
+        .select("id")
+        .ilike("name", payload.name)
+        .eq("is_active", true)
+        .neq("id", req.params.id)
+        .limit(1);
+      if (lookupError) throw lookupError;
+      if (existing?.length) return res.status(409).json({ message: "A supplier with that name already exists" });
+    }
+
+    const { data: supplier, error } = await supabase
+      .from("suppliers")
+      .update(payload)
+      .eq("id", req.params.id)
+      .select(supplierSelect)
+      .maybeSingle();
+    if (error) throw error;
+    if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+    return res.json({ supplier: formatSupplier(supplier) });
+  } catch (error) {
+    if (error.message === "Credit limit must be a non-negative amount"
+      || error.message === "Expense account selections must be valid account IDs"
+      || error.message === "Custom fields must be an object"
+      || error.message === "Custom field names cannot be blank"
+      || error.message === "Supplier status must be active or inactive") {
+      return res.status(400).json({ message: error.message });
+    }
+    console.error("Supplier update error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to update supplier" });
   }
 });
 
