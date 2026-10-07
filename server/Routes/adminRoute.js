@@ -1065,17 +1065,130 @@ router.patch("/api/supplier-bill-lines/:lineId", async (req, res) => {
   }
 });
 
+const customerProfileSelect = "id, name, company_name, salutation, first_name, middle_name, last_name, job_title, main_phone, work_phone, mobile_phone, fax, main_email, cc_email, website, other_email, invoice_address, shipping_address, currency, account_number, credit_limit, payment_terms, price_level, preferred_delivery_method, preferred_payment_method, vat_code, vat_registration_number, customer_vat(vat_code, vat_registration_number), customer_type, sales_rep, custom_fields, job_description, job_type, job_status, job_start_date, projected_end_date, job_end_date, email, phone, address, is_active, created_at";
+const formatCustomer = (customer) => {
+  const { customer_vat: customerVat, ...customerDetails } = customer;
+  const vat = Array.isArray(customerVat) ? customerVat[0] : customerVat;
+  return {
+    ...customerDetails,
+    vat_code: vat?.vat_code ?? customer.vat_code ?? null,
+    vat_registration_number: vat?.vat_registration_number ?? customer.vat_registration_number ?? null,
+  };
+};
+const customerProfileFields = {
+  companyName: "company_name",
+  salutation: "salutation",
+  firstName: "first_name",
+  middleName: "middle_name",
+  lastName: "last_name",
+  jobTitle: "job_title",
+  mainPhone: "main_phone",
+  workPhone: "work_phone",
+  mobilePhone: "mobile_phone",
+  fax: "fax",
+  mainEmail: "main_email",
+  ccEmail: "cc_email",
+  website: "website",
+  otherEmail: "other_email",
+  invoiceAddress: "invoice_address",
+  shippingAddress: "shipping_address",
+  currency: "currency",
+  accountNumber: "account_number",
+  creditLimit: "credit_limit",
+  paymentTerms: "payment_terms",
+  priceLevel: "price_level",
+  preferredDeliveryMethod: "preferred_delivery_method",
+  preferredPaymentMethod: "preferred_payment_method",
+  vatCode: "vat_code",
+  vatRegistrationNumber: "vat_registration_number",
+  customerType: "customer_type",
+  salesRep: "sales_rep",
+  jobDescription: "job_description",
+  jobType: "job_type",
+  jobStatus: "job_status",
+  jobStartDate: "job_start_date",
+  projectedEndDate: "projected_end_date",
+  jobEndDate: "job_end_date",
+};
+const buildCustomerPayload = (body) => {
+  const payload = {};
+  for (const [field, column] of Object.entries(customerProfileFields)) {
+    if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+    const value = body[field];
+    if (field === "creditLimit") {
+      if (value === "" || value == null) payload[column] = null;
+      else {
+        const amount = Number(value);
+        if (!Number.isFinite(amount) || amount < 0) throw new Error("Credit limit must be a non-negative amount");
+        payload[column] = amount;
+      }
+    } else if (["jobStartDate", "projectedEndDate", "jobEndDate"].includes(field)) {
+      if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(String(value)) || Number.isNaN(Date.parse(`${value}T00:00:00Z`)))) {
+        throw new Error("Job dates must be valid calendar dates");
+      }
+      payload[column] = String(value || "").trim() || null;
+    } else if (field === "mainEmail" || field === "ccEmail" || field === "otherEmail") {
+      const email = normalizeEmail(value) || null;
+      if (value && !email) throw new Error("Enter a valid customer email address");
+      payload[column] = email;
+    } else {
+      payload[column] = String(value ?? "").trim() || null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "customFields")) {
+    if (!body.customFields || typeof body.customFields !== "object" || Array.isArray(body.customFields)) {
+      throw new Error("Custom fields must be an object");
+    }
+    const customFields = Object.entries(body.customFields)
+      .map(([key, value]) => [String(key).trim(), String(value ?? "").trim()]);
+    if (customFields.some(([key]) => !key)) throw new Error("Custom field names cannot be blank");
+    payload.custom_fields = Object.fromEntries(customFields);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "name")) {
+    payload.name = String(body.name ?? "").trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "mainEmail") || Object.prototype.hasOwnProperty.call(body, "email")) {
+    const email = normalizeEmail(body.mainEmail ?? body.email) || null;
+    payload.main_email = email;
+    payload.email = email;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "mainPhone") || Object.prototype.hasOwnProperty.call(body, "phone")) {
+    const phone = String(body.mainPhone ?? body.phone ?? "").trim() || null;
+    payload.main_phone = phone;
+    payload.phone = phone;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "invoiceAddress") || Object.prototype.hasOwnProperty.call(body, "address")) {
+    const address = String(body.invoiceAddress ?? body.address ?? "").trim() || null;
+    payload.invoice_address = address;
+    payload.address = address;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "isActive")) {
+    if (typeof body.isActive !== "boolean") throw new Error("Customer status must be active or inactive");
+    payload.is_active = body.isActive;
+  }
+  return payload;
+};
+
+const isCustomerValidationError = (message) => [
+  "Credit limit must be a non-negative amount",
+  "Job dates must be valid calendar dates",
+  "Enter a valid customer email address",
+  "Custom fields must be an object",
+  "Custom field names cannot be blank",
+  "Customer status must be active or inactive",
+].includes(message);
+
 router.get("/api/customers", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
     if (!allowed) return res.status(403).json({ message: "Customer permission required" });
-    const { data, error } = await supabase
-      .from("customers")
-      .select("id, name, email, phone, address")
-      .eq("is_active", true)
-      .order("name");
+    let query = supabase.from("customers").select(customerProfileSelect);
+    if (req.query.includeInactive !== "true") query = query.eq("is_active", true);
+    const { data, error } = await query.order("name");
     if (error) throw error;
-    return res.json({ customers: data || [] });
+    return res.json({ customers: (data || []).map(formatCustomer) });
   } catch (error) {
     console.error("Customers lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load customers" });
@@ -1087,16 +1200,13 @@ router.post("/api/customers", async (req, res) => {
     const { currentUser, allowed } = await canUseAccounting(req, ["invoice", "bills"]);
     if (!allowed) return res.status(403).json({ message: "Invoice permission required" });
 
-    const name = String(req.body?.name || "").trim();
-    const email = normalizeEmail(req.body?.email) || null;
-    const phone = String(req.body?.phone || "").trim() || null;
-    const address = String(req.body?.address || "").trim() || null;
-    if (!name) return res.status(400).json({ message: "Customer name is required" });
+    const payload = buildCustomerPayload(req.body || {});
+    if (!payload.name) return res.status(400).json({ message: "Customer name is required" });
 
     const { data: existing, error: lookupError } = await supabase
       .from("customers")
       .select("id")
-      .ilike("name", name)
+      .ilike("name", payload.name)
       .eq("is_active", true)
       .limit(1);
     if (lookupError) throw lookupError;
@@ -1104,14 +1214,61 @@ router.post("/api/customers", async (req, res) => {
 
     const { data: customer, error } = await supabase
       .from("customers")
-      .insert({ name, email, phone, address, is_active: true, created_by: currentUser.id })
-      .select("id, name, email, phone, address, is_active, created_at")
+      .insert({
+        ...payload,
+        is_active: payload.is_active ?? true,
+        currency: payload.currency || "GHS",
+        custom_fields: payload.custom_fields || {},
+        created_by: currentUser.id,
+      })
+      .select(customerProfileSelect)
       .single();
     if (error) throw error;
-    return res.status(201).json({ customer });
+    return res.status(201).json({ customer: formatCustomer(customer) });
   } catch (error) {
+    if (isCustomerValidationError(error.message)) return res.status(400).json({ message: error.message });
     console.error("Customer creation error:", error);
     return res.status(500).json({ message: error?.message || "Unable to create customer" });
+  }
+});
+
+router.patch("/api/customers/:id", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, ["invoice", "bills"]);
+    if (!allowed) return res.status(403).json({ message: "Invoice permission required" });
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ message: "Invalid customer ID" });
+
+    const payload = buildCustomerPayload(req.body || {});
+    if (!Object.keys(payload).length) return res.status(400).json({ message: "At least one customer field is required" });
+    if (Object.prototype.hasOwnProperty.call(payload, "name") && !payload.name) {
+      return res.status(400).json({ message: "Customer name is required" });
+    }
+
+    if (payload.name && payload.is_active !== false) {
+      const { data: existing, error: lookupError } = await supabase
+        .from("customers")
+        .select("id")
+        .ilike("name", payload.name)
+        .eq("is_active", true)
+        .neq("id", req.params.id)
+        .limit(1);
+      if (lookupError) throw lookupError;
+      if (existing?.length) return res.status(409).json({ message: "A customer with that name already exists" });
+    }
+
+    const { data: customer, error } = await supabase
+      .from("customers")
+      .update(payload)
+      .eq("id", req.params.id)
+      .select(customerProfileSelect)
+      .maybeSingle();
+    if (error) throw error;
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    return res.json({ customer: formatCustomer(customer) });
+  } catch (error) {
+    if (isCustomerValidationError(error.message)) return res.status(400).json({ message: error.message });
+    console.error("Customer update error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to update customer" });
   }
 });
 
