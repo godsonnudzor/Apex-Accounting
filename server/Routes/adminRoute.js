@@ -604,11 +604,21 @@ router.get("/api/ledger/accounts", async (req, res) => {
       .eq("is_active", true)
       .order("name");
     if (error) throw error;
-    const { data: groupLedgers, error: groupsError } = await supabase
-      .from("ledger_groups")
-      .select("name, account_type")
-      .order("name");
+    const { data: groupLedgerAccounts, error: groupsError } = await supabase
+      .from("ledger_accounts")
+      .select("group_ledger, account_type")
+      .eq("is_active", true)
+      .not("group_ledger", "is", null)
+      .order("group_ledger");
     if (groupsError) throw groupsError;
+    const groupLedgers = [...new Map(
+      (groupLedgerAccounts || [])
+        .filter((account) => account.group_ledger)
+        .map((account) => [account.group_ledger, {
+          name: account.group_ledger,
+          account_type: account.account_type,
+        }]),
+    ).values()];
     const { data: lines, error: linesError } = await supabase
       .from("journal_lines")
       .select("account, debit, credit, journal_entries!inner(status)")
@@ -643,13 +653,14 @@ router.post("/api/ledger/accounts", async (req, res) => {
       return res.status(400).json({ message: "Code, name, and a valid account type are required" });
     }
     if (groupLedger) {
-      const { data: group, error: groupError } = await supabase
-        .from("ledger_groups")
-        .select("name, account_type")
-        .eq("name", groupLedger)
-        .maybeSingle();
+      const { data: groupAccounts, error: groupError } = await supabase
+        .from("ledger_accounts")
+        .select("account_type")
+        .eq("group_ledger", groupLedger)
+        .eq("is_active", true)
+        .limit(1);
       if (groupError) throw groupError;
-      if (!group || group.account_type !== accountType) {
+      if (!groupAccounts?.length || groupAccounts[0].account_type !== accountType) {
         return res.status(400).json({ message: "Select a valid Group Ledger option" });
       }
     }
