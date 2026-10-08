@@ -594,22 +594,6 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
   return { currentUser, allowed: permissions.some((name) => data?.[name] === true) };
 };
 
-router.get("/api/ledger/groups", async (req, res) => {
-  try {
-    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
-    if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
-    const { data, error } = await supabase
-      .from("ledger_groups")
-      .select("name, account_type")
-      .order("name");
-    if (error) throw error;
-    return res.json({ groupLedgers: data || [] });
-  } catch (error) {
-    console.error("Ledger groups lookup error:", error);
-    return res.status(500).json({ message: error?.message || "Unable to load group ledgers" });
-  }
-});
-
 router.get("/api/ledger/accounts", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
@@ -620,6 +604,11 @@ router.get("/api/ledger/accounts", async (req, res) => {
       .eq("is_active", true)
       .order("name");
     if (error) throw error;
+    const { data: groupLedgers, error: groupsError } = await supabase
+      .from("ledger_groups")
+      .select("name, account_type")
+      .order("name");
+    if (groupsError) throw groupsError;
     const { data: lines, error: linesError } = await supabase
       .from("journal_lines")
       .select("account, debit, credit, journal_entries!inner(status)")
@@ -629,10 +618,13 @@ router.get("/api/ledger/accounts", async (req, res) => {
       summary[line.account] = (summary[line.account] || 0) + Number(line.debit || 0) - Number(line.credit || 0);
       return summary;
     }, {});
-    return res.json({ accounts: (data || []).map((account) => ({
-      ...account,
-      balance: balances[`${account.code} - ${account.name}`] || 0,
-    })) });
+    return res.json({
+      accounts: (data || []).map((account) => ({
+        ...account,
+        balance: balances[`${account.code} - ${account.name}`] || 0,
+      })),
+      groupLedgers: groupLedgers || [],
+    });
   } catch (error) {
     console.error("Ledger accounts lookup error:", error);
     return res.status(500).json({ message: error?.message || "Unable to load ledger accounts" });

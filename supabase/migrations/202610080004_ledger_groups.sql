@@ -9,3 +9,5 @@ values
   ('Account Payable', 'liability'),
   ('Account Receivable', 'asset')
 on conflict (name) do nothing;
+
+grant select on public.ledger_groups to anon, authenticated, service_role;

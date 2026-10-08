@@ -24,20 +24,14 @@ const ChartOfAccounts = () => {
 
   const loadAccounts = async () => {
     const response = await fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" });
-    const result = await response.json();
+    const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to load chart of accounts");
     setAccounts(result.accounts || []);
-  };
-
-  const loadGroupLedgers = async () => {
-    const response = await fetch(getApiUrl("/api/ledger/groups"), { credentials: "include" });
-    const result = await readApiResponse(response);
-    if (!response.ok) throw new Error(result.message || "Unable to load group ledgers");
     setGroupLedgers(result.groupLedgers || []);
   };
 
   useEffect(() => {
-    Promise.all([loadAccounts(), loadGroupLedgers()])
+    loadAccounts()
       .catch((loadError) => setError(loadError.message))
       .finally(() => setLoading(false));
   }, []);
