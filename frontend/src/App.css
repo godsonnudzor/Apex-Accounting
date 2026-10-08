@@ -30,7 +30,7 @@
 .bill-section-bar strong:nth-of-type(2) { padding: 7px 10px; background: #dbe2e5; font-weight: 400; }
 .bill-section-bar span { font-weight: 700; }
 .bill-table { border: 1px solid #c5cdd1; }
-.bill-table-head, .bill-table-row { display: grid; grid-template-columns: 140px minmax(160px, 1fr) 33px; }
+.bill-table-head, .bill-table-row { display: grid; grid-template-columns: 140px minmax(160px, 1fr) minmax(180px, 220px) 33px; }
 .bill-table-head { height: 24px; color: #68757b; font-size: 10px; align-items: center; }
 .bill-table-head span { padding-left: 7px; border-right: 1px dotted #adb7ba; }
 .bill-table-row { min-height: 35px; background: #fff; }
@@ -64,7 +64,7 @@
 .bill-side-block small, .side-muted { color: #929b9e !important; }
 .bill-toast { position: fixed; right: 22px; bottom: 20px; padding: 10px 16px; color: #fff; border-radius: 3px; background: #2f6e8e; box-shadow: 0 2px 8px #0003; }
 @media (max-width: 850px) { .bill-layout { grid-template-columns: 1fr; } .bill-sidebar { border-top: 1px solid #bec3c4; border-left: 0; } .bill-header-grid { margin-top: 18px; margin-left: 0; } .bill-heading { min-height: 390px; } }
-@media (max-width: 620px) { .bill-sheet { padding: 17px 12px 150px; } .bill-header-grid { grid-template-columns: 1fr 1fr; } .bill-header-grid .bill-address { grid-row: auto; } .bill-bottom-grid { grid-template-columns: 1fr; } .bill-footer-actions { right: 12px; bottom: 12px; left: 12px; align-items: flex-end; flex-direction: column; gap: 10px; } .bill-footer-actions div { flex-wrap: wrap; justify-content: flex-end; } .bill-table { overflow-x: auto; } .bill-table-head, .bill-table-row { min-width: 590px; } }
+@media (max-width: 620px) { .bill-sheet { padding: 17px 12px 150px; } .bill-header-grid { grid-template-columns: 1fr 1fr; } .bill-header-grid .bill-address { grid-row: auto; } .bill-bottom-grid { grid-template-columns: 1fr; } .bill-footer-actions { right: 12px; bottom: 12px; left: 12px; align-items: flex-end; flex-direction: column; gap: 10px; } .bill-footer-actions div { flex-wrap: wrap; justify-content: flex-end; } .bill-table { overflow-x: auto; } .bill-table-head, .bill-table-row { min-width: 760px; } }
 
 .cheque-app { min-height: 100vh; color: #29363d; background: #eceeed; font-family: "Segoe UI", Arial, sans-serif; font-size: 12px; }
 .cheque-toolbar { min-height: 80px; padding: 0 12px; background: #f2f2f0; border-bottom: 1px solid #c8cccb; box-shadow: 0 1px 4px #0002; }

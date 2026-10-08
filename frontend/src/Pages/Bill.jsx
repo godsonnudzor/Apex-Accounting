@@ -22,7 +22,7 @@ const initialBill = () => ({
 	billReceived: true,
 });
 
-const newLine = () => ({ amount: "", memo: "" });
+const newLine = () => ({ amount: "", memo: "", ledgerAccountId: "" });
 
 const money = (value) => `${currency} ${Number(value || 0).toFixed(2)}`;
 
@@ -38,6 +38,7 @@ function Bill() {
 	const [saving, setSaving] = useState(false);
 	const [lines, setLines] = useState([newLine(), newLine(), newLine()]);
 	const [suppliers, setSuppliers] = useState([]);
+	const [ledgerAccounts, setLedgerAccounts] = useState([]);
 	const [lookupLoading, setLookupLoading] = useState(true);
 	const [lookupError, setLookupError] = useState("");
 	const [activePanel, setActivePanel] = useState("Name");
@@ -45,10 +46,18 @@ function Bill() {
 
 	useEffect(() => {
 		const loadBillLookups = async () => {
-			const supplierResponse = await fetch(getApiUrl("/api/suppliers"), { credentials: "include" });
-			const supplierResult = await readApiResponse(supplierResponse);
+			const [supplierResponse, accountResponse] = await Promise.all([
+				fetch(getApiUrl("/api/suppliers"), { credentials: "include" }),
+				fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
+			]);
+			const [supplierResult, accountResult] = await Promise.all([
+				readApiResponse(supplierResponse),
+				readApiResponse(accountResponse),
+			]);
 			if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
+			if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
 			setSuppliers(supplierResult.suppliers || []);
+			setLedgerAccounts((accountResult.accounts || []).filter((account) => account.account_type === "expense"));
 		};
 
 		loadBillLookups()
@@ -146,6 +155,7 @@ function Bill() {
 					lines: enteredLines.map((line) => ({
 						amount: Number(line.amount),
 						memo: line.memo,
+						ledgerAccountId: line.ledgerAccountId || null,
 					})),
 				}),
 			});
@@ -218,13 +228,16 @@ function Bill() {
 					</div>
 
 					<div className="bill-section-bar"><strong>Bill items</strong><span>{money(subtotal)}</span><strong>Items</strong><span>{money(total)}</span></div>
-					<p className="side-muted">Assign expense ledger accounts from Supplier Center after saving the bill.</p>
 					<div className="bill-table" role="table" aria-label="Bill lines">
-						<div className="bill-table-head" role="row"><span>AMOUNT ({currency})</span><span>MEMO</span><span aria-label="remove column" /></div>
+						<div className="bill-table-head" role="row"><span>AMOUNT ({currency})</span><span>MEMO</span><span>LEDGER ACCOUNT</span><span aria-label="remove column" /></div>
 						{lines.map((line, index) => (
 							<div className="bill-table-row" role="row" key={index}>
 								<input name="amount" type="number" min="0" step="0.01" value={line.amount} onChange={(event) => updateLine(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" />
 								<input name="memo" value={line.memo} onChange={(event) => updateLine(index, event)} aria-label={`Memo ${index + 1}`} />
+								<select name="ledgerAccountId" value={line.ledgerAccountId} onChange={(event) => updateLine(index, event)} aria-label={`Ledger account ${index + 1}`}>
+									<option value="">Select expense ledger</option>
+									{ledgerAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
+								</select>
 								<button aria-label={`Remove line ${index + 1}`} onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}>x</button>
 							</div>
 						))}
