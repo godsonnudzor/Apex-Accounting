@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { getApiUrl, readApiResponse } from "../context/auth";
-import { supabase } from "../lib/supabaseClient";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
 const initialForm = { code: "", name: "", accountType: "asset", groupLedger: "" };
@@ -28,23 +27,11 @@ const ChartOfAccounts = () => {
     const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to load chart of accounts");
     setAccounts(result.accounts || []);
-  };
-
-  const loadGroupLedgers = async () => {
-    if (!supabase) {
-      throw new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
-    }
-
-    const { data, error: queryError } = await supabase
-      .from("ledger_groups")
-      .select("name, account_type")
-      .order("name");
-    if (queryError) throw new Error(`Unable to load group ledgers from Supabase: ${queryError.message}`);
-    setGroupLedgers(data || []);
+    setGroupLedgers(result.groupLedgers || []);
   };
 
   useEffect(() => {
-    Promise.all([loadAccounts(), loadGroupLedgers()])
+    loadAccounts()
       .catch((loadError) => setError(loadError.message))
       .finally(() => setLoading(false));
   }, []);
