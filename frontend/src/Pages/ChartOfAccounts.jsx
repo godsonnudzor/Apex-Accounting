@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { getApiUrl } from "../context/auth";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
-const initialForm = { code: "", name: "", accountType: "asset" };
+const groupLedgers = [
+  { name: "Account Payable", accountType: "liability" },
+  { name: "Account Receivable", accountType: "asset" },
+];
+const initialForm = { code: "", name: "", accountType: "asset", groupLedger: "" };
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 
 const ChartOfAccounts = () => {
@@ -37,7 +41,16 @@ const ChartOfAccounts = () => {
     [accounts, filter],
   );
 
-  const updateForm = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const updateForm = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === "groupLedger" && value
+        ? { accountType: groupLedgers.find((groupLedger) => groupLedger.name === value).accountType }
+        : {}),
+    }));
+  };
 
   const openLedgerReport = async (account) => {
     setSelectedAccount(account);
@@ -107,18 +120,19 @@ const ChartOfAccounts = () => {
 
         <form onSubmit={saveAccount} className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">Add ledger account</h2>
-          <div className="grid gap-4 md:grid-cols-[160px_1fr_200px_auto] md:items-end">
+          <div className="grid gap-4 md:grid-cols-[160px_1fr_180px_180px_auto] md:items-end">
             <label className="text-sm font-medium text-slate-700">Code<input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" name="code" value={form.code} onChange={updateForm} placeholder="5700" required /></label>
             <label className="text-sm font-medium text-slate-700">Account name<input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" name="name" value={form.name} onChange={updateForm} placeholder="Bank charges" required /></label>
-            <label className="text-sm font-medium text-slate-700">Type<select className="mt-1 w-full rounded border border-slate-300 px-3 py-2" name="accountType" value={form.accountType} onChange={updateForm}>{accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">Type<select className="mt-1 w-full rounded border border-slate-300 px-3 py-2 disabled:bg-slate-100" name="accountType" value={form.accountType} onChange={updateForm} disabled={Boolean(form.groupLedger)}>{accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">Group Ledger<select className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2" name="groupLedger" value={form.groupLedger} onChange={updateForm}><option value="">None</option>{groupLedgers.map((groupLedger) => <option key={groupLedger.name} value={groupLedger.name}>{groupLedger.name}</option>)}</select></label>
             <button className="rounded bg-teal-600 px-4 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50" disabled={saving}>{saving ? "Saving..." : "Add account"}</button>
           </div>
         </form>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[650px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account</th><th className="px-4 py-3">Type</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3">Status</th></tr></thead>
-            <tbody>{loading ? <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-500">Loading accounts...</td></tr> : visibleAccounts.length ? visibleAccounts.map((account) => <tr key={account.id} className="border-t border-slate-100"><td className="px-4 py-3 font-semibold text-slate-900">{account.code}</td><td className="px-4 py-3">{account.name}</td><td className="px-4 py-3 capitalize text-slate-600">{account.account_type}</td><td className="px-4 py-3 text-right font-semibold">{formatMoney(account.balance)}</td><td className="px-4 py-3 text-emerald-700">Active</td><td className="px-4 py-3"><button type="button" className="rounded bg-teal-600 px-3 py-1 text-xs font-semibold text-white" onClick={() => openLedgerReport(account)}>Open report</button></td></tr>) : <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-500">No accounts found.</td></tr>}</tbody>
+          <table className="w-full min-w-[850px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Group Ledger</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Report</th></tr></thead>
+            <tbody>{loading ? <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">Loading accounts...</td></tr> : visibleAccounts.length ? visibleAccounts.map((account) => <tr key={account.id} className="border-t border-slate-100"><td className="px-4 py-3 font-semibold text-slate-900">{account.code}</td><td className="px-4 py-3">{account.name}</td><td className="px-4 py-3 capitalize text-slate-600">{account.account_type}</td><td className="px-4 py-3">{account.group_ledger || "-"}</td><td className="px-4 py-3 text-right font-semibold">{formatMoney(account.balance)}</td><td className="px-4 py-3 text-emerald-700">Active</td><td className="px-4 py-3"><button type="button" className="rounded bg-teal-600 px-3 py-1 text-xs font-semibold text-white" onClick={() => openLedgerReport(account)}>Open report</button></td></tr>) : <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">No accounts found.</td></tr>}</tbody>
           </table>
         </div>
 

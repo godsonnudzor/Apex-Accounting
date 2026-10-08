@@ -600,7 +600,7 @@ router.get("/api/ledger/accounts", async (req, res) => {
     if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
     const { data, error } = await supabase
       .from("ledger_accounts")
-      .select("id, code, name, account_type")
+      .select("id, code, name, account_type, group_ledger")
       .eq("is_active", true)
       .order("name");
     if (error) throw error;
@@ -630,13 +630,21 @@ router.post("/api/ledger/accounts", async (req, res) => {
     const code = String(req.body?.code || "").trim();
     const name = String(req.body?.name || "").trim();
     const accountType = String(req.body?.accountType || "").trim().toLowerCase();
+    const groupLedger = String(req.body?.groupLedger || "").trim();
     if (!code || !name || !["asset", "liability", "equity", "income", "expense"].includes(accountType)) {
       return res.status(400).json({ message: "Code, name, and a valid account type are required" });
     }
+    const groupLedgerTypes = {
+      "Account Payable": "liability",
+      "Account Receivable": "asset",
+    };
+    if (groupLedger && groupLedgerTypes[groupLedger] !== accountType) {
+      return res.status(400).json({ message: "Select a valid Group Ledger option" });
+    }
     const { data: account, error } = await supabase
       .from("ledger_accounts")
-      .insert({ code, name, account_type: accountType })
-      .select("id, code, name, account_type, is_active")
+      .insert({ code, name, account_type: accountType, group_ledger: groupLedger || null })
+      .select("id, code, name, account_type, group_ledger, is_active")
       .single();
     if (error) {
       if (error.code === "23505") return res.status(409).json({ message: "An account with that code already exists" });
