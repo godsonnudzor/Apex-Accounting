@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
 const initialForm = { code: "", name: "", accountType: "asset", groupLedger: "" };
@@ -31,7 +31,7 @@ const ChartOfAccounts = () => {
 
   const loadGroupLedgers = async () => {
     const response = await fetch(getApiUrl("/api/ledger/groups"), { credentials: "include" });
-    const result = await response.json();
+    const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to load group ledgers");
     setGroupLedgers(result.groupLedgers || []);
   };
