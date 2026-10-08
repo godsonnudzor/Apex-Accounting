@@ -1242,7 +1242,7 @@ button {
 .line-header,
 .line-row {
   display: grid;
-  grid-template-columns: 65px 120px minmax(150px, 1fr) minmax(180px, 1.1fr) 75px 115px;
+  grid-template-columns: minmax(180px, 1.1fr) 65px 120px minmax(150px, 1fr) 75px 115px;
 }
 .line-header {
   height: 22px;
@@ -1445,7 +1445,7 @@ button {
   }
   .line-header,
   .line-row {
-    grid-template-columns: 55px 90px minmax(120px, 1fr) minmax(150px, 1fr) 65px 90px;
+    grid-template-columns: minmax(150px, 1fr) 55px 90px minmax(120px, 1fr) 65px 90px;
   }
   .invoice-actions {
     position: static;

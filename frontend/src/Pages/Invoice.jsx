@@ -348,15 +348,26 @@ function Invoice() {
           >
             <p className="side-empty">Choose an income account for each line; saved invoice revenue is posted to Profit &amp; Loss.</p>
             <div className="line-header" role="row">
+              <span>INCOME ACCOUNT</span>
               <span>QTY</span>
               <span>ITEM</span>
               <span>DESCRIPTION</span>
-              <span>INCOME ACCOUNT</span>
               <span>RATE</span>
               <span>AMOUNT</span>
             </div>
             {lines.map((line, index) => (
               <div className="line-row" role="row" key={index}>
+                <select
+                  aria-label={`Income account ${index + 1}`}
+                  name="incomeAccountId"
+                  value={line.incomeAccountId}
+                  onChange={(event) => updateLine(index, event)}
+                >
+                  <option value="">{lookupLoading ? "Loading income accounts..." : "Select income account"}</option>
+                  {accounts.filter((account) => account.account_type === "income").map((account) => (
+                    <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                  ))}
+                </select>
                 <input
                   aria-label={`Quantity ${index + 1}`}
                   name="quantity"
@@ -377,17 +388,6 @@ function Invoice() {
                   value={line.description}
                   onChange={(event) => updateLine(index, event)}
                 />
-                <select
-                  aria-label={`Income account ${index + 1}`}
-                  name="incomeAccountId"
-                  value={line.incomeAccountId}
-                  onChange={(event) => updateLine(index, event)}
-                >
-                  <option value="">{lookupLoading ? "Loading income accounts..." : "Select income account"}</option>
-                  {accounts.filter((account) => account.account_type === "income").map((account) => (
-                    <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                  ))}
-                </select>
                 <input
                   aria-label={`Rate ${index + 1}`}
                   name="rate"
