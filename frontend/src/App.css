@@ -30,7 +30,7 @@
 .bill-section-bar strong:nth-of-type(2) { padding: 7px 10px; background: #dbe2e5; font-weight: 400; }
 .bill-section-bar span { font-weight: 700; }
 .bill-table { border: 1px solid #c5cdd1; }
-.bill-table-head, .bill-table-row { display: grid; grid-template-columns: 140px minmax(160px, 1fr) minmax(180px, 220px) 33px; }
+.bill-table-head, .bill-table-row { display: grid; grid-template-columns: minmax(180px, 220px) 140px minmax(160px, 1fr) 33px; }
 .bill-table-head { height: 24px; color: #68757b; font-size: 10px; align-items: center; }
 .bill-table-head span { padding-left: 7px; border-right: 1px dotted #adb7ba; }
 .bill-table-row { min-height: 35px; background: #fff; }

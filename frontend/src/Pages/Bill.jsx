@@ -229,15 +229,15 @@ function Bill() {
 
 					<div className="bill-section-bar"><strong>Bill items</strong><span>{money(subtotal)}</span><strong>Items</strong><span>{money(total)}</span></div>
 					<div className="bill-table" role="table" aria-label="Bill lines">
-						<div className="bill-table-head" role="row"><span>AMOUNT ({currency})</span><span>MEMO</span><span>LEDGER ACCOUNT</span><span aria-label="remove column" /></div>
+						<div className="bill-table-head" role="row"><span>LEDGER ACCOUNT</span><span>AMOUNT ({currency})</span><span>MEMO</span><span aria-label="remove column" /></div>
 						{lines.map((line, index) => (
 							<div className="bill-table-row" role="row" key={index}>
-								<input name="amount" type="number" min="0" step="0.01" value={line.amount} onChange={(event) => updateLine(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" />
-								<input name="memo" value={line.memo} onChange={(event) => updateLine(index, event)} aria-label={`Memo ${index + 1}`} />
 								<select name="ledgerAccountId" value={line.ledgerAccountId} onChange={(event) => updateLine(index, event)} aria-label={`Ledger account ${index + 1}`}>
 									<option value="">Select expense ledger</option>
 									{ledgerAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
 								</select>
+								<input name="amount" type="number" min="0" step="0.01" value={line.amount} onChange={(event) => updateLine(index, event)} aria-label={`Amount ${index + 1}`} placeholder="0.00" />
+								<input name="memo" value={line.memo} onChange={(event) => updateLine(index, event)} aria-label={`Memo ${index + 1}`} />
 								<button aria-label={`Remove line ${index + 1}`} onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}>x</button>
 							</div>
 						))}
