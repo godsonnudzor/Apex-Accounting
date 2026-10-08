@@ -2,15 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { getApiUrl } from "../context/auth";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
-const groupLedgers = [
-  { name: "Account Payable", accountType: "liability" },
-  { name: "Account Receivable", accountType: "asset" },
-];
 const initialForm = { code: "", name: "", accountType: "asset", groupLedger: "" };
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 
 const ChartOfAccounts = () => {
   const [accounts, setAccounts] = useState([]);
+  const [groupLedgers, setGroupLedgers] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -32,8 +29,17 @@ const ChartOfAccounts = () => {
     setAccounts(result.accounts || []);
   };
 
+  const loadGroupLedgers = async () => {
+    const response = await fetch(getApiUrl("/api/ledger/groups"), { credentials: "include" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "Unable to load group ledgers");
+    setGroupLedgers(result.groupLedgers || []);
+  };
+
   useEffect(() => {
-    loadAccounts().catch((loadError) => setError(loadError.message)).finally(() => setLoading(false));
+    Promise.all([loadAccounts(), loadGroupLedgers()])
+      .catch((loadError) => setError(loadError.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const visibleAccounts = useMemo(
@@ -47,7 +53,7 @@ const ChartOfAccounts = () => {
       ...current,
       [name]: value,
       ...(name === "groupLedger" && value
-        ? { accountType: groupLedgers.find((groupLedger) => groupLedger.name === value).accountType }
+        ? { accountType: groupLedgers.find((groupLedger) => groupLedger.name === value)?.account_type || current.accountType }
         : {}),
     }));
   };

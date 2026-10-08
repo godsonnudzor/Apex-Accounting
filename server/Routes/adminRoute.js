@@ -594,6 +594,22 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
   return { currentUser, allowed: permissions.some((name) => data?.[name] === true) };
 };
 
+router.get("/api/ledger/groups", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
+    if (!allowed) return res.status(403).json({ message: "Ledger permission required" });
+    const { data, error } = await supabase
+      .from("ledger_groups")
+      .select("name, account_type")
+      .order("name");
+    if (error) throw error;
+    return res.json({ groupLedgers: data || [] });
+  } catch (error) {
+    console.error("Ledger groups lookup error:", error);
+    return res.status(500).json({ message: error?.message || "Unable to load group ledgers" });
+  }
+});
+
 router.get("/api/ledger/accounts", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req, ["write_cheque", "bills", "invoice"]);
@@ -634,12 +650,16 @@ router.post("/api/ledger/accounts", async (req, res) => {
     if (!code || !name || !["asset", "liability", "equity", "income", "expense"].includes(accountType)) {
       return res.status(400).json({ message: "Code, name, and a valid account type are required" });
     }
-    const groupLedgerTypes = {
-      "Account Payable": "liability",
-      "Account Receivable": "asset",
-    };
-    if (groupLedger && groupLedgerTypes[groupLedger] !== accountType) {
-      return res.status(400).json({ message: "Select a valid Group Ledger option" });
+    if (groupLedger) {
+      const { data: group, error: groupError } = await supabase
+        .from("ledger_groups")
+        .select("name, account_type")
+        .eq("name", groupLedger)
+        .maybeSingle();
+      if (groupError) throw groupError;
+      if (!group || group.account_type !== accountType) {
+        return res.status(400).json({ message: "Select a valid Group Ledger option" });
+      }
     }
     const { data: account, error } = await supabase
       .from("ledger_accounts")
