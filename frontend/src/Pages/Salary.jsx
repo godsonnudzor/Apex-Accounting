@@ -47,7 +47,7 @@ const PAYROLL_COLUMNS = [
 const Salary = () => {
   const [employees, setEmployees] = useState([]);
   const [periodStart, setPeriodStart] = useState("2026-09-01");
-  const [periodEnd, setPeriodEnd] = useState("2026-09-30");
+  const [periodEnd, setPeriodEnd] = useState("2030-09-30");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
