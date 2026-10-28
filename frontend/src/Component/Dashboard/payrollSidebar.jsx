@@ -131,6 +131,17 @@ const PayrollDashboardSidebar = () => {
             <FaCalendar /> <span>Leave </span>
           </NavLink>
         ) : null}
+        {hasPermission("GroupAccount") ? (
+          <NavLink
+            to="/GroupAccount"
+            className={({ isActive }) =>
+              `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`
+            }
+            end
+          >
+            <FaCalendar /> <span>Group Accounts</span>
+          </NavLink>
+        ) : null}
       </div>
     </div>
   );
