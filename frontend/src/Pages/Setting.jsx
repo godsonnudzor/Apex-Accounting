@@ -64,6 +64,11 @@ const permissionLabels = [
     label: "Leave",
     description: "Manage employee leave requests",
   },
+  {
+    key: "groupAccount",
+    label: "Group Accounts",
+    description: "Manage group account settings",
+  },
   { key: "reports", label: "Reports", description: "Open financial reports" },
 ];
 const defaults = {
@@ -80,6 +85,7 @@ const defaults = {
   salaries: false,
   leaveManagement: false,
   reports: false,
+  groupAccount: false,
 };
 
 function Setting() {
