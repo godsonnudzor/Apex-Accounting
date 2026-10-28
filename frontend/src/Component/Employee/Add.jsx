@@ -167,6 +167,7 @@ const Add = () => {
 if (!response.ok) {
   // Read as text first incase the server sent an HTML error page
   const errorText = await response.text();
+  console.error("Raw Server Response:", errorText);
   let errorMessage = "Unable to add employee";
   
   try {
