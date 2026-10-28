@@ -164,9 +164,9 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/groupaccount",
+    path: "/GroupAccount",
     element: (
-      <PermissionRoute permission={[ "GroupAccounts" ]}>
+      <PermissionRoute permission={[ "GroupAccount" ]}>
         <GroupAccount />
       </PermissionRoute>
     ),
