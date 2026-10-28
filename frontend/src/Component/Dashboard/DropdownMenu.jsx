@@ -9,6 +9,7 @@ const MENU = [
       { label: "Chart of Account", href: "/chart-of-accounts" },
       { label: "Journal Entries", href: "/journal-entries" },
       { label: "Ledger Creation", href: "/chart-of-accounts" },
+      { label: "Group Accounts", href: "/group-accounts" },
     ],
   },
   {

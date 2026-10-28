@@ -35,6 +35,7 @@ import { calculatorAction, calculatorLoader } from "./routes/calculatorData";
 import { bracketsLoader } from "./routes/brackets";
 import TaxDataTable from "./components/TaxDataTable";
 import { useLoaderData } from "react-router-dom";
+import GroupAccount from "./Pages/GroupAccount";
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
@@ -49,8 +50,9 @@ function AdminRoute({ children }) {
 
 function PermissionRoute({ permission, children }) {
   const { user, loading, hasPermission, refreshUser } = useAuth();
-  const hasRequiredPermission = (Array.isArray(permission) ? permission : [permission])
-    .some((requiredPermission) => hasPermission(requiredPermission));
+  const hasRequiredPermission = (
+    Array.isArray(permission) ? permission : [permission]
+  ).some((requiredPermission) => hasPermission(requiredPermission));
   const [checkingPermission, setCheckingPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
 
@@ -158,6 +160,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission={["invoice", "bills"]}>
         <Invoice />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/group-accounts",
+    element: (
+      <PermissionRoute permission={[ "GroupAccounts" ]}>
+        <GroupAccount />
       </PermissionRoute>
     ),
   },
