@@ -153,27 +153,31 @@ const Add = () => {
         }
       });
 
+      if (isEditing) {
+        formData.append("id", id);
+      }
+
       if (profileImage) {
         formData.append("profile_image", profileImage);
       }
 
-     const response = await fetch(getApiUrl(isEditing ? `/api/employees/${id}` : "/api/employees"), {
-  method: isEditing ? "PUT" : "POST",
-  credentials: "include",
-  body: formData,
-});
+      const response = await fetch(getApiUrl("/api/employees"), {
+        method: isEditing ? "PUT" : "POST",
+        credentials: "include",
+        body: formData,
+      });
 
-const result = await readApiResponse(response);
-if (!response.ok) {
-  throw new Error(result.message || "Unable to save employee");
-}
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to save employee");
+      }
 
-navigate("/employees");
-} catch (saveError) {
-  setError(saveError.message);
-} finally {
-  setSaving(false);
-}
+      navigate("/employees");
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

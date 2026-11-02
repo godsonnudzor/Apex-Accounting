@@ -2677,14 +2677,14 @@ router.post("/api/payments", async (req, res) => {
   }
 });
 
-router.put("/api/employees/:id", uploadProfileImage, async (req, res) => {
+const updateEmployee = async (req, res) => {
   try {
     const currentUser = authenticate(req);
     if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
 
-    const id = Number(req.params.id);
+    const id = Number(req.params.id ?? req.body?.id);
     const firstName = String(req.body?.firstName || "").trim();
     const lastName = String(req.body?.lastName || "").trim();
     const dateOfBirth = String(req.body?.dateOfBirth || "").trim();
@@ -2784,7 +2784,10 @@ router.put("/api/employees/:id", uploadProfileImage, async (req, res) => {
       .status(500)
       .json({ message: error?.message || "Unable to update employee" });
   }
-});
+};
+
+router.put("/api/employees/:id", uploadProfileImage, updateEmployee);
+router.put("/api/employees", uploadProfileImage, updateEmployee);
 
 router.get("/api/departments", async (req, res) => {
   try {
