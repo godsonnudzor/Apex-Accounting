@@ -6,18 +6,6 @@ import { supabase } from "../lib/supabaseClient.js";
 import { createUser } from "../controller/User.js";
 
 const router = express.Router();
-const uploadProfileImage = async (req, res, next) => {
-  try {
-    const { default: multer } = await import("multer");
-    const upload = multer({
-      storage: multer.memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 },
-    });
-    upload.single("profile_image")(req, res, next);
-  } catch (error) {
-    next(error);
-  }
-};
 
 const fallbackAdmin = {
   id: 1,
@@ -587,7 +575,7 @@ router.post("/api/payroll/runs", async (req, res) => {
   }
 });
 
-router.post("/api/employees", uploadProfileImage, async (req, res) => {
+router.post("/api/employees", async (req, res) => {
   try {
     const currentUser = authenticate(req);
     if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
@@ -700,7 +688,7 @@ router.post("/api/employees", uploadProfileImage, async (req, res) => {
         allowance,
         bank_name: req.body?.bankName?.trim() || null,
         account_name: req.body?.accountName?.trim() || null,
-        profile_image: req.file?.originalname || null,
+        profile_image: req.body?.profileImage || null,
       })
       .select()
       .single();
@@ -2757,7 +2745,9 @@ const updateEmployee = async (req, res) => {
         allowance,
         bank_name: req.body?.bankName?.trim() || null,
         account_name: req.body?.accountName?.trim() || null,
-        ...(req.file ? { profile_image: req.file.originalname } : {}),
+        ...(req.body?.profileImage
+          ? { profile_image: req.body.profileImage }
+          : {}),
       })
       .eq("id", id)
       .select()
@@ -2786,8 +2776,8 @@ const updateEmployee = async (req, res) => {
   }
 };
 
-router.put("/api/employees/:id", uploadProfileImage, updateEmployee);
-router.put("/api/employees", uploadProfileImage, updateEmployee);
+router.put("/api/employees/:id", updateEmployee);
+router.put("/api/employees", updateEmployee);
 
 router.get("/api/departments", async (req, res) => {
   try {

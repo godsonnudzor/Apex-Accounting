@@ -145,26 +145,19 @@ const Add = () => {
     setSaving(true);
 
     try {
-      const formData = new FormData();
-
-      Object.entries(form).forEach(([key, value]) => {
-        if (key !== "confirmPassword") {
-          formData.append(key, value);
-        }
-      });
-
+      const employeeData = Object.fromEntries(
+        Object.entries(form).filter(([key]) => key !== "confirmPassword"),
+      );
+      employeeData.profileImage = profileImage?.name || existingImage || null;
       if (isEditing) {
-        formData.append("id", id);
-      }
-
-      if (profileImage) {
-        formData.append("profile_image", profileImage);
+        employeeData.id = id;
       }
 
       const response = await fetch(getApiUrl("/api/employees"), {
         method: isEditing ? "PUT" : "POST",
         credentials: "include",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employeeData),
       });
 
       const result = await readApiResponse(response);
