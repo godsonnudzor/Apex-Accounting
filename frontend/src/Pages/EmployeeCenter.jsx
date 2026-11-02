@@ -19,18 +19,18 @@ const initialsFor = (name = "Employee") =>
     .join("")
     .toUpperCase();
 
-const EmployeeCenter = () => {
+const EmployeeCenter = ({ sectionLabel = "employee center" }) => {
   const { user, hasPermission } = useAuth();
   const displayName = user?.name || "Employee";
   const visibleActions = actions.filter(({ permission }) => hasPermission(permission));
-  const role = user?.role === "admin" ? "Administrator" : "Employee";
+  const role = String(user?.role).toLowerCase() === "admin" ? "Administrator" : "Employee";
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 md:px-8 md:py-10">
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex flex-col gap-5 rounded-2xl bg-slate-900 p-6 text-white shadow-xl md:flex-row md:items-end md:justify-between md:p-8">
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-teal-300">Apex / employee center</p>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-teal-300">Apex / {sectionLabel}</p>
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Good to see you, {displayName.split(" ")[0]}.</h1>
             <p className="mt-2 max-w-xl text-sm text-slate-300">Your workspace for the people, payroll, and finance tools available to your account.</p>
           </div>
