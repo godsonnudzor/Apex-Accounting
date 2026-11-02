@@ -3,10 +3,11 @@ import { createContext, useContext } from "react";
 export const AuthContext = createContext(null);
 
 export const getApiUrl = (path) => {
+  const apiPath = path.replace(/\/+$/, "") || "/";
   const rawApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
-  if (import.meta.env.MODE !== "development") return path;
+  if (import.meta.env.MODE !== "development") return apiPath;
   const baseUrl = rawApiUrl ? rawApiUrl.trim().replace(/\/+$/, "") : "http://localhost:4000";
-  return new URL(path, `${baseUrl}/`).toString();
+  return new URL(apiPath, `${baseUrl}/`).toString();
 };
 
 export const readApiResponse = async (response) => {
