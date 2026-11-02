@@ -95,6 +95,81 @@ const alerts = [
   },
 ];
 
+const employeeWorkspaces = [
+  {
+    label: "Bills",
+    description: "Create and review supplier bills.",
+    to: "/bill",
+    permissions: ["bills"],
+  },
+  {
+    label: "Invoices",
+    description: "Create and manage customer invoices.",
+    to: "/invoice",
+    permissions: ["invoice", "bills"],
+  },
+  {
+    label: "Write cheque",
+    description: "Create cash and cheque transactions.",
+    to: "/write-cheque",
+    permissions: ["writeCheque"],
+  },
+  {
+    label: "Payroll",
+    description: "Review payroll activity and compensation.",
+    to: "/PayrollDashboard",
+    permissions: ["payroll"],
+  },
+  {
+    label: "Departments",
+    description: "View and manage departments.",
+    to: "/department",
+    permissions: ["departments"],
+  },
+  {
+    label: "Employee records",
+    description: "Browse employee information.",
+    to: "/employees",
+    permissions: ["employeeManagement"],
+  },
+  {
+    label: "Salaries",
+    description: "View salary records.",
+    to: "/salary",
+    permissions: ["salaries"],
+  },
+  {
+    label: "Leave",
+    description: "Open leave records and requests.",
+    to: "/leaveManagement",
+    permissions: ["leaveManagement"],
+  },
+  {
+    label: "Group accounts",
+    description: "Open group account management.",
+    to: "/GroupAccount",
+    permissions: ["groupAccount"],
+  },
+  {
+    label: "Tax analyzer",
+    description: "Calculate and save tax scenarios.",
+    to: "/tax-analyzer",
+    permissions: ["taxJurisdictions", "userScenarios"],
+  },
+  {
+    label: "Tax brackets",
+    description: "View the tax bracket library.",
+    to: "/tax-analyzer/brackets",
+    permissions: ["taxBrackets"],
+  },
+  {
+    label: "Financial reports",
+    description: "Open the financial reports available to you.",
+    to: "/financial-reports",
+    permissions: ["reports", "writeCheque"],
+  },
+];
+
 function CashFlowChart({ range }) {
   const points =
     range === "90 days"
@@ -160,7 +235,7 @@ function CashFlowChart({ range }) {
 
 function Admin() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [range, setRange] = useState("30 days");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
@@ -176,6 +251,9 @@ function Admin() {
     .toUpperCase();
   const isAdmin = String(user?.role).toLowerCase() === "admin";
   const role = isAdmin ? "Administrator" : "Employee";
+  const availableWorkspaces = employeeWorkspaces.filter(({ permissions }) =>
+    permissions.some(hasPermission),
+  );
 
   const runAction = (action) => {
     setMessage(`${action} is ready to start`);
@@ -195,7 +273,7 @@ function Admin() {
         <div className="brand">
           <span className="brand-mark">A</span>
           <span>
-            Apex<span className="brand-muted"> / finance</span>
+            Apex<span className="brand-muted"> / {isAdmin ? "finance" : "workspace"}</span>
           </span>
         </div>
         
@@ -253,17 +331,19 @@ function Admin() {
               Hello! {displayName} <span>✦</span>
             </h1>
             <p className="subtitle">
-              Here’s what’s happening with your finances today.
+              {isAdmin
+                ? "Here’s what’s happening with your finances today."
+                : "Your workspace shows only the tools enabled for your account."}
             </p>
           </div>
-          <button
+          {isAdmin && <button
             className="primary-button"
             onClick={() => runAction("New invoice")}
           >
             <span>＋</span> New invoice
-          </button>
+          </button>}
         </div>
-        <div className="quick-actions">
+        {isAdmin && <div className="quick-actions">
           <span className="quick-label">Quick actions</span>
           <button onClick={() => navigate("/bill")}>
             ＋ <span>Create invoice</span>
@@ -274,8 +354,35 @@ function Admin() {
           <button onClick={() => runAction("Bank reconciliation")}>
             ↻ <span>Reconcile bank</span>
           </button>
-        </div>
-        <section className="metric-grid" aria-label="Financial health">
+        </div>}
+        {!isAdmin && (
+          <section className="employee-workspace-section">
+            <div className="employee-workspace-heading">
+              <div>
+                <p className="eyebrow">Your access</p>
+                <h2>Available workspaces</h2>
+              </div>
+              <span>{availableWorkspaces.length} available</span>
+            </div>
+            {availableWorkspaces.length ? (
+              <div className="employee-workspace-grid">
+                {availableWorkspaces.map(({ label, description, to }) => (
+                  <Link className="employee-workspace-card" key={to} to={to}>
+                    <span aria-hidden="true">{label[0]}</span>
+                    <strong>{label}</strong>
+                    <p>{description}</p>
+                    <small>Open workspace &rarr;</small>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="employee-workspace-empty">
+                No additional workspaces are enabled for your account.
+              </div>
+            )}
+          </section>
+        )}
+        {isAdmin && <section className="metric-grid" aria-label="Financial health">
           {metrics.map((metric) => (
             <article className="metric-card" key={metric.label}>
               <div className={`metric-icon ${metric.tone}`}>{metric.icon}</div>
@@ -291,8 +398,8 @@ function Admin() {
               </div>
             </article>
           ))}
-        </section>
-        <section className="dashboard-grid">
+        </section>}
+        {isAdmin && <section className="dashboard-grid">
           <article className="panel cash-panel">
             <div className="panel-header">
               <div>
@@ -467,7 +574,7 @@ function Admin() {
               View all notifications <span>→</span>
             </button>
           </article>
-        </section>
+        </section>}
         {message && (
           <div className="toast" role="status">
             ✓ {message}

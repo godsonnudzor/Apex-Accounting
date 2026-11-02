@@ -48,6 +48,19 @@ function AdminRoute({ children }) {
   );
 }
 
+function AccessDenied() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-slate-100 p-6 text-center text-slate-900">
+      <div>
+        <h1 className="text-2xl font-bold">Access not available</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Your account does not have permission to view this workspace.
+        </p>
+      </div>
+    </main>
+  );
+}
+
 function PermissionRoute({ permission, children }) {
   const { user, loading, hasPermission, refreshUser } = useAuth();
   const hasRequiredPermission = (
@@ -84,8 +97,7 @@ function PermissionRoute({ permission, children }) {
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" replace />;
   if (checkingPermission) return <div>Loading...</div>;
-  if (!hasRequiredPermission)
-    return <Navigate to="/EmployeeDashboard" replace />;
+  if (!hasRequiredPermission) return <AccessDenied />;
   return children;
 }
 
@@ -166,7 +178,7 @@ const router = createBrowserRouter([
   {
     path: "/GroupAccount",
     element: (
-      <PermissionRoute permission={[ "GroupAccount" ]}>
+      <PermissionRoute permission="groupAccount">
         <GroupAccount />
       </PermissionRoute>
     ),
@@ -198,7 +210,7 @@ const router = createBrowserRouter([
   {
     path: "/financial-reports",
     element: (
-      <PermissionRoute permission="writeCheque">
+      <PermissionRoute permission={["reports", "writeCheque"]}>
         <FinancialReports />
       </PermissionRoute>
     ),

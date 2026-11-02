@@ -98,7 +98,7 @@ const PayrollDashboardSidebar = () => {
             <FaList /> <span>Chart of accounts</span>
           </NavLink>
         ) : null}
-        {hasPermission("writeCheque") ? (
+        {hasPermission("reports") || hasPermission("writeCheque") ? (
           <NavLink
             to="/financial-reports"
             className={({ isActive }) =>
@@ -131,7 +131,7 @@ const PayrollDashboardSidebar = () => {
             <FaCalendar /> <span>Leave </span>
           </NavLink>
         ) : null}
-        {hasPermission("GroupAccount") ? (
+        {hasPermission("groupAccount") ? (
           <NavLink
             to="/GroupAccount"
             className={({ isActive }) =>

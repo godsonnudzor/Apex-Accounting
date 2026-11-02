@@ -1,65 +1,60 @@
 import { useState, useRef, useEffect, useId } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../../context/auth";
 import "../../App.css";
 
 const MENU = [
-  { label: "Dashboard", href: "/dashboard" },
+  { label: "Dashboard", href: "/EmployeeDashboard", permissions: ["dashboard"] },
   {
     label: "File",
     items: [
-      { label: "Chart of Account", href: "/chart-of-accounts" },
-      { label: "Journal Entries", href: "/journal-entries" },
-      { label: "Ledger Creation", href: "/chart-of-accounts" },
-      { label: "Group Accounts", href: "/GroupAccount" },
+      { label: "Chart of Account", href: "/chart-of-accounts", permissions: ["writeCheque"] },
+      { label: "Journal Entries", href: "/journal", permissions: ["writeCheque"] },
+      { label: "Group Accounts", href: "/GroupAccount", permissions: ["groupAccount"] },
     ],
   },
   {
     label: "Suppliers",
     items: [
-      { label: "Center", href: "/suppliersCenter" },
-      { label: "Creation", href: "/suppliers" },
-      { label: "Bills", href: "/bill" },
-      { label: "Aging", href: "/suppliersAging" },
+      { label: "Center", href: "/suppliersCenter", permissions: ["writeCheque", "bills", "invoice"] },
+      { label: "Creation", href: "/suppliers", permissions: ["writeCheque", "bills", "invoice"] },
+      { label: "Bills", href: "/bill", permissions: ["bills"] },
     ],
   },
-   {
+  {
     label: "Customers",
     items: [
-      { label: "Center", href: "/customersCenter" },
-      { label: "Customer Creation", href: "/customers" },
-      { label: "Invoices", href: "/invoices" },
-      { label: "Aging List", href: "/customerAging" },
+      { label: "Center", href: "/customersCenter", permissions: ["invoice", "bills"] },
+      { label: "Customer Creation", href: "/customers", permissions: ["invoice", "bills"] },
+      { label: "Invoices", href: "/invoices", permissions: ["invoice", "bills"] },
     ],
   },
-   {
+  {
     label: "Banking",
     items: [
-      { label: "Write Cheque", href: "/write-cheque" },
-      { label: "Contra Entries", href: "/contra-entries" },
-      { label: "Reconcile", href: "/reconcile" },
+      { label: "Write Cheque", href: "/write-cheque", permissions: ["writeCheque"] },
     ],
   },
   {
     label: "Employees",
     items: [
-      { label: "Employees Center", href: "/EmployeeDashboard" },
-      { label: "Payroll", href: "/PayrollDashboard" },
-      { label: "Tax Table Info", href: "/tax-analyzer" },
+      { label: "Employees Center", href: "/EmployeeDashboard", permissions: ["dashboard"] },
+      { label: "Departments", href: "/department", permissions: ["departments"] },
+      { label: "Employee records", href: "/employees", permissions: ["employeeManagement"] },
+      { label: "Payroll", href: "/PayrollDashboard", permissions: ["payroll"] },
+      { label: "Salaries", href: "/salary", permissions: ["salaries"] },
+      { label: "Leave", href: "/leaveManagement", permissions: ["leaveManagement"] },
+      { label: "Tax analyzer", href: "/tax-analyzer", permissions: ["taxJurisdictions", "userScenarios"] },
+      { label: "Tax brackets", href: "/tax-analyzer/brackets", permissions: ["taxBrackets"] },
     ],
   },
   {
     label: "Reports",
     items: [
-      { label: "Profit & loss", href: "/financial-reports" },
-      { label: "Balance sheet", href: "/reports/bs" },
-      { label: "Cash flow", href: "/reports/cf" },
-      { label: "Budget Analysis", href: "/reports/budget" },
-      { label: "Asset Register", href: "/reports/asset-register" },
-      { label: "Audit Trail", href: "/reports/audit-trail" },
-      { label: "Account List", href: "/reports/account-list" },
-     
+      { label: "Financial reports", href: "/financial-reports", permissions: ["reports", "writeCheque"] },
     ],
   },
-  { label: "Settings", href: "/settings" },
+  { label: "Settings", href: "/settings", adminOnly: true },
 ];
 
 function Arrow({ open }) {
@@ -88,7 +83,11 @@ function Dropdown({ label, items, open, onToggle, onClose }) {
   const btnRef = useRef(null);
   const listRef = useRef(null);
 
-
+  const focusItem = (index) => {
+    const links = [...(listRef.current?.querySelectorAll("a") || [])];
+    if (!links.length) return;
+    links[(index + links.length) % links.length].focus();
+  };
 
   const onButtonKey = (e) => {
     if (e.key === "ArrowDown") {
@@ -134,9 +133,9 @@ function Dropdown({ label, items, open, onToggle, onClose }) {
         <ul id={id} ref={listRef} className="dd-panel" onKeyDown={onListKey}>
           {items.map((it) => (
             <li key={it.href}>
-              <a href={it.href} onClick={onClose}>
+              <Link to={it.href} onClick={onClose}>
                 {it.label}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
@@ -148,6 +147,17 @@ function Dropdown({ label, items, open, onToggle, onClose }) {
 export default function DropdownMenu({ menu = MENU }) {
   const [openIndex, setOpenIndex] = useState(null);
   const navRef = useRef(null);
+  const { user, hasPermission } = useAuth();
+  const isAdmin = String(user?.role).toLowerCase() === "admin";
+  const visibleMenu = menu.flatMap((entry) => {
+    if (entry.adminOnly && !isAdmin) return [];
+    if (entry.permissions && !entry.permissions.some(hasPermission)) return [];
+    if (!entry.items) return [entry];
+    const items = entry.items.filter(({ permissions }) =>
+      permissions.some(hasPermission),
+    );
+    return items.length ? [{ ...entry, items }] : [];
+  });
 
   // Close on outside click
   useEffect(() => {
@@ -163,7 +173,7 @@ export default function DropdownMenu({ menu = MENU }) {
   return (
     <nav ref={navRef} className="dd-nav" aria-label="Main">
       <ul className="dd-list">
-        {menu.map((m, i) =>
+        {visibleMenu.map((m, i) =>
           m.items ? (
             <Dropdown
               key={m.label}
@@ -175,9 +185,9 @@ export default function DropdownMenu({ menu = MENU }) {
             />
           ) : (
             <li key={m.label} className="dd-item">
-              <a className="dd-trigger" href={m.href}>
+              <Link className="dd-trigger" to={m.href}>
                 {m.label}
-              </a>
+              </Link>
             </li>
           )
         )}
