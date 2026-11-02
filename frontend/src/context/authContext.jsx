@@ -74,7 +74,7 @@ function AuthProvider({ children }) {
       salaries: asBoolean(permissions.salaries),
       leaveManagement: asBoolean(permissions.leaveManagement ?? permissions.leave_management),
       reports: asBoolean(permissions.reports),
-      groupAccount: asBoolean(permissions.groupAccount ?? permissions.GroupAccount ?? permissions.group_account),
+      groupAccount: asBoolean(permissions.groupAccount ?? permissions.groupAccounts ?? permissions.GroupAccount ?? permissions.group_accounts ?? permissions.group_account),
     };
   };
   const updatePermissions = async (userId, nextPermissions) => {

@@ -138,6 +138,10 @@ function Setting() {
       setMessage("Permissions saved");
       window.setTimeout(() => setMessage(""), 2200);
     } catch (saveError) {
+      setSavedPermissions((current) => ({
+        ...current,
+        [selectedEmployee.id]: selectedPermissions,
+      }));
       setError(saveError.message);
     }
   };

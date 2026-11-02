@@ -69,11 +69,12 @@ const readPermissions = async (userId, role) => {
       salaries: true,
       leaveManagement: true,
       reports: true,
+      groupAccount: true,
     };
   const { data, error } = await supabase
     .from("employee_permissions")
     .select(
-      "dashboard, write_cheque, bills, invoice, payroll, employee_management, tax_brackets, tax_jurisdictions, user_scenarios, departments, salaries, leave_management, reports",
+      "dashboard, write_cheque, bills, invoice, payroll, employee_management, tax_brackets, tax_jurisdictions, user_scenarios, departments, salaries, leave_management, reports, group_accounts",
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -94,6 +95,7 @@ const readPermissions = async (userId, role) => {
     salaries: data?.salaries ?? false,
     leaveManagement: data?.leave_management ?? false,
     reports: data?.reports ?? false,
+    groupAccount: data?.group_accounts ?? false,
   };
 };
 
@@ -3016,7 +3018,7 @@ router.put("/api/users/:userId/permissions", async (req, res) => {
         reports: data.reports,
         departments: data.departments,
         salaries: data.salaries,
-        groupAccounts: data.group_accounts,
+        groupAccount: data.group_accounts,
         leaveManagement: data.leave_management,
         employeeManagement: data.employee_management,
         taxBrackets: data.tax_brackets,
