@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 import { formatCurrency } from "../utils/taxCalculator";
 import {
   calculateGhanaPayroll,
@@ -60,7 +60,7 @@ const Salary = () => {
   useEffect(() => {
     fetch(getApiUrl("/api/employees"), { credentials: "include" })
       .then(async (response) => {
-        const result = await response.json();
+        const result = await readApiResponse(response);
         if (!response.ok)
           throw new Error(result.message || "Unable to load employees");
         setEmployees(result.employees || []);
@@ -98,7 +98,7 @@ const Salary = () => {
           entries,
         }),
       });
-      const result = await response.json();
+      const result = await readApiResponse(response);
       if (!response.ok)
         throw new Error(result.message || "Unable to save payroll run");
       setMessage(`Payroll run ${result.runId} saved and journal entry ${result.journalEntryId} posted.`);
