@@ -92,7 +92,7 @@ function PermissionRoute({ permission, children }) {
 function EmployeeDashboardRoute() {
   return (
     <PermissionRoute permission="dashboard">
-      <EmployeeCenter />
+      <Deshboard />
     </PermissionRoute>
   );
 }

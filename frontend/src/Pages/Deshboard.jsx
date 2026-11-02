@@ -1,7 +1,7 @@
-import EmployeeCenter from "./EmployeeCenter";
+import Admin from "../Component/Dashboard/admin";
 
 const Deshboard = () => {
-  return <EmployeeCenter sectionLabel="dashboard" />;
+  return <Admin />;
 };
 
 export default Deshboard;

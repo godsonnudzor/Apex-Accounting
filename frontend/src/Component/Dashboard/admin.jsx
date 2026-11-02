@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
 import DropdownMenu from "./DropdownMenu";
-import { getApiUrl, readApiResponse } from "../../context/auth";
+import { useAuth } from "../../context/auth";
 
 const metrics = [
   {
@@ -160,22 +160,22 @@ function CashFlowChart({ range }) {
 
 function Admin() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [range, setRange] = useState("30 days");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
-  const [user, setUser] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    fetch(getApiUrl("/api/me"), { credentials: "include" })
-      .then(async (response) => {
-        const result = await readApiResponse(response);
-        if (!response.ok) throw new Error(result.message || "Unable to load user");
-        return result;
-      })
-      .then((result) => setUser(result.user))
-      .catch(() => setUser(null));
-  }, []);
+  const displayName = user?.name || "User";
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const isAdmin = String(user?.role).toLowerCase() === "admin";
+  const role = isAdmin ? "Administrator" : "Employee";
 
   const runAction = (action) => {
     setMessage(`${action} is ready to start`);
@@ -201,14 +201,16 @@ function Admin() {
         
        
         <div className="sidebar-bottom">
-          <Link className="nav-item" to="/settings">
-            <span>⚙</span>Settings
-          </Link>
+          {isAdmin && (
+            <Link className="nav-item" to="/settings">
+              <span>⚙</span>Settings
+            </Link>
+          )}
           <div className="profile">
-            <div className="avatar">GN</div>
+            <div className="avatar">{initials}</div>
             <div>
-              <strong>{user?.name}</strong>
-              <small>Administrator</small>
+              <strong>{displayName}</strong>
+              <small>{role}</small>
             </div>
             <span>•••</span>
           </div>
@@ -241,14 +243,14 @@ function Admin() {
             >
               ♧<i />
             </button>
-            <div className="top-avatar">GN</div>
+            <div className="top-avatar">{initials}</div>
           </div>
         </header>
         <div className="page-heading">
           <div>
             <p className="eyebrow"> <DropdownMenu /></p>
             <h1>
-              Hello! {user?.name || "User"} <span>✦</span>
+              Hello! {displayName} <span>✦</span>
             </h1>
             <p className="subtitle">
               Here’s what’s happening with your finances today.
