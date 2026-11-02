@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getApiUrl } from "../../context/auth";
+import { getApiUrl, readApiResponse } from "../../context/auth";
 
 const initialForm = {
   firstName: "",
@@ -42,7 +42,7 @@ const Add = () => {
           credentials: "include",
         });
 
-        const result = await response.json();
+        const result = await readApiResponse(response);
 
         if (!response.ok) {
           throw new Error(result.message || "Unable to load departments");
@@ -65,7 +65,7 @@ const Add = () => {
     const loadEmployee = async () => {
       try {
         const response = await fetch(getApiUrl("/api/employees"), { credentials: "include" });
-        const result = await response.json();
+        const result = await readApiResponse(response);
         if (!response.ok) throw new Error(result.message || "Unable to load employee");
 
         const employee = result.employees?.find((item) => String(item.id) === String(id));
@@ -163,28 +163,10 @@ const Add = () => {
   body: formData,
 });
 
-// 1. Check if the response failed FIRST, before parsing JSON
+const result = await readApiResponse(response);
 if (!response.ok) {
-  // Read as text first incase the server sent an HTML error page
-  const errorText = await response.text();
-  console.error("Raw Server Response:", errorText);
-  let errorMessage = "Unable to add employee";
-  
-  try {
-    // Try parsing it as JSON in case your backend sends a JSON error object
-    const errorJson = JSON.parse(errorText);
-    errorMessage = errorJson.message || errorMessage;
-  } catch (e) {
-    // If it's HTML (like a 404/500 page), it won't parse as JSON. 
-    // You can log errorText or use a generic message.
-    console.error("Server returned HTML error:", errorText);
-  }
-  
-  throw new Error(errorMessage);
+  throw new Error(result.message || "Unable to save employee");
 }
-
-// 2. Only parse as JSON if the response was successful (200-299)
-const result = await response.json();
 
 navigate("/employees");
 } catch (saveError) {

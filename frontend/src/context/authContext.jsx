@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AuthContext, getApiUrl } from "./auth";
+import { AuthContext, getApiUrl, readApiResponse } from "./auth";
 
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -11,7 +11,7 @@ function AuthProvider({ children }) {
       setUser(null);
       return null;
     }
-    const result = await response.json();
+    const result = await readApiResponse(response);
     const currentUser = result.user || null;
     setUser(currentUser);
     return currentUser;
@@ -30,16 +30,13 @@ function AuthProvider({ children }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    const contentType = response.headers.get("content-type") || "";
-    const result = contentType.includes("application/json")
-      ? await response.json()
-      : await response.text();
+    const result = await readApiResponse(response);
 
     if (!response.ok) {
       throw new Error(
         typeof result === "object"
           ? result?.Error || result?.message || "Login failed"
-          : result || "Login failed",
+          : "Login failed",
       );
     }
 
@@ -47,7 +44,7 @@ function AuthProvider({ children }) {
       credentials: "include",
     });
     const currentUser = currentUserResponse.ok
-      ? (await currentUserResponse.json()).user
+      ? (await readApiResponse(currentUserResponse)).user
       : null;
     setUser(currentUser);
     return currentUser;
@@ -87,7 +84,7 @@ function AuthProvider({ children }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(nextPermissions),
     });
-    const result = await response.json();
+    const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to update permissions");
     return result.permissions;
   };

@@ -11,17 +11,19 @@ export const getApiUrl = (path) => {
 
 export const readApiResponse = async (response) => {
   const body = await response.text();
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    try {
-      return JSON.parse(body);
-    } catch {
-      return { message: `The API returned invalid JSON (${response.status})` };
-    }
+  try {
+    return JSON.parse(body);
+  } catch {
+    const summary = body
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+    const detail = summary ? `: ${summary}` : "";
+    throw new Error(
+      `The API returned a non-JSON response (HTTP ${response.status})${detail}. Check that the backend API route is deployed and reachable.`,
+    );
   }
-  return {
-    message: `The API returned an HTML or text response (${response.status}). Check the Vercel API deployment.`,
-  };
 };
 
 export const useAuth = () => {
