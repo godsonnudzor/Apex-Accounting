@@ -2287,6 +2287,8 @@ router.get("/api/reports/financial/details", async (req, res) => {
     if (!allowed)
       return res.status(403).json({ message: "Report permission required" });
     const account = String(req.query?.account || "").trim();
+    const partyType = String(req.query?.partyType || "").trim();
+    const partyId = Number(req.query?.partyId);
     const report = String(req.query?.report || "").trim();
     const year = /^\d{4}$/.test(String(req.query?.year || ""))
       ? String(req.query.year)
@@ -2298,12 +2300,27 @@ router.get("/api/reports/financial/details", async (req, res) => {
         : report === "balance-sheet"
           ? ["asset", "liability", "equity"]
           : [];
-    if (!account && !reportTypes.length)
+    if (
+      (!account && !reportTypes.length) &&
+      !(
+        ["supplier", "customer", "employee"].includes(partyType) &&
+        Number.isSafeInteger(partyId) &&
+        partyId > 0
+      )
+    )
       return res.status(400).json({ message: "Account or report is required" });
+    if (
+      (partyType || req.query?.partyId !== undefined) &&
+      (!["supplier", "customer", "employee"].includes(partyType) ||
+        !Number.isSafeInteger(partyId) ||
+        partyId <= 0)
+    ) {
+      return res.status(400).json({ message: "A valid party type and ID are required" });
+    }
     const { data: entries, error } = await supabase
       .from("journal_entries")
       .select(
-        "id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo)",
+        "id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo, supplier_id, customer_id, employee_id)",
       )
       .eq("status", "posted")
       .order("entry_date", { ascending: false })
@@ -2329,11 +2346,15 @@ router.get("/api/reports/financial/details", async (req, res) => {
       .map((entry) => ({
         ...entry,
         lines: (entry.journal_lines || []).filter((line) =>
-          account ? line.account === account : reportAccounts.has(line.account),
+          partyType
+            ? Number(line[`${partyType}_id`]) === partyId
+            : account
+              ? line.account === account
+              : reportAccounts.has(line.account),
         ),
       }))
       .filter((entry) => entry.lines.length);
-    return res.json({ account, month, entries: details });
+    return res.json({ account, partyType, partyId: partyType ? partyId : null, month, entries: details });
   } catch (error) {
     console.error("Financial report detail lookup error:", error);
     return res
@@ -2477,15 +2498,42 @@ router.get("/api/journal/lookups", async (req, res) => {
     if (customerResult.error) throw customerResult.error;
     if (employeeResult.error) throw employeeResult.error;
 
+    const { data: partyLines, error: partyLinesError } = await supabase
+      .from("journal_lines")
+      .select(
+        "supplier_id, customer_id, employee_id, debit, credit, journal_entries!inner(status)",
+      )
+      .eq("journal_entries.status", "posted");
+    if (partyLinesError) throw partyLinesError;
+    const partyBalances = (partyLines || []).reduce((balances, line) => {
+      for (const partyType of ["supplier", "customer", "employee"]) {
+        const partyId = line[`${partyType}_id`];
+        if (partyId === null || partyId === undefined) continue;
+        const key = `${partyType}:${partyId}`;
+        balances[key] =
+          (balances[key] || 0) +
+          Number(line.debit || 0) -
+          Number(line.credit || 0);
+      }
+      return balances;
+    }, {});
+
     return res.json({
-      suppliers: supplierResult.data || [],
-      customers: customerResult.data || [],
+      suppliers: (supplierResult.data || []).map((supplier) => ({
+        ...supplier,
+        balance: partyBalances[`supplier:${supplier.id}`] || 0,
+      })),
+      customers: (customerResult.data || []).map((customer) => ({
+        ...customer,
+        balance: partyBalances[`customer:${customer.id}`] || 0,
+      })),
       employees: (employeeResult.data || []).map((employee) => ({
         id: employee.id,
         name:
           employee.users?.name ||
           `${employee.first_name} ${employee.last_name}`.trim(),
         is_active: true,
+        balance: partyBalances[`employee:${employee.id}`] || 0,
       })),
     });
   } catch (error) {
