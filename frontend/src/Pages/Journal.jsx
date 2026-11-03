@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
 import { getApiUrl } from "../context/auth";
 
-const blankLine = () => ({ account: "", debit: "", credit: "", memo: "" });
+const blankLine = () => ({
+  account: "",
+  partySelection: "",
+  debit: "",
+  credit: "",
+  memo: "",
+});
+
+const getLinePartyName = (line) =>
+  line.supplier?.name ||
+  line.customer?.name ||
+  line.employee?.users?.name ||
+  [line.employee?.first_name, line.employee?.last_name].filter(Boolean).join(" ");
 
 const Journal = () => {
   const [entries, setEntries] = useState([]);
@@ -10,11 +22,6 @@ const Journal = () => {
     suppliers: [],
     employees: [],
     customers: [],
-  });
-  const [partySearch, setPartySearch] = useState({
-    suppliers: "",
-    employees: "",
-    customers: "",
   });
   const [form, setForm] = useState({
     entryDate: new Date().toISOString().slice(0, 10),
@@ -98,7 +105,13 @@ const Journal = () => {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, lines }),
+        body: JSON.stringify({
+          ...form,
+          lines: lines.map(({ partySelection, ...line }) => {
+            const [partyType = "", partyId = ""] = partySelection.split(":");
+            return { ...line, partyType, partyId: partyId || null };
+          }),
+        }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -142,62 +155,6 @@ const Journal = () => {
             {message}
           </p>
         )}
-        <section className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Available parties
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Search supplier, employee, and customer names while preparing an entry.
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              ["suppliers", "Suppliers"],
-              ["employees", "Employees"],
-              ["customers", "Customers"],
-            ].map(([key, label]) => {
-              const search = partySearch[key].trim().toLowerCase();
-              const matches = parties[key].filter((party) =>
-                party.name?.toLowerCase().includes(search),
-              );
-              return (
-                <div key={key} className="min-w-0">
-                  <label className="text-sm font-medium text-slate-700">
-                    {label}
-                    <input
-                      className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                      type="search"
-                      value={partySearch[key]}
-                      onChange={(event) =>
-                        setPartySearch((current) => ({
-                          ...current,
-                          [key]: event.target.value,
-                        }))
-                      }
-                      placeholder={`Search ${label.toLowerCase()}`}
-                    />
-                  </label>
-                  <ul className="mt-2 max-h-40 overflow-y-auto rounded border border-slate-200">
-                    {matches.map((party) => (
-                      <li
-                        key={party.id}
-                        className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700 last:border-b-0"
-                      >
-                        {party.name}
-                      </li>
-                    ))}
-                    {!matches.length && (
-                      <li className="px-3 py-2 text-sm text-slate-500">
-                        No {label.toLowerCase()} found.
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </section>
         <form
           onSubmit={saveEntry}
           className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -235,10 +192,11 @@ const Journal = () => {
             </label>
           </div>
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left text-sm">
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-3 py-2">Account</th>
+                  <th className="px-3 py-2">Supplier / Employee / Customer</th>
                   <th className="px-3 py-2">Debit</th>
                   <th className="px-3 py-2">Credit</th>
                   <th className="px-3 py-2">Memo</th>
@@ -262,6 +220,37 @@ const Journal = () => {
                             {account.code} - {account.name}
                           </option>
                         ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        className="w-full rounded border border-slate-300 px-3 py-2"
+                        name="partySelection"
+                        value={line.partySelection}
+                        onChange={(event) => updateLine(index, event)}
+                      >
+                        <option value="">No party</option>
+                        <optgroup label="Suppliers">
+                          {parties.suppliers.map((supplier) => (
+                            <option key={supplier.id} value={`supplier:${supplier.id}`}>
+                              {supplier.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Employees">
+                          {parties.employees.map((employee) => (
+                            <option key={employee.id} value={`employee:${employee.id}`}>
+                              {employee.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Customers">
+                          {parties.customers.map((customer) => (
+                            <option key={customer.id} value={`customer:${customer.id}`}>
+                              {customer.name}
+                            </option>
+                          ))}
+                        </optgroup>
                       </select>
                     </td>
                     <td className="px-2 py-2">
@@ -348,6 +337,7 @@ const Journal = () => {
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Reference</th>
+                <th className="px-4 py-3">Suppliers / Employees / Customers</th>
                 <th className="px-4 py-3">Lines</th>
               </tr>
             </thead>
@@ -359,6 +349,9 @@ const Journal = () => {
                   <td className="px-4 py-3 capitalize">{entry.source}</td>
                   <td className="px-4 py-3">{entry.reference || "-"}</td>
                   <td className="px-4 py-3">
+                    {[...new Set((entry.journal_lines || []).map(getLinePartyName).filter(Boolean))].join(", ") || "-"}
+                  </td>
+                  <td className="px-4 py-3">
                     {entry.journal_lines?.length || 0}
                   </td>
                 </tr>
@@ -366,7 +359,7 @@ const Journal = () => {
               {!entries.length && (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan="6"
                     className="px-4 py-8 text-center text-slate-500"
                   >
                     No journal entries found.

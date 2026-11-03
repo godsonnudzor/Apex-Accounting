@@ -2505,7 +2505,7 @@ router.get("/api/journal", async (req, res) => {
     const { data, error } = await supabase
       .from("journal_entries")
       .select(
-        "id, entry_date, reference, description, source, status, created_at, journal_lines(id, account, debit, credit, memo), payment_records(id, payment_type, payment_number, payee, amount, bank_account)",
+        "id, entry_date, reference, description, source, status, created_at, journal_lines(id, account, debit, credit, memo, supplier:suppliers(name), customer:customers(name), employee:employees(first_name, last_name, users(name))), payment_records(id, payment_type, payment_number, payee, amount, bank_account)",
       )
       .order("entry_date", { ascending: false })
       .order("id", { ascending: false });
@@ -2528,11 +2528,34 @@ router.post("/api/journal", async (req, res) => {
     const description = String(req.body?.description || "").trim();
     const reference = String(req.body?.reference || "").trim() || null;
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const hasInvalidParty = lines.some((line) => {
+      const partyType = String(line.partyType || "").trim();
+      const partyId = line.partyId;
+      if (
+        !partyType &&
+        (partyId === undefined || partyId === null || partyId === "")
+      ) {
+        return false;
+      }
+      return (
+        !["supplier", "customer", "employee"].includes(partyType) ||
+        !Number.isSafeInteger(Number(partyId)) ||
+        Number(partyId) <= 0
+      );
+    });
+    if (hasInvalidParty)
+      return res.status(400).json({ message: "Select a valid supplier, customer, or employee" });
     const normalizedLines = lines.map((line) => ({
       account: String(line.account || "").trim(),
       debit: Number(line.debit || 0),
       credit: Number(line.credit || 0),
       memo: String(line.memo || "").trim() || null,
+      supplier_id:
+        line.partyType === "supplier" ? Number(line.partyId) : null,
+      customer_id:
+        line.partyType === "customer" ? Number(line.partyId) : null,
+      employee_id:
+        line.partyType === "employee" ? Number(line.partyId) : null,
     }));
     const debitTotal = normalizedLines.reduce(
       (sum, line) => sum + line.debit,
