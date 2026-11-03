@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { getApiUrl } from "../context/auth";
 
 const blankLine = () => ({
-  account: "",
-  partySelection: "",
+  accountSelection: "",
   debit: "",
   credit: "",
   memo: "",
@@ -115,9 +114,18 @@ const Journal = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          lines: lines.map(({ partySelection, ...line }) => {
-            const [partyType = "", partyId = ""] = partySelection.split(":");
-            return { ...line, partyType, partyId: partyId || null };
+          lines: lines.map(({ accountSelection, ...line }) => {
+            const [selectionType = "", ...selectionParts] = accountSelection.split(":");
+            const selectionValue = selectionParts.join(":");
+            if (selectionType === "ledger") {
+              return { ...line, account: selectionValue };
+            }
+            return {
+              ...line,
+              account: "",
+              partyType: selectionType,
+              partyId: selectionValue || null,
+            };
           }),
         }),
       });
@@ -203,7 +211,7 @@ const Journal = () => {
             <table className="w-full min-w-[800px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-3 py-2">Account and party</th>
+                  <th className="px-3 py-2">Account</th>
                   <th className="px-3 py-2">Debit</th>
                   <th className="px-3 py-2">Credit</th>
                   <th className="px-3 py-2">Memo</th>
@@ -217,12 +225,12 @@ const Journal = () => {
                       <div className="space-y-2">
                         <select
                           className="w-full rounded border border-slate-300 px-3 py-2"
-                          name="account"
-                          value={line.account}
+                          name="accountSelection"
+                          value={line.accountSelection}
                           onChange={(event) => updateLine(index, event)}
                           required
                         >
-                          <option value="">Select ledger account</option>
+                          <option value="">Select ledger account or party</option>
                           {Object.entries(accountTypeLabels).map(([type, label]) => {
                             const typeAccounts = accounts.filter(
                               (account) => account.account_type === type,
@@ -233,7 +241,7 @@ const Journal = () => {
                                 {typeAccounts.map((account) => (
                                   <option
                                     key={account.id}
-                                    value={`${account.code} - ${account.name}`}
+                                    value={`ledger:${account.code} - ${account.name}`}
                                   >
                                     {account.code} - {account.name}
                                   </option>
@@ -241,33 +249,24 @@ const Journal = () => {
                               </optgroup>
                             );
                           })}
-                        </select>
-                        <select
-                          className="w-full rounded border border-slate-300 px-3 py-2 text-slate-600"
-                          name="partySelection"
-                          value={line.partySelection}
-                          onChange={(event) => updateLine(index, event)}
-                          aria-label="Optional supplier, employee, or customer"
-                        >
-                          <option value="">No supplier, employee, or customer</option>
-                          <optgroup label="Suppliers">
-                            {parties.suppliers.map((supplier) => (
-                              <option key={supplier.id} value={`supplier:${supplier.id}`}>
-                                {supplier.name}
+                          <optgroup label="Customers (Assets)">
+                            {parties.customers.map((customer) => (
+                              <option key={customer.id} value={`customer:${customer.id}`}>
+                                {customer.name}{customer.is_active === false ? " (inactive)" : ""}
                               </option>
                             ))}
                           </optgroup>
-                          <optgroup label="Employees">
+                          <optgroup label="Suppliers (Liabilities)">
+                            {parties.suppliers.map((supplier) => (
+                              <option key={supplier.id} value={`supplier:${supplier.id}`}>
+                                {supplier.name}{supplier.is_active === false ? " (inactive)" : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Employees (Expenses / Liabilities)">
                             {parties.employees.map((employee) => (
                               <option key={employee.id} value={`employee:${employee.id}`}>
                                 {employee.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Customers">
-                            {parties.customers.map((customer) => (
-                              <option key={customer.id} value={`customer:${customer.id}`}>
-                                {customer.name}
                               </option>
                             ))}
                           </optgroup>

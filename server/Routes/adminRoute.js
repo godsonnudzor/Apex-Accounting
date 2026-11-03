@@ -2461,13 +2461,11 @@ router.get("/api/journal/lookups", async (req, res) => {
     const [supplierResult, customerResult, employeeResult] = await Promise.all([
       supabase
         .from("suppliers")
-        .select("id, name")
-        .eq("is_active", true)
+        .select("id, name, is_active")
         .order("name"),
       supabase
         .from("customers")
-        .select("id, name")
-        .eq("is_active", true)
+        .select("id, name, is_active")
         .order("name"),
       supabase
         .from("employees")
@@ -2487,6 +2485,7 @@ router.get("/api/journal/lookups", async (req, res) => {
         name:
           employee.users?.name ||
           `${employee.first_name} ${employee.last_name}`.trim(),
+        is_active: true,
       })),
     });
   } catch (error) {
@@ -2545,8 +2544,59 @@ router.post("/api/journal", async (req, res) => {
     });
     if (hasInvalidParty)
       return res.status(400).json({ message: "Select a valid supplier, customer, or employee" });
+
+    const selectedPartyIds = Object.fromEntries(
+      ["supplier", "customer", "employee"].map((partyType) => [
+        partyType,
+        [
+          ...new Set(
+            lines
+              .filter((line) => line.partyType === partyType)
+              .map((line) => Number(line.partyId)),
+          ),
+        ],
+      ]),
+    );
+    const partyNames = new Map();
+    for (const [partyType, table] of [
+      ["supplier", "suppliers"],
+      ["customer", "customers"],
+      ["employee", "employees"],
+    ]) {
+      const ids = selectedPartyIds[partyType];
+      if (!ids.length) continue;
+      const selection =
+        partyType === "employee"
+          ? "id, first_name, last_name, users(name)"
+          : "id, name";
+      const { data, error } = await supabase
+        .from(table)
+        .select(selection)
+        .in("id", ids);
+      if (error) throw error;
+      for (const party of data || []) {
+        const name =
+          party.name ||
+          party.users?.name ||
+          `${party.first_name || ""} ${party.last_name || ""}`.trim();
+        partyNames.set(`${partyType}:${party.id}`, name);
+      }
+    }
+
+    if (
+      lines.some(
+        (line) =>
+          line.partyType &&
+          !partyNames.get(`${line.partyType}:${Number(line.partyId)}`),
+      )
+    ) {
+      return res.status(400).json({ message: "One or more selected parties could not be found" });
+    }
+
     const normalizedLines = lines.map((line) => ({
-      account: String(line.account || "").trim(),
+      account: line.partyType
+        ? `${line.partyType[0].toUpperCase()}${line.partyType.slice(1)}: ${partyNames.get(`${line.partyType}:${Number(line.partyId)}`)}`
+        : String(line.account || "").trim(),
       debit: Number(line.debit || 0),
       credit: Number(line.credit || 0),
       memo: String(line.memo || "").trim() || null,
