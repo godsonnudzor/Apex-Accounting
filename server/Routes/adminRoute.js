@@ -2452,6 +2452,51 @@ router.get("/api/reports/aging", async (req, res) => {
   }
 });
 
+router.get("/api/journal/lookups", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Journal permission required" });
+
+    const [supplierResult, customerResult, employeeResult] = await Promise.all([
+      supabase
+        .from("suppliers")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name"),
+      supabase
+        .from("customers")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name"),
+      supabase
+        .from("employees")
+        .select("id, first_name, last_name, users(name)")
+        .order("first_name", { ascending: true }),
+    ]);
+
+    if (supplierResult.error) throw supplierResult.error;
+    if (customerResult.error) throw customerResult.error;
+    if (employeeResult.error) throw employeeResult.error;
+
+    return res.json({
+      suppliers: supplierResult.data || [],
+      customers: customerResult.data || [],
+      employees: (employeeResult.data || []).map((employee) => ({
+        id: employee.id,
+        name:
+          employee.users?.name ||
+          `${employee.first_name} ${employee.last_name}`.trim(),
+      })),
+    });
+  } catch (error) {
+    console.error("Journal party lookup error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to load journal party lookups" });
+  }
+});
+
 router.get("/api/journal", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);

@@ -6,6 +6,16 @@ const blankLine = () => ({ account: "", debit: "", credit: "", memo: "" });
 const Journal = () => {
   const [entries, setEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [parties, setParties] = useState({
+    suppliers: [],
+    employees: [],
+    customers: [],
+  });
+  const [partySearch, setPartySearch] = useState({
+    suppliers: "",
+    employees: "",
+    customers: "",
+  });
   const [form, setForm] = useState({
     entryDate: new Date().toISOString().slice(0, 10),
     reference: "",
@@ -26,9 +36,25 @@ const Journal = () => {
     setEntries(result.entries || []);
   };
 
+  const loadParties = async () => {
+    const response = await fetch(getApiUrl("/api/journal/lookups"), {
+      credentials: "include",
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || "Unable to load suppliers, employees, and customers");
+    }
+    setParties({
+      suppliers: result.suppliers || [],
+      employees: result.employees || [],
+      customers: result.customers || [],
+    });
+  };
+
   useEffect(() => {
     Promise.all([
       loadEntries(),
+      loadParties(),
       fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Unable to load ledger accounts");
@@ -116,6 +142,62 @@ const Journal = () => {
             {message}
           </p>
         )}
+        <section className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Available parties
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Search supplier, employee, and customer names while preparing an entry.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              ["suppliers", "Suppliers"],
+              ["employees", "Employees"],
+              ["customers", "Customers"],
+            ].map(([key, label]) => {
+              const search = partySearch[key].trim().toLowerCase();
+              const matches = parties[key].filter((party) =>
+                party.name?.toLowerCase().includes(search),
+              );
+              return (
+                <div key={key} className="min-w-0">
+                  <label className="text-sm font-medium text-slate-700">
+                    {label}
+                    <input
+                      className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                      type="search"
+                      value={partySearch[key]}
+                      onChange={(event) =>
+                        setPartySearch((current) => ({
+                          ...current,
+                          [key]: event.target.value,
+                        }))
+                      }
+                      placeholder={`Search ${label.toLowerCase()}`}
+                    />
+                  </label>
+                  <ul className="mt-2 max-h-40 overflow-y-auto rounded border border-slate-200">
+                    {matches.map((party) => (
+                      <li
+                        key={party.id}
+                        className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700 last:border-b-0"
+                      >
+                        {party.name}
+                      </li>
+                    ))}
+                    {!matches.length && (
+                      <li className="px-3 py-2 text-sm text-slate-500">
+                        No {label.toLowerCase()} found.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         <form
           onSubmit={saveEntry}
           className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
