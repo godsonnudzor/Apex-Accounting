@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const blankLine = () => ({
   accountSelection: "",
@@ -30,6 +30,7 @@ const Journal = () => {
     employees: [],
     customers: [],
   });
+  const [partyLookupError, setPartyLookupError] = useState("");
   const [form, setForm] = useState({
     entryDate: new Date().toISOString().slice(0, 10),
     reference: "",
@@ -54,15 +55,67 @@ const Journal = () => {
     const response = await fetch(getApiUrl("/api/journal/lookups"), {
       credentials: "include",
     });
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.message || "Unable to load suppliers, employees, and customers");
+    if (response.status !== 404) {
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to load suppliers, employees, and customers");
+      }
+      for (const key of ["suppliers", "employees", "customers"]) {
+        if (!Array.isArray(result[key])) {
+          throw new Error(`Journal lookup response is missing the ${key} list`);
+        }
+      }
+      setParties({
+        suppliers: result.suppliers,
+        employees: result.employees,
+        customers: result.customers,
+      });
+      setPartyLookupError("");
+      return;
     }
-    setParties({
-      suppliers: result.suppliers || [],
-      employees: result.employees || [],
-      customers: result.customers || [],
+
+    const sources = [
+      ["suppliers", "/api/suppliers?includeInactive=true"],
+      ["customers", "/api/customers?includeInactive=true"],
+      ["employees", "/api/employees"],
+    ];
+    const results = await Promise.allSettled(
+      sources.map(async ([key, path]) => {
+        const lookupResponse = await fetch(getApiUrl(path), {
+          credentials: "include",
+        });
+        const lookupResult = await readApiResponse(lookupResponse);
+        if (!lookupResponse.ok) {
+          throw new Error(
+            lookupResult.message || `Unable to load ${key}`,
+          );
+        }
+        if (!Array.isArray(lookupResult[key])) {
+          throw new Error(`The API response is missing the ${key} list`);
+        }
+        return lookupResult[key];
+      }),
+    );
+    const nextParties = { suppliers: [], customers: [], employees: [] };
+    const lookupErrors = [];
+    results.forEach((result, index) => {
+      const [key] = sources[index];
+      if (result.status === "fulfilled") {
+        nextParties[key] = result.value;
+      } else {
+        lookupErrors.push(
+          `${key}: ${result.reason?.message || "unable to load"}`,
+        );
+      }
     });
+    setParties({
+      ...nextParties,
+    });
+    setPartyLookupError(
+      lookupErrors.length
+        ? `Some party lists could not be loaded: ${lookupErrors.join("; ")}`
+        : "",
+    );
   };
 
   useEffect(() => {
@@ -120,9 +173,18 @@ const Journal = () => {
             if (selectionType === "ledger") {
               return { ...line, account: selectionValue };
             }
+            const party = parties[`${selectionType}s`]?.find(
+              (item) => String(item.id) === selectionValue,
+            );
+            const partyName =
+              party?.name ||
+              party?.users?.name ||
+              [party?.first_name, party?.last_name].filter(Boolean).join(" ");
             return {
               ...line,
-              account: "",
+              account: partyName
+                ? `${selectionType[0].toUpperCase()}${selectionType.slice(1)}: ${partyName}`
+                : "",
               partyType: selectionType,
               partyId: selectionValue || null,
             };
@@ -169,6 +231,14 @@ const Journal = () => {
             role="status"
           >
             {message}
+          </p>
+        )}
+        {partyLookupError && (
+          <p
+            className="mb-4 rounded bg-amber-50 px-4 py-3 text-amber-800"
+            role="status"
+          >
+            {partyLookupError}
           </p>
         )}
         <form
@@ -250,6 +320,11 @@ const Journal = () => {
                             );
                           })}
                           <optgroup label="Customers (Assets)">
+                            {!parties.customers.length && (
+                              <option disabled value="">
+                                No customers returned by the API
+                              </option>
+                            )}
                             {parties.customers.map((customer) => (
                               <option key={customer.id} value={`customer:${customer.id}`}>
                                 {customer.name}{customer.is_active === false ? " (inactive)" : ""}
@@ -257,6 +332,11 @@ const Journal = () => {
                             ))}
                           </optgroup>
                           <optgroup label="Suppliers (Liabilities)">
+                            {!parties.suppliers.length && (
+                              <option disabled value="">
+                                No suppliers returned by the API
+                              </option>
+                            )}
                             {parties.suppliers.map((supplier) => (
                               <option key={supplier.id} value={`supplier:${supplier.id}`}>
                                 {supplier.name}{supplier.is_active === false ? " (inactive)" : ""}
@@ -264,6 +344,11 @@ const Journal = () => {
                             ))}
                           </optgroup>
                           <optgroup label="Employees (Expenses / Liabilities)">
+                            {!parties.employees.length && (
+                              <option disabled value="">
+                                No employees returned by the API
+                              </option>
+                            )}
                             {parties.employees.map((employee) => (
                               <option key={employee.id} value={`employee:${employee.id}`}>
                                 {employee.name}
