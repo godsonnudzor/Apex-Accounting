@@ -15,6 +15,14 @@ const getLinePartyName = (line) =>
   line.employee?.users?.name ||
   [line.employee?.first_name, line.employee?.last_name].filter(Boolean).join(" ");
 
+const accountTypeLabels = {
+  asset: "Assets",
+  liability: "Liabilities",
+  equity: "Equity",
+  income: "Income",
+  expense: "Expenses",
+};
+
 const Journal = () => {
   const [entries, setEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -192,11 +200,10 @@ const Journal = () => {
             </label>
           </div>
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[800px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-3 py-2">Account</th>
-                  <th className="px-3 py-2">Supplier / Employee / Customer</th>
+                  <th className="px-3 py-2">Account and party</th>
                   <th className="px-3 py-2">Debit</th>
                   <th className="px-3 py-2">Credit</th>
                   <th className="px-3 py-2">Memo</th>
@@ -207,51 +214,65 @@ const Journal = () => {
                 {lines.map((line, index) => (
                   <tr key={index}>
                     <td className="px-2 py-2">
-                      <select
-                        className="w-full rounded border border-slate-300 px-3 py-2"
-                        name="account"
-                        value={line.account}
-                        onChange={(event) => updateLine(index, event)}
-                        required
-                      >
-                        <option value="">Select ledger account</option>
-                        {accounts.map((account) => (
-                          <option key={account.id} value={`${account.code} - ${account.name}`}>
-                            {account.code} - {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-2 py-2">
-                      <select
-                        className="w-full rounded border border-slate-300 px-3 py-2"
-                        name="partySelection"
-                        value={line.partySelection}
-                        onChange={(event) => updateLine(index, event)}
-                      >
-                        <option value="">No party</option>
-                        <optgroup label="Suppliers">
-                          {parties.suppliers.map((supplier) => (
-                            <option key={supplier.id} value={`supplier:${supplier.id}`}>
-                              {supplier.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Employees">
-                          {parties.employees.map((employee) => (
-                            <option key={employee.id} value={`employee:${employee.id}`}>
-                              {employee.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Customers">
-                          {parties.customers.map((customer) => (
-                            <option key={customer.id} value={`customer:${customer.id}`}>
-                              {customer.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
+                      <div className="space-y-2">
+                        <select
+                          className="w-full rounded border border-slate-300 px-3 py-2"
+                          name="account"
+                          value={line.account}
+                          onChange={(event) => updateLine(index, event)}
+                          required
+                        >
+                          <option value="">Select ledger account</option>
+                          {Object.entries(accountTypeLabels).map(([type, label]) => {
+                            const typeAccounts = accounts.filter(
+                              (account) => account.account_type === type,
+                            );
+                            if (!typeAccounts.length) return null;
+                            return (
+                              <optgroup key={type} label={label}>
+                                {typeAccounts.map((account) => (
+                                  <option
+                                    key={account.id}
+                                    value={`${account.code} - ${account.name}`}
+                                  >
+                                    {account.code} - {account.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            );
+                          })}
+                        </select>
+                        <select
+                          className="w-full rounded border border-slate-300 px-3 py-2 text-slate-600"
+                          name="partySelection"
+                          value={line.partySelection}
+                          onChange={(event) => updateLine(index, event)}
+                          aria-label="Optional supplier, employee, or customer"
+                        >
+                          <option value="">No supplier, employee, or customer</option>
+                          <optgroup label="Suppliers">
+                            {parties.suppliers.map((supplier) => (
+                              <option key={supplier.id} value={`supplier:${supplier.id}`}>
+                                {supplier.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Employees">
+                            {parties.employees.map((employee) => (
+                              <option key={employee.id} value={`employee:${employee.id}`}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Customers">
+                            {parties.customers.map((customer) => (
+                              <option key={customer.id} value={`customer:${customer.id}`}>
+                                {customer.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        </select>
+                      </div>
                     </td>
                     <td className="px-2 py-2">
                       <input
