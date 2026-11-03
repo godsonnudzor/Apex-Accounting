@@ -2510,13 +2510,50 @@ router.get("/api/journal/lookups", async (req, res) => {
         const partyId = line[`${partyType}_id`];
         if (partyId === null || partyId === undefined) continue;
         const key = `${partyType}:${partyId}`;
+        const balanceDelta =
+          partyType === "customer"
+            ? Number(line.debit || 0) - Number(line.credit || 0)
+            : Number(line.credit || 0) - Number(line.debit || 0);
         balances[key] =
-          (balances[key] || 0) +
-          Number(line.debit || 0) -
-          Number(line.credit || 0);
+          (balances[key] || 0) + balanceDelta;
       }
       return balances;
     }, {});
+
+    const [billResult, invoiceResult, payrollResult] = await Promise.all([
+      supabase
+        .from("supplier_bills")
+        .select("supplier_id, document_type, total_amount"),
+      supabase
+        .from("customer_invoices")
+        .select("customer_id, total_amount")
+        .eq("status", "open"),
+      supabase
+        .from("payroll_entries")
+        .select("employee_id, net_pay, payroll_runs!inner(status)")
+        .eq("payroll_runs.status", "processed"),
+    ]);
+    if (billResult.error) throw billResult.error;
+    if (invoiceResult.error) throw invoiceResult.error;
+    if (payrollResult.error) throw payrollResult.error;
+
+    for (const bill of billResult.data || []) {
+      const key = `supplier:${bill.supplier_id}`;
+      const sign = bill.document_type === "credit" ? -1 : 1;
+      partyBalances[key] =
+        (partyBalances[key] || 0) +
+        sign * Number(bill.total_amount || 0);
+    }
+    for (const invoice of invoiceResult.data || []) {
+      const key = `customer:${invoice.customer_id}`;
+      partyBalances[key] =
+        (partyBalances[key] || 0) + Number(invoice.total_amount || 0);
+    }
+    for (const payrollEntry of payrollResult.data || []) {
+      const key = `employee:${payrollEntry.employee_id}`;
+      partyBalances[key] =
+        (partyBalances[key] || 0) + Number(payrollEntry.net_pay || 0);
+    }
 
     return res.json({
       suppliers: (supplierResult.data || []).map((supplier) => ({

@@ -53,10 +53,36 @@ const ChartOfAccounts = () => {
           return lookupResult[key];
         }),
       );
+      const agingResponse = await fetch(getApiUrl("/api/reports/aging"), { credentials: "include" });
+      const agingResult = await readApiResponse(agingResponse);
+      if (!agingResponse.ok) {
+        throw new Error(agingResult.message || "Unable to load supplier and customer balances");
+      }
+      const supplierBalances = new Map(
+        (agingResult.suppliers || []).map((supplier) => [
+          String(supplier.supplier_id),
+          Number(supplier.total || 0),
+        ]),
+      );
+      const customerBalances = new Map(
+        (agingResult.customers || []).map((customer) => [
+          String(customer.customer_id),
+          Number(customer.total || 0),
+        ]),
+      );
       setParties({
-        suppliers: results[0],
-        customers: results[1],
-        employees: results[2],
+        suppliers: results[0].map((supplier) => ({
+          ...supplier,
+          balance: supplierBalances.get(String(supplier.id)) || 0,
+        })),
+        customers: results[1].map((customer) => ({
+          ...customer,
+          balance: customerBalances.get(String(customer.id)) || 0,
+        })),
+        employees: results[2].map((employee) => ({
+          ...employee,
+          balance: null,
+        })),
       });
       return;
     }
@@ -226,7 +252,7 @@ const ChartOfAccounts = () => {
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Group Ledger</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Report</th></tr></thead>
-            <tbody>{loading ? <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">Loading accounts...</td></tr> : visibleAccounts.length ? visibleAccounts.map((account) => <tr key={account.id} className="border-t border-slate-100"><td className="px-4 py-3 font-semibold text-slate-900">{account.code}</td><td className="px-4 py-3">{account.name}</td><td className="px-4 py-3 capitalize text-slate-600">{account.partyType ? `${account.partyType} (${account.account_type})` : account.account_type}</td><td className="px-4 py-3">{account.group_ledger || "-"}</td><td className="px-4 py-3 text-right font-semibold">{formatMoney(account.balance)}</td><td className={`px-4 py-3 ${account.is_active === false ? "text-slate-500" : "text-emerald-700"}`}>{account.is_active === false ? "Inactive" : "Active"}</td><td className="px-4 py-3"><button type="button" className="rounded bg-teal-600 px-3 py-1 text-xs font-semibold text-white" onClick={() => openLedgerReport(account)}>Open report</button></td></tr>) : <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">No accounts found.</td></tr>}</tbody>
+            <tbody>{loading ? <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">Loading accounts...</td></tr> : visibleAccounts.length ? visibleAccounts.map((account) => <tr key={account.id} className="border-t border-slate-100"><td className="px-4 py-3 font-semibold text-slate-900">{account.code}</td><td className="px-4 py-3">{account.name}</td><td className="px-4 py-3 capitalize text-slate-600">{account.partyType ? `${account.partyType} (${account.account_type})` : account.account_type}</td><td className="px-4 py-3">{account.group_ledger || "-"}</td><td className="px-4 py-3 text-right font-semibold">{account.balance == null ? "—" : formatMoney(account.balance)}</td><td className={`px-4 py-3 ${account.is_active === false ? "text-slate-500" : "text-emerald-700"}`}>{account.is_active === false ? "Inactive" : "Active"}</td><td className="px-4 py-3"><button type="button" className="rounded bg-teal-600 px-3 py-1 text-xs font-semibold text-white" onClick={() => openLedgerReport(account)}>Open report</button></td></tr>) : <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">No accounts found.</td></tr>}</tbody>
           </table>
         </div>
 
