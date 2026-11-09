@@ -483,7 +483,7 @@ begin
       v_available := round(v_available - v_credit_offset, 2);
       v_credit_remaining := round(v_credit_remaining - v_credit_offset, 2);
 
-      select round((item->>'amount')::numeric, 2)
+      select round((item->>'amount')::numeric, 2) as amount
         into v_allocation
         from jsonb_array_elements(p_allocations) as item
        where (item->>'documentId')::bigint = v_document.id;
