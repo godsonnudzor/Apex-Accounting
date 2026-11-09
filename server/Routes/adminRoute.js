@@ -807,6 +807,21 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
 
 router.get("/api/ledger/accounts", async (req, res) => {
   try {
+    if (req.query?.resource === "groups") {
+      const { allowed } = await canUseAccounting(req, [
+        "write_cheque",
+        "group_accounts",
+      ]);
+      if (!allowed)
+        return res.status(403).json({ message: "Group ledger permission required" });
+      const { data, error } = await supabase
+        .from("ledger_groups")
+        .select("name, account_type, created_at")
+        .order("name");
+      if (error) throw error;
+      return res.json({ groups: data || [] });
+    }
+
     const { allowed } = await canUseAccounting(req, [
       "write_cheque",
       "bills",
@@ -856,63 +871,38 @@ router.get("/api/ledger/accounts", async (req, res) => {
   }
 });
 
-router.get("/api/ledger/groups", async (req, res) => {
-  try {
-    const { allowed } = await canUseAccounting(req, [
-      "write_cheque",
-      "group_accounts",
-    ]);
-    if (!allowed)
-      return res.status(403).json({ message: "Group ledger permission required" });
-    const { data, error } = await supabase
-      .from("ledger_groups")
-      .select("name, account_type, created_at")
-      .order("name");
-    if (error) throw error;
-    return res.json({ groups: data || [] });
-  } catch (error) {
-    console.error("Ledger groups lookup error:", error);
-    return res
-      .status(500)
-      .json({ message: error?.message || "Unable to load group ledgers" });
-  }
-});
-
-router.post("/api/ledger/groups", async (req, res) => {
-  try {
-    const { allowed } = await canUseAccounting(req, "group_accounts");
-    if (!allowed)
-      return res.status(403).json({ message: "Group ledger permission required" });
-    const name = String(req.body?.name || "").trim();
-    const accountType = String(req.body?.accountType || "")
-      .trim()
-      .toLowerCase();
-    if (!name || name.length > 100)
-      return res.status(400).json({ message: "Enter a group ledger name up to 100 characters" });
-    if (!["asset", "liability", "equity", "income", "expense"].includes(accountType))
-      return res.status(400).json({ message: "Select a valid account type" });
-
-    const { data, error } = await supabase
-      .from("ledger_groups")
-      .insert({ name, account_type: accountType })
-      .select("name, account_type, created_at")
-      .single();
-    if (error) {
-      if (error.code === "23505")
-        return res.status(409).json({ message: "A group ledger with that name already exists" });
-      throw error;
-    }
-    return res.status(201).json({ group: data });
-  } catch (error) {
-    console.error("Ledger group creation error:", error);
-    return res
-      .status(500)
-      .json({ message: error?.message || "Unable to create group ledger" });
-  }
-});
-
 router.post("/api/ledger/accounts", async (req, res) => {
   try {
+    if (req.query?.resource === "groups") {
+      const { allowed } = await canUseAccounting(req, "group_accounts");
+      if (!allowed)
+        return res.status(403).json({ message: "Group ledger permission required" });
+      const name = String(req.body?.name || "").trim();
+      const accountType = String(req.body?.accountType || "")
+        .trim()
+        .toLowerCase();
+      if (!name || name.length > 100)
+        return res.status(400).json({
+          message: "Enter a group ledger name up to 100 characters",
+        });
+      if (!["asset", "liability", "equity", "income", "expense"].includes(accountType))
+        return res.status(400).json({ message: "Select a valid account type" });
+
+      const { data, error } = await supabase
+        .from("ledger_groups")
+        .insert({ name, account_type: accountType })
+        .select("name, account_type, created_at")
+        .single();
+      if (error) {
+        if (error.code === "23505")
+          return res.status(409).json({
+            message: "A group ledger with that name already exists",
+          });
+        throw error;
+      }
+      return res.status(201).json({ group: data });
+    }
+
     const { currentUser, allowed } = await canUseAccounting(req);
     if (!allowed)
       return res.status(403).json({ message: "Ledger permission required" });

@@ -15,9 +15,10 @@ function LedgerAccountCreate() {
   useEffect(() => {
     let active = true;
     const loadGroups = async () => {
-      const response = await fetch(getApiUrl("/api/ledger/groups"), {
-        credentials: "include",
-      });
+      const response = await fetch(
+        getApiUrl("/api/ledger/accounts?resource=groups"),
+        { credentials: "include" },
+      );
       const result = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(result.message || "Unable to load group ledgers");

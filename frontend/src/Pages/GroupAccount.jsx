@@ -14,9 +14,12 @@ function GroupAccount() {
   const [message, setMessage] = useState("");
 
   const loadGroups = async () => {
-    const response = await fetch(getApiUrl("/api/ledger/groups"), {
+    const response = await fetch(
+      getApiUrl("/api/ledger/accounts?resource=groups"),
+      {
       credentials: "include",
-    });
+      },
+    );
     const result = await readApiResponse(response);
     if (!response.ok) {
       throw new Error(result.message || "Unable to load group ledgers");
@@ -36,12 +39,15 @@ function GroupAccount() {
     setMessage("");
     setSaving(true);
     try {
-      const response = await fetch(getApiUrl("/api/ledger/groups"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, accountType }),
-      });
+      const response = await fetch(
+        getApiUrl("/api/ledger/accounts?resource=groups"),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, accountType }),
+        },
+      );
       const result = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(result.message || "Unable to create group ledger");
