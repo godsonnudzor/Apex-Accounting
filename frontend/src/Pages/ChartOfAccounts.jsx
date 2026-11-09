@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getApiUrl, readApiResponse } from "../context/auth";
 
@@ -7,6 +7,7 @@ const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 
 const ChartOfAccounts = () => {
   const [accounts, setAccounts] = useState([]);
+  const [groupLedgers, setGroupLedgers] = useState([]);
   const [parties, setParties] = useState({ suppliers: [], customers: [], employees: [] });
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -25,6 +26,7 @@ const ChartOfAccounts = () => {
     const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to load chart of accounts");
     setAccounts(result.accounts || []);
+    setGroupLedgers(result.groupLedgers || []);
   };
 
   const loadParties = async () => {
@@ -147,6 +149,39 @@ const ChartOfAccounts = () => {
     [accounts, parties, filter],
   );
 
+  const accountGroups = useMemo(() => {
+    const groups = new Map();
+    for (const group of groupLedgers) {
+      if (filter !== "all" && group.account_type !== filter) continue;
+      groups.set(group.name, {
+        name: group.name,
+        accountType: group.account_type,
+        accounts: [],
+      });
+    }
+
+    for (const account of visibleAccounts) {
+      const name = account.group_ledger || "Ungrouped";
+      if (!groups.has(name)) {
+        groups.set(name, {
+          name,
+          accountType: account.account_type,
+          accounts: [],
+        });
+      }
+      groups.get(name).accounts.push(account);
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        accounts: group.accounts.sort((left, right) =>
+          String(left.code).localeCompare(String(right.code)),
+        ),
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [filter, groupLedgers, visibleAccounts]);
+
   const openLedgerReport = async (account) => {
     setSelectedAccount(account);
     setLedgerLoading(true);
@@ -202,7 +237,65 @@ const ChartOfAccounts = () => {
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Group Ledger</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Report</th></tr></thead>
-            <tbody>{loading ? <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">Loading accounts...</td></tr> : visibleAccounts.length ? visibleAccounts.map((account) => <tr key={account.id} className="border-t border-slate-100"><td className="px-4 py-3 font-semibold text-slate-900">{account.code}</td><td className="px-4 py-3">{account.name}</td><td className="px-4 py-3 capitalize text-slate-600">{account.partyType ? `${account.partyType} (${account.account_type})` : account.account_type}</td><td className="px-4 py-3">{account.group_ledger || "-"}</td><td className="px-4 py-3 text-right font-semibold">{account.account_type === "expense" || account.balance == null ? "—" : formatMoney(account.balance)}</td><td className={`px-4 py-3 ${account.is_active === false ? "text-slate-500" : "text-emerald-700"}`}>{account.is_active === false ? "Inactive" : "Active"}</td><td className="px-4 py-3"><button type="button" className="rounded bg-teal-600 px-3 py-1 text-xs font-semibold text-white" onClick={() => openLedgerReport(account)}>Open report</button></td></tr>) : <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">No accounts found.</td></tr>}</tbody>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
+                    Loading accounts...
+                  </td>
+                </tr>
+              ) : accountGroups.length ? (
+                accountGroups.map((group) => (
+                  <Fragment key={group.name}>
+                    <tr className="border-t border-slate-200 bg-slate-50">
+                      <td colSpan="2" className="px-4 py-3 font-semibold text-slate-900">
+                        {group.name}
+                      </td>
+                      <td className="px-4 py-3 capitalize text-slate-600">
+                        {group.accountType}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        Group ledger · {group.accounts.length} account{group.accounts.length === 1 ? "" : "s"}
+                      </td>
+                      <td colSpan="3" />
+                    </tr>
+                    {group.accounts.map((account) => (
+                      <tr key={account.id} className="border-t border-slate-100">
+                        <td className="px-4 py-3 pl-8 font-semibold text-slate-900">{account.code}</td>
+                        <td className="px-4 py-3">{account.name}</td>
+                        <td className="px-4 py-3 capitalize text-slate-600">
+                          {account.partyType ? `${account.partyType} (${account.account_type})` : account.account_type}
+                        </td>
+                        <td className="px-4 py-3">{account.group_ledger || "-"}</td>
+                        <td className="px-4 py-3 text-right font-semibold">
+                          {account.account_type === "expense" || account.balance == null
+                            ? "—"
+                            : formatMoney(account.balance)}
+                        </td>
+                        <td className={`px-4 py-3 ${account.is_active === false ? "text-slate-500" : "text-emerald-700"}`}>
+                          {account.is_active === false ? "Inactive" : "Active"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            className="rounded bg-teal-600 px-3 py-1 text-xs font-semibold text-white"
+                            onClick={() => openLedgerReport(account)}
+                          >
+                            Open report
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
+                    No accounts found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
           </table>
         </div>
 
