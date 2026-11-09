@@ -269,7 +269,7 @@ function Admin() {
       ),
       request("/api/reports/aging", "Unable to load dashboard aging data"),
       request(
-        "/api/dashboard/transactions",
+        "/api/journal?status=posted&limit=8",
         "Unable to load recent transactions",
       ),
     ]).then(([reportResult, agingResult, transactionResult]) => {
@@ -285,7 +285,7 @@ function Admin() {
         setDashboardAgingError(agingResult.reason.message);
       }
       if (transactionResult.status === "fulfilled") {
-        setDashboardTransactions(transactionResult.value.transactions || []);
+        setDashboardTransactions(transactionResult.value.entries || []);
       } else {
         setDashboardTransactionsError(transactionResult.reason.message);
       }

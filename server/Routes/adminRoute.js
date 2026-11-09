@@ -2363,30 +2363,6 @@ router.get("/api/reports/financial/details", async (req, res) => {
   }
 });
 
-router.get("/api/dashboard/transactions", async (req, res) => {
-  try {
-    const { allowed } = await canUseAccounting(req);
-    if (!allowed)
-      return res.status(403).json({ message: "Dashboard permission required" });
-    const { data, error } = await supabase
-      .from("journal_entries")
-      .select(
-        "id, entry_date, reference, description, source, journal_lines(id, account, debit, credit, memo, supplier:suppliers(name), customer:customers(name), employee:employees(first_name, last_name, users(name))), payment_records(id, payment_type, payment_number, payee, amount, bank_account)",
-      )
-      .eq("status", "posted")
-      .order("entry_date", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(8);
-    if (error) throw error;
-    return res.json({ transactions: data || [] });
-  } catch (error) {
-    console.error("Dashboard transactions lookup error:", error);
-    return res.status(500).json({
-      message: error?.message || "Unable to load dashboard transactions",
-    });
-  }
-});
-
 router.get("/api/reports/aging", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
@@ -2610,13 +2586,31 @@ router.get("/api/journal", async (req, res) => {
     const { allowed } = await canUseAccounting(req);
     if (!allowed)
       return res.status(403).json({ message: "Journal permission required" });
-    const { data, error } = await supabase
+    const status = String(req.query?.status || "");
+    if (status && !["draft", "posted"].includes(status)) {
+      return res.status(400).json({ message: "Invalid journal status" });
+    }
+    const limitValue = req.query?.limit;
+    const limit =
+      limitValue === undefined
+        ? null
+        : /^\d+$/.test(String(limitValue))
+          ? Number(limitValue)
+          : NaN;
+    if (limit !== null && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+      return res.status(400).json({ message: "Invalid journal entry limit" });
+    }
+
+    let query = supabase
       .from("journal_entries")
       .select(
         "id, entry_date, reference, description, source, status, created_at, journal_lines(id, account, debit, credit, memo, supplier:suppliers(name), customer:customers(name), employee:employees(first_name, last_name, users(name))), payment_records(id, payment_type, payment_number, payee, amount, bank_account)",
       )
       .order("entry_date", { ascending: false })
       .order("id", { ascending: false });
+    if (status) query = query.eq("status", status);
+    if (limit !== null) query = query.limit(limit);
+    const { data, error } = await query;
     if (error) throw error;
     return res.json({ entries: data || [] });
   } catch (error) {
