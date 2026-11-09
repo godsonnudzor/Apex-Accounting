@@ -874,7 +874,10 @@ router.get("/api/ledger/accounts", async (req, res) => {
 router.post("/api/ledger/accounts", async (req, res) => {
   try {
     if (req.query?.resource === "groups") {
-      const { allowed } = await canUseAccounting(req, "group_accounts");
+      const { allowed } = await canUseAccounting(req, [
+        "group_accounts",
+        "write_cheque",
+      ]);
       if (!allowed)
         return res.status(403).json({ message: "Group ledger permission required" });
       const name = String(req.body?.name || "").trim();
