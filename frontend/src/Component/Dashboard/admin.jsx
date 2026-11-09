@@ -12,64 +12,31 @@ const metrics = [
   },
   {
     label: "Net profit margin",
-    value: "24.6%",
-    change: "+3.2%",
-    note: "vs. last month",
     icon: "◒",
     tone: "blue",
   },
   {
     label: "Accounts receivable",
-    value: "$126,480",
-    change: "+8.4%",
-    note: "outstanding",
     icon: "◎",
     tone: "amber",
   },
   {
     label: "Accounts payable",
-    value: "$48,920",
-    change: "-4.1%",
-    note: "due this month",
     icon: "▣",
     tone: "red",
   },
 ];
 
-const transactions = [
-  {
-    name: "Northstar Studio",
-    detail: "Invoice #1048",
-    amount: "+$8,420",
-    date: "Today, 10:42 AM",
-    type: "income",
-    mark: "NS",
-  },
-  {
-    name: "Figma Professional",
-    detail: "Software subscription",
-    amount: "-$240",
-    date: "Today, 9:18 AM",
-    type: "expense",
-    mark: "F",
-  },
-  {
-    name: "Apex Office Supply",
-    detail: "Office equipment",
-    amount: "-$1,280",
-    date: "Yesterday, 4:36 PM",
-    type: "expense",
-    mark: "AO",
-  },
-  {
-    name: "Marlow & Co.",
-    detail: "Invoice #1047",
-    amount: "+$4,860",
-    date: "Yesterday, 1:12 PM",
-    type: "income",
-    mark: "MC",
-  },
-];
+const relationRecord = (value) => (Array.isArray(value) ? value[0] : value);
+
+const transactionDate = (date) =>
+  date
+    ? new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Date unavailable";
 
 const alerts = [
   {
@@ -248,6 +215,14 @@ function Admin() {
   const [dashboardReport, setDashboardReport] = useState(null);
   const [dashboardReportLoading, setDashboardReportLoading] = useState(true);
   const [dashboardReportError, setDashboardReportError] = useState("");
+  const [dashboardAging, setDashboardAging] = useState(null);
+  const [dashboardAgingLoading, setDashboardAgingLoading] = useState(true);
+  const [dashboardAgingError, setDashboardAgingError] = useState("");
+  const [dashboardTransactions, setDashboardTransactions] = useState([]);
+  const [dashboardTransactionsLoading, setDashboardTransactionsLoading] =
+    useState(true);
+  const [dashboardTransactionsError, setDashboardTransactionsError] =
+    useState("");
 
   const displayName = user?.name || "User";
   const initials = displayName
@@ -262,6 +237,8 @@ function Admin() {
   useEffect(() => {
     if (!isAdmin) {
       setDashboardReportLoading(false);
+      setDashboardAgingLoading(false);
+      setDashboardTransactionsLoading(false);
       return undefined;
     }
 
@@ -269,28 +246,53 @@ function Admin() {
     const year = new Date().getFullYear();
     setDashboardReportLoading(true);
     setDashboardReportError("");
+    setDashboardAgingLoading(true);
+    setDashboardAgingError("");
+    setDashboardTransactionsLoading(true);
+    setDashboardTransactionsError("");
 
-    fetch(`${getApiUrl("/api/reports/financial")}?year=${year}`, {
-      credentials: "include",
-    })
-      .then(async (response) => {
+    const request = (path, fallbackMessage) =>
+      fetch(getApiUrl(path), { credentials: "include" }).then(
+        async (response) => {
         const result = await readApiResponse(response);
         if (!response.ok) {
-          throw new Error(
-            result.message || "Unable to load dashboard financial data",
-          );
+          throw new Error(result.message || fallbackMessage);
         }
         return result;
-      })
-      .then((result) => {
-        if (active) setDashboardReport(result);
-      })
-      .catch((error) => {
-        if (active) setDashboardReportError(error.message);
-      })
-      .finally(() => {
-        if (active) setDashboardReportLoading(false);
-      });
+        },
+      );
+
+    Promise.allSettled([
+      request(
+        `/api/reports/financial?year=${year}`,
+        "Unable to load dashboard financial data",
+      ),
+      request("/api/reports/aging", "Unable to load dashboard aging data"),
+      request(
+        "/api/dashboard/transactions",
+        "Unable to load recent transactions",
+      ),
+    ]).then(([reportResult, agingResult, transactionResult]) => {
+      if (!active) return;
+      if (reportResult.status === "fulfilled") {
+        setDashboardReport(reportResult.value);
+      } else {
+        setDashboardReportError(reportResult.reason.message);
+      }
+      if (agingResult.status === "fulfilled") {
+        setDashboardAging(agingResult.value);
+      } else {
+        setDashboardAgingError(agingResult.reason.message);
+      }
+      if (transactionResult.status === "fulfilled") {
+        setDashboardTransactions(transactionResult.value.transactions || []);
+      } else {
+        setDashboardTransactionsError(transactionResult.reason.message);
+      }
+      setDashboardReportLoading(false);
+      setDashboardAgingLoading(false);
+      setDashboardTransactionsLoading(false);
+    });
 
     return () => {
       active = false;
@@ -368,11 +370,177 @@ function Admin() {
     }),
     { income: 0, expenses: 0 },
   );
+  const annualProfitLoss = dashboardReport?.profitLoss || [];
+  const annualIncome = annualProfitLoss
+    .filter((account) => account.account_type === "income")
+    .reduce((sum, account) => sum + Number(account.balance || 0), 0);
+  const netProfitMargin = annualIncome
+    ? (Number(dashboardReport?.netProfit || 0) / annualIncome) * 100
+    : 0;
+  const receivables = (dashboardAging?.customers || []).reduce(
+    (sum, customer) => sum + Number(customer.total || 0),
+    0,
+  );
+  const payables = (dashboardAging?.suppliers || []).reduce(
+    (sum, supplier) => sum + Number(supplier.total || 0),
+    0,
+  );
+  const receivableBuckets = [
+    { key: "days1to30", label: "0–30 days", tone: "fresh" },
+    { key: "days31to60", label: "31–60 days", tone: "warm" },
+    { key: "days61to90", label: "61–90 days", tone: "overdue" },
+    { key: "over90", label: "90+ days", tone: "overdue" },
+  ].map((bucket) => ({
+    ...bucket,
+    amount: (dashboardAging?.customers || []).reduce(
+      (sum, customer) => sum + Number(customer[bucket.key] || 0),
+      0,
+    ),
+    count: (dashboardAging?.customers || []).reduce(
+      (sum, customer) =>
+        sum +
+        (customer.transactions || []).filter((transaction) => {
+          const age = Number(transaction.age_days || 0);
+          if (bucket.key === "days1to30") return age <= 30;
+          if (bucket.key === "days31to60") return age > 30 && age <= 60;
+          if (bucket.key === "days61to90") return age > 60 && age <= 90;
+          return age > 90;
+        }).length,
+      0,
+    ),
+  }));
+  const incomeAccountNames = new Set(
+    annualProfitLoss
+      .filter((account) => account.account_type === "income")
+      .map((account) => `${account.code} - ${account.name}`),
+  );
+  const expenseAccountNames = new Set(
+    annualProfitLoss
+      .filter((account) => account.account_type === "expense")
+      .map((account) => `${account.code} - ${account.name}`),
+  );
+  const recentTransactions = dashboardTransactions.map((entry) => {
+    const payment = relationRecord(entry.payment_records);
+    const lines = entry.journal_lines || [];
+    const incomeAmount = lines.reduce(
+      (sum, line) =>
+        sum +
+        (incomeAccountNames.has(line.account)
+          ? Number(line.credit || 0) - Number(line.debit || 0)
+          : 0),
+      0,
+    );
+    const expenseAmount = lines.reduce(
+      (sum, line) =>
+        sum +
+        (expenseAccountNames.has(line.account)
+          ? Number(line.debit || 0) - Number(line.credit || 0)
+          : 0),
+      0,
+    );
+    const type = incomeAmount > 0
+      ? "income"
+      : expenseAmount > 0 || payment
+        ? "expense"
+        : "neutral";
+    const amount =
+      incomeAmount > 0
+        ? incomeAmount
+        : expenseAmount > 0
+          ? expenseAmount
+          : Number(payment?.amount || 0) ||
+            lines.reduce((sum, line) => sum + Number(line.debit || 0), 0);
+    const partyNames = lines
+      .map((line) => {
+        const supplier = relationRecord(line.supplier);
+        const customer = relationRecord(line.customer);
+        const employee = relationRecord(line.employee);
+        const userRecord = relationRecord(employee?.users);
+        return (
+          supplier?.name ||
+          customer?.name ||
+          [employee?.first_name, employee?.last_name].filter(Boolean).join(" ") ||
+          userRecord?.name
+        );
+      })
+      .filter(Boolean);
+    const name =
+      payment?.payee ||
+      partyNames[0] ||
+      entry.description ||
+      entry.source ||
+      entry.reference ||
+      "Journal entry";
+    const detail = [
+      entry.reference,
+      entry.description || entry.source,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const initials = String(name)
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase();
+    return {
+      id: entry.id,
+      name,
+      detail: detail || "Posted transaction",
+      amount,
+      date: transactionDate(entry.entry_date),
+      type,
+      mark: initials || "JE",
+    };
+  });
   const formatMoney = (value) =>
     `GHC ${Number(value || 0).toLocaleString("en-GH", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+  const metricData = {
+    "Cash flow": {
+      value: dashboardReportLoading
+        ? "Loading..."
+        : dashboardReportError
+          ? "Unavailable"
+          : formatMoney(cashFlowTotals.income - cashFlowTotals.expenses),
+      loading: dashboardReportLoading,
+      error: dashboardReportError,
+      note: `Net for ${range}`,
+    },
+    "Net profit margin": {
+      value: dashboardReportLoading
+        ? "Loading..."
+        : dashboardReportError
+          ? "Unavailable"
+          : `${netProfitMargin.toFixed(1)}%`,
+      loading: dashboardReportLoading,
+      error: dashboardReportError,
+      note: "year to date",
+    },
+    "Accounts receivable": {
+      value: dashboardAgingLoading
+        ? "Loading..."
+        : dashboardAgingError
+          ? "Unavailable"
+          : formatMoney(receivables),
+      loading: dashboardAgingLoading,
+      error: dashboardAgingError,
+      note: "open customer invoices",
+    },
+    "Accounts payable": {
+      value: dashboardAgingLoading
+        ? "Loading..."
+        : dashboardAgingError
+          ? "Unavailable"
+          : formatMoney(payables),
+      loading: dashboardAgingLoading,
+      error: dashboardAgingError,
+      note: "supplier bills",
+    },
+  };
   const availableWorkspaces = employeeWorkspaces.filter(({ permissions }) =>
     permissions.some(hasPermission),
   );
@@ -505,38 +673,23 @@ function Admin() {
           </section>
         )}
         {isAdmin && <section className="metric-grid" aria-label="Financial health">
-          {metrics.map((metric) => {
-            const isCashFlowMetric = metric.label === "Cash flow";
-            return (
-              <article className="metric-card" key={metric.label}>
-                <div className={`metric-icon ${metric.tone}`}>{metric.icon}</div>
-                <p>{metric.label}</p>
-                <strong>
-                  {isCashFlowMetric
-                    ? dashboardReportLoading
-                      ? "Loading..."
-                      : dashboardReportError
-                        ? "Unavailable"
-                        : formatMoney(
-                            cashFlowTotals.income - cashFlowTotals.expenses,
-                          )
-                    : metric.value}
-                </strong>
-                <div className="metric-change">
-                  <span
-                    className={
-                      !isCashFlowMetric && metric.change.startsWith("-")
-                        ? "negative"
-                        : ""
-                    }
-                  >
-                    {isCashFlowMetric ? "Live" : metric.change}
-                  </span>{" "}
-                  {isCashFlowMetric ? `for ${range}` : metric.note}
-                </div>
-              </article>
-            );
-          })}
+          {metrics.map((metric) => (
+            <article className="metric-card" key={metric.label}>
+              <div className={`metric-icon ${metric.tone}`}>{metric.icon}</div>
+              <p>{metric.label}</p>
+              <strong>{metricData[metric.label].value}</strong>
+              <div className="metric-change">
+                <span>
+                  {metricData[metric.label].loading
+                    ? "Loading"
+                    : metricData[metric.label].error
+                      ? "Error"
+                      : "Live"}
+                </span>{" "}
+                {metricData[metric.label].note}
+              </div>
+            </article>
+          ))}
         </section>}
         {isAdmin && dashboardReportError ? (
           <p
@@ -650,81 +803,93 @@ function Admin() {
             <div className="panel-header">
               <div>
                 <h2>Recent transactions</h2>
-                <p>Your latest financial activity</p>
+                <p>Latest posted journal entries</p>
               </div>
-              <button className="text-button">
+              <Link className="text-button" to="/journal">
                 View all <span>→</span>
-              </button>
+              </Link>
             </div>
-            <div className="transaction-list">
-              {transactions.map((transaction) => (
-                <div className="transaction" key={transaction.name}>
-                  <div className={`transaction-mark ${transaction.type}`}>
-                    {transaction.mark}
+            {dashboardTransactionsLoading ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                Loading recent transactions...
+              </p>
+            ) : dashboardTransactionsError ? (
+              <p className="py-8 text-center text-sm text-red-700" role="alert">
+                {dashboardTransactionsError}
+              </p>
+            ) : recentTransactions.length ? (
+              <div className="transaction-list">
+                {recentTransactions.map((transaction) => (
+                  <div className="transaction" key={transaction.id}>
+                    <div className={`transaction-mark ${transaction.type}`}>
+                      {transaction.mark}
+                    </div>
+                    <div className="transaction-name">
+                      <strong>{transaction.name}</strong>
+                      <small>{transaction.detail}</small>
+                    </div>
+                    <div className={`transaction-amount ${transaction.type}`}>
+                      {transaction.type === "income"
+                        ? "+"
+                        : transaction.type === "expense"
+                          ? "-"
+                          : ""}
+                      {formatMoney(transaction.amount)}
+                    </div>
+                    <time>{transaction.date}</time>
                   </div>
-                  <div className="transaction-name">
-                    <strong>{transaction.name}</strong>
-                    <small>{transaction.detail}</small>
-                  </div>
-                  <div className={`transaction-amount ${transaction.type}`}>
-                    {transaction.amount}
-                  </div>
-                  <time>{transaction.date}</time>
-                  <button
-                    className="row-more"
-                    aria-label={`More options for ${transaction.name}`}
-                  >
-                    •••
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-slate-500">
+                No posted transactions are available.
+              </p>
+            )}
           </article>
           <article className="panel aging-panel">
             <div className="panel-header">
               <div>
                 <h2>Receivables aging</h2>
-                <p>Invoices needing collection</p>
+                <p>Open customer invoices by age</p>
+                <p>Payment allocations are not included yet.</p>
               </div>
-              <button className="text-button">
+              <Link className="text-button" to="/customers/aging">
                 View report <span>→</span>
-              </button>
+              </Link>
             </div>
-            <div
-              className="aging-table"
-              role="table"
-              aria-label="Receivables aging report"
-            >
-              <div className="aging-row aging-heading" role="row">
-                <span>Age</span>
-                <span>Invoices</span>
-                <span>Amount</span>
+            {dashboardAgingLoading ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                Loading receivables aging...
+              </p>
+            ) : dashboardAgingError ? (
+              <p className="py-8 text-center text-sm text-red-700" role="alert">
+                {dashboardAgingError}
+              </p>
+            ) : (
+              <div
+                className="aging-table"
+                role="table"
+                aria-label="Receivables aging report"
+              >
+                <div className="aging-row aging-heading" role="row">
+                  <span>Age</span>
+                  <span>Invoices</span>
+                  <span>Amount</span>
+                </div>
+                {receivableBuckets.map((bucket) => (
+                  <div className="aging-row" role="row" key={bucket.key}>
+                    <span>
+                      <i className={`aging-dot ${bucket.tone}`} />
+                      {bucket.label}
+                    </span>
+                    <strong>{bucket.count}</strong>
+                    <b className={bucket.key === "over90" ? "overdue-value" : ""}>
+                      {formatMoney(bucket.amount)}
+                    </b>
+                  </div>
+                ))}
               </div>
-              <div className="aging-row" role="row">
-                <span>
-                  <i className="aging-dot fresh" />
-                  0–30 days
-                </span>
-                <strong>12</strong>
-                <b>$42,680</b>
-              </div>
-              <div className="aging-row" role="row">
-                <span>
-                  <i className="aging-dot warm" />
-                  30–60 days
-                </span>
-                <strong>5</strong>
-                <b>$18,940</b>
-              </div>
-              <div className="aging-row" role="row">
-                <span>
-                  <i className="aging-dot overdue" />
-                  60+ days
-                </span>
-                <strong>3</strong>
-                <b className="overdue-value">$9,860</b>
-              </div>
-            </div>
+            )}
           </article>
           <article className="panel alerts-panel">
             <div className="panel-header">

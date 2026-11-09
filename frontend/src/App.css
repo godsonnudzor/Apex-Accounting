@@ -832,6 +832,10 @@ button {
   color: #bc7d31;
   background: #fbf0d9;
 }
+.transaction-mark.neutral {
+  color: var(--muted);
+  background: var(--canvas);
+}
 .transaction-name strong,
 .transaction-name small {
   display: block;
