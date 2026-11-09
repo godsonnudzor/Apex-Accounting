@@ -8,9 +8,10 @@ const MENU = [
   {
     label: "File",
     items: [
-      { label: "Chart of Account", href: "/chart-of-accounts", permissions: ["writeCheque"] },
+      { label: "Chart of Accounts", href: "/chart-of-accounts", permissions: ["writeCheque"] },
+      { label: "Create Ledger Account", href: "/ledger-accounts/new", permissions: ["writeCheque"] },
       { label: "Journal Entries", href: "/journal", permissions: ["writeCheque"] },
-      { label: "Group Accounts", href: "/GroupAccount", permissions: ["groupAccount"] },
+      { label: "Group Ledgers", href: "/GroupAccount", permissions: ["groupAccount"] },
     ],
   },
   {

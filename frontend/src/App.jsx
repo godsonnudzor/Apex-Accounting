@@ -27,6 +27,7 @@ import EmployeeAdd from "./Component/Employee/Add";
 import Salary from "./Pages/Salary";
 import PayrollLiabilities from "./Pages/PayrollLiabilities";
 import ChartOfAccounts from "./Pages/ChartOfAccounts";
+import LedgerAccountCreate from "./Pages/LedgerAccountCreate";
 import FinancialReports from "./Pages/FinancialReports";
 import LeaveManagement from "./Pages/LeaveManagemet";
 import Add from "./Component/Department/Add";
@@ -221,6 +222,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="writeCheque">
         <ChartOfAccounts />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/ledger-accounts/new",
+    element: (
+      <PermissionRoute permission="writeCheque">
+        <LedgerAccountCreate />
       </PermissionRoute>
     ),
   },

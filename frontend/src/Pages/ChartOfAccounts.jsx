@@ -1,21 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { getApiUrl, readApiResponse } from "../context/auth";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
-const initialForm = { code: "", name: "", accountType: "asset", groupLedger: "" };
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 
 const ChartOfAccounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [parties, setParties] = useState({ suppliers: [], customers: [], employees: [] });
-  const [groupLedgers, setGroupLedgers] = useState([]);
-  const [form, setForm] = useState(initialForm);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [partyError, setPartyError] = useState("");
-  const [message, setMessage] = useState("");
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -29,7 +25,6 @@ const ChartOfAccounts = () => {
     const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.message || "Unable to load chart of accounts");
     setAccounts(result.accounts || []);
-    setGroupLedgers(result.groupLedgers || []);
   };
 
   const loadParties = async () => {
@@ -152,17 +147,6 @@ const ChartOfAccounts = () => {
     [accounts, parties, filter],
   );
 
-  const updateForm = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-      ...(name === "groupLedger" && value
-        ? { accountType: groupLedgers.find((groupLedger) => groupLedger.name === value)?.account_type || current.accountType }
-        : {}),
-    }));
-  };
-
   const openLedgerReport = async (account) => {
     setSelectedAccount(account);
     setLedgerLoading(true);
@@ -195,30 +179,6 @@ const ChartOfAccounts = () => {
   });
   const ledgerTotals = searchableEntries.reduce((summary, entry) => (entry.lines || []).reduce((lineSummary, line) => ({ debit: lineSummary.debit + Number(line.debit || 0), credit: lineSummary.credit + Number(line.credit || 0) }), summary), { debit: 0, credit: 0 });
 
-  const saveAccount = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    setMessage("");
-    try {
-      const response = await fetch(getApiUrl("/api/ledger/accounts"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Unable to create account");
-      setAccounts((current) => [...current, result.account].sort((left, right) => left.code.localeCompare(right.code)));
-      setForm(initialForm);
-      setMessage("Ledger account created successfully.");
-    } catch (saveError) {
-      setError(saveError.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
@@ -228,27 +188,17 @@ const ChartOfAccounts = () => {
             <h1 className="mt-1 text-3xl font-bold text-slate-900">Chart of accounts</h1>
             <p className="mt-2 text-sm text-slate-500">Manage the accounts used by payroll, payments, and journal entries.</p>
           </div>
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm">
-            <option value="all">All account types</option>
-            {accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
-          </select>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/ledger-accounts/new" className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-teal-800">Create ledger account</Link>
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm">
+              <option value="all">All account types</option>
+              {accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
+            </select>
+          </div>
         </div>
 
         {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         {partyError && <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">Party ledgers could not be loaded: {partyError}</p>}
-        {message && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">{message}</p>}
-
-        <form onSubmit={saveAccount} className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Add ledger account</h2>
-          <div className="grid gap-4 md:grid-cols-[160px_1fr_180px_180px_auto] md:items-end">
-            <label className="text-sm font-medium text-slate-700">Code<input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" name="code" value={form.code} onChange={updateForm} placeholder="5700" required /></label>
-            <label className="text-sm font-medium text-slate-700">Account name<input className="mt-1 w-full rounded border border-slate-300 px-3 py-2" name="name" value={form.name} onChange={updateForm} placeholder="Bank charges" required /></label>
-            <label className="text-sm font-medium text-slate-700">Type<select className="mt-1 w-full rounded border border-slate-300 px-3 py-2 disabled:bg-slate-100" name="accountType" value={form.accountType} onChange={updateForm} disabled={Boolean(form.groupLedger)}>{accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
-            <label className="text-sm font-medium text-slate-700">Group Ledger<select className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2" name="groupLedger" value={form.groupLedger} onChange={updateForm}><option value="">None</option>{groupLedgers.map((groupLedger) => <option key={groupLedger.name} value={groupLedger.name}>{groupLedger.name}</option>)}</select></label>
-            <button className="rounded bg-teal-600 px-4 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50" disabled={saving}>{saving ? "Saving..." : "Add account"}</button>
-          </div>
-        </form>
-
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Group Ledger</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Report</th></tr></thead>

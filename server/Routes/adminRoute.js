@@ -821,25 +821,14 @@ router.get("/api/ledger/accounts", async (req, res) => {
       .order("name");
     if (error) throw error;
     const { data: groupLedgerAccounts, error: groupsError } = await supabase
-      .from("ledger_accounts")
-      .select("group_ledger, account_type")
-      .eq("is_active", true)
-      .not("group_ledger", "is", null)
-      .order("group_ledger");
+      .from("ledger_groups")
+      .select("name, account_type")
+      .order("name");
     if (groupsError) throw groupsError;
-    const groupLedgers = [
-      ...new Map(
-        (groupLedgerAccounts || [])
-          .filter((account) => account.group_ledger)
-          .map((account) => [
-            account.group_ledger,
-            {
-              name: account.group_ledger,
-              account_type: account.account_type,
-            },
-          ]),
-      ).values(),
-    ];
+    const groupLedgers = (groupLedgerAccounts || []).map((group) => ({
+      name: group.name,
+      account_type: group.account_type,
+    }));
     const { data: lines, error: linesError } = await supabase
       .from("journal_lines")
       .select("account, debit, credit, journal_entries!inner(status)")
@@ -867,6 +856,61 @@ router.get("/api/ledger/accounts", async (req, res) => {
   }
 });
 
+router.get("/api/ledger/groups", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, [
+      "write_cheque",
+      "group_accounts",
+    ]);
+    if (!allowed)
+      return res.status(403).json({ message: "Group ledger permission required" });
+    const { data, error } = await supabase
+      .from("ledger_groups")
+      .select("name, account_type, created_at")
+      .order("name");
+    if (error) throw error;
+    return res.json({ groups: data || [] });
+  } catch (error) {
+    console.error("Ledger groups lookup error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to load group ledgers" });
+  }
+});
+
+router.post("/api/ledger/groups", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req, "group_accounts");
+    if (!allowed)
+      return res.status(403).json({ message: "Group ledger permission required" });
+    const name = String(req.body?.name || "").trim();
+    const accountType = String(req.body?.accountType || "")
+      .trim()
+      .toLowerCase();
+    if (!name || name.length > 100)
+      return res.status(400).json({ message: "Enter a group ledger name up to 100 characters" });
+    if (!["asset", "liability", "equity", "income", "expense"].includes(accountType))
+      return res.status(400).json({ message: "Select a valid account type" });
+
+    const { data, error } = await supabase
+      .from("ledger_groups")
+      .insert({ name, account_type: accountType })
+      .select("name, account_type, created_at")
+      .single();
+    if (error) {
+      if (error.code === "23505")
+        return res.status(409).json({ message: "A group ledger with that name already exists" });
+      throw error;
+    }
+    return res.status(201).json({ group: data });
+  } catch (error) {
+    console.error("Ledger group creation error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to create group ledger" });
+  }
+});
+
 router.post("/api/ledger/accounts", async (req, res) => {
   try {
     const { currentUser, allowed } = await canUseAccounting(req);
@@ -890,16 +934,15 @@ router.post("/api/ledger/accounts", async (req, res) => {
         .json({ message: "Code, name, and a valid account type are required" });
     }
     if (groupLedger) {
-      const { data: groupAccounts, error: groupError } = await supabase
-        .from("ledger_accounts")
+      const { data: groupAccount, error: groupError } = await supabase
+        .from("ledger_groups")
         .select("account_type")
-        .eq("group_ledger", groupLedger)
-        .eq("is_active", true)
-        .limit(1);
+        .eq("name", groupLedger)
+        .maybeSingle();
       if (groupError) throw groupError;
       if (
-        !groupAccounts?.length ||
-        groupAccounts[0].account_type !== accountType
+        !groupAccount ||
+        groupAccount.account_type !== accountType
       ) {
         return res
           .status(400)
