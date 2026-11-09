@@ -105,7 +105,7 @@ function Settlement({ settlementType }) {
         currency,
       });
       const response = await fetch(
-        getApiUrl(`/api/settlements/pending?${query.toString()}`),
+        getApiUrl(`/api/settlements-pending?${query.toString()}`),
         { credentials: "include" },
       );
       const result = await readApiResponse(response);
@@ -204,8 +204,8 @@ function Settlement({ settlementType }) {
       const response = await fetch(
         getApiUrl(
           isReceipt
-            ? "/api/settlements/receipts"
-            : "/api/settlements/supplier-payments",
+            ? "/api/settlements-receipts"
+            : "/api/settlements-supplier-payments",
         ),
         {
           method: "POST",
@@ -241,7 +241,7 @@ function Settlement({ settlementType }) {
         currency,
       });
       const pendingResponse = await fetch(
-        getApiUrl(`/api/settlements/pending?${query.toString()}`),
+        getApiUrl(`/api/settlements-pending?${query.toString()}`),
         { credentials: "include" },
       );
       const pendingResult = await readApiResponse(pendingResponse);

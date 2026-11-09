@@ -2602,7 +2602,9 @@ router.get("/api/reports/aging", async (req, res) => {
   }
 });
 
-router.get("/api/settlements/pending", async (req, res) => {
+router.get(
+  ["/api/settlements/pending", "/api/settlements-pending"],
+  async (req, res) => {
   try {
     const type = String(req.query?.type || "");
     if (!["receipt", "supplier_payment"].includes(type)) {
@@ -2645,7 +2647,8 @@ router.get("/api/settlements/pending", async (req, res) => {
             ...invoice,
             customer: relationRecord(invoice.customer),
           })),
-      });
+        },
+      );
     }
 
     const { data, error } = await supabase
@@ -2778,12 +2781,17 @@ const createSettlement = async (req, res, settlementType) => {
   }
 };
 
-router.post("/api/settlements/receipts", (req, res) =>
-  createSettlement(req, res, "receipt"),
+router.post(
+  ["/api/settlements/receipts", "/api/settlements-receipts"],
+  (req, res) => createSettlement(req, res, "receipt"),
 );
 
-router.post("/api/settlements/supplier-payments", (req, res) =>
-  createSettlement(req, res, "supplier_payment"),
+router.post(
+  [
+    "/api/settlements/supplier-payments",
+    "/api/settlements-supplier-payments",
+  ],
+  (req, res) => createSettlement(req, res, "supplier_payment"),
 );
 
 router.get("/api/journal/lookups", async (req, res) => {
