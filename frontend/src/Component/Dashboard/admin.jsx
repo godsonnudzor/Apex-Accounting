@@ -1,15 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../App.css";
 import DropdownMenu from "./DropdownMenu";
-import { useAuth } from "../../context/auth";
+import { getApiUrl, readApiResponse, useAuth } from "../../context/auth";
 
 const metrics = [
   {
     label: "Cash flow",
-    value: "$84,260",
-    change: "+12.8%",
-    note: "vs. last month",
     icon: "↗",
     tone: "green",
   },
@@ -176,28 +173,30 @@ const employeeWorkspaces = [
   },
 ];
 
-function CashFlowChart({ range }) {
-  const points =
-    range === "90 days"
-      ? {
-          income:
-            "26,58 74,50 122,61 170,35 218,42 266,24 314,37 362,18 410,30 458,10",
-          expense:
-            "26,72 74,66 122,74 170,55 218,64 266,48 314,55 362,40 410,50 458,35",
-        }
-      : {
-          income:
-            "26,62 74,44 122,56 170,31 218,39 266,20 314,34 362,15 410,28 458,8",
-          expense:
-            "26,72 74,70 122,61 170,58 218,63 266,49 314,57 362,39 410,52 458,31",
-        };
+function CashFlowChart({ data }) {
+  const maximum = Math.max(
+    1,
+    ...data.flatMap(({ income, expenses }) => [income, expenses]),
+  );
+  const toPoints = (key) =>
+    data
+      .map((month, index) => {
+        const x = data.length === 1 ? 242 : 26 + (432 * index) / (data.length - 1);
+        const y = 88 - (Math.max(0, month[key]) / maximum) * 74;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  const incomePoints = toPoints("income");
+  const expensePoints = toPoints("expenses");
+  const lastX = data.length === 1 ? 242 : 458;
+  const labelInterval = Math.max(1, Math.ceil(data.length / 5));
 
   return (
     <div className="chart-wrap">
       <svg
         viewBox="0 0 484 100"
         role="img"
-        aria-label={`Cash flow forecast for ${range}`}
+        aria-label="Monthly revenue and expenses from Profit and Loss"
       >
         <defs>
           <linearGradient id="incomeFill" x1="0" x2="0" y1="0" y2="1">
@@ -210,11 +209,11 @@ function CashFlowChart({ range }) {
         ))}
         <path
           className="chart-fill"
-          d={`M 26,100 L ${points.income} L 458,100 Z`}
+          d={incomePoints ? `M ${incomePoints} L ${lastX},100 L 26,100 Z` : ""}
         />
-        <polyline points={points.income} className="line-income" />
-        <polyline points={points.expense} className="line-expense" />
-        {points.income.split(" ").map((point) => {
+        <polyline points={incomePoints} className="line-income" />
+        <polyline points={expensePoints} className="line-expense" />
+        {incomePoints.split(" ").filter(Boolean).map((point) => {
           const [cx, cy] = point.split(",");
           return (
             <circle
@@ -228,11 +227,11 @@ function CashFlowChart({ range }) {
         })}
       </svg>
       <div className="chart-labels">
-        <span>Aug 01</span>
-        <span>Aug 15</span>
-        <span>Aug 30</span>
-        <span>Sep 15</span>
-        <span>Sep 30</span>
+        {data.map((month, index) =>
+          index % labelInterval === 0 || index === data.length - 1 ? (
+            <span key={month.key}>{month.label}</span>
+          ) : null,
+        )}
       </div>
     </div>
   );
@@ -242,10 +241,13 @@ function CashFlowChart({ range }) {
 function Admin() {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
-  const [range, setRange] = useState("30 days");
+  const [range, setRange] = useState("6 months");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dashboardReport, setDashboardReport] = useState(null);
+  const [dashboardReportLoading, setDashboardReportLoading] = useState(true);
+  const [dashboardReportError, setDashboardReportError] = useState("");
 
   const displayName = user?.name || "User";
   const initials = displayName
@@ -257,6 +259,120 @@ function Admin() {
     .toUpperCase();
   const isAdmin = String(user?.role).toLowerCase() === "admin";
   const role = isAdmin ? "Administrator" : "Employee";
+  useEffect(() => {
+    if (!isAdmin) {
+      setDashboardReportLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const year = new Date().getFullYear();
+    setDashboardReportLoading(true);
+    setDashboardReportError("");
+
+    fetch(`${getApiUrl("/api/reports/financial")}?year=${year}`, {
+      credentials: "include",
+    })
+      .then(async (response) => {
+        const result = await readApiResponse(response);
+        if (!response.ok) {
+          throw new Error(
+            result.message || "Unable to load dashboard financial data",
+          );
+        }
+        return result;
+      })
+      .then((result) => {
+        if (active) setDashboardReport(result);
+      })
+      .catch((error) => {
+        if (active) setDashboardReportError(error.message);
+      })
+      .finally(() => {
+        if (active) setDashboardReportLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAdmin]);
+
+  const reportMonths = dashboardReport?.months || [];
+  const monthlyProfitLoss = dashboardReport?.monthlyProfitLoss || [];
+  const incomeAccounts = monthlyProfitLoss.filter(
+    (account) => account.account_type === "income",
+  );
+  const expenseAccounts = monthlyProfitLoss.filter(
+    (account) => account.account_type === "expense",
+  );
+  const monthlyCashFlow = reportMonths.map((month, index) => ({
+    ...month,
+    income: incomeAccounts.reduce(
+      (sum, account) => sum + Number(account.months?.[index] || 0),
+      0,
+    ),
+    expenses: expenseAccounts.reduce(
+      (sum, account) => sum + Number(account.months?.[index] || 0),
+      0,
+    ),
+  }));
+  const visibleCashFlow = monthlyCashFlow.slice(range === "6 months" ? -6 : -12);
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentMonthIndex = reportMonths.findIndex(
+    (month) => month.key === currentMonthKey,
+  );
+  const currentMonthExpenses = expenseAccounts
+    .map((account) => ({
+      name: account.name,
+      amount: Number(account.months?.[currentMonthIndex] || 0),
+    }))
+    .filter((account) => account.amount !== 0)
+    .sort((left, right) => right.amount - left.amount);
+  const expenseBreakdown =
+    currentMonthExpenses.length > 4
+      ? [
+          ...currentMonthExpenses.slice(0, 3),
+          {
+            name: "Other",
+            amount: currentMonthExpenses
+              .slice(3)
+              .reduce((sum, account) => sum + account.amount, 0),
+          },
+        ]
+      : currentMonthExpenses;
+  const expenseTotal = currentMonthExpenses.reduce(
+    (sum, account) => sum + account.amount,
+    0,
+  );
+  const positiveExpenseTotal = expenseBreakdown.reduce(
+    (sum, account) => sum + Math.max(0, account.amount),
+    0,
+  );
+  const breakdownColors = ["#227d66", "#61a9ad", "#e4a74b", "#d4dce0"];
+  let expenseArcStart = 0;
+  const donutBackground = positiveExpenseTotal
+    ? `conic-gradient(${expenseBreakdown
+        .map((account, index) => {
+          const share =
+            (Math.max(0, account.amount) / positiveExpenseTotal) * 100;
+          const arc = `${breakdownColors[index % breakdownColors.length]} ${expenseArcStart}% ${expenseArcStart + share}%`;
+          expenseArcStart += share;
+          return arc;
+        })
+        .join(", ")})`
+    : "conic-gradient(#d4dce0 0 100%)";
+  const cashFlowTotals = visibleCashFlow.reduce(
+    (totals, month) => ({
+      income: totals.income + month.income,
+      expenses: totals.expenses + month.expenses,
+    }),
+    { income: 0, expenses: 0 },
+  );
+  const formatMoney = (value) =>
+    `GHC ${Number(value || 0).toLocaleString("en-GH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   const availableWorkspaces = employeeWorkspaces.filter(({ permissions }) =>
     permissions.some(hasPermission),
   );
@@ -389,31 +505,56 @@ function Admin() {
           </section>
         )}
         {isAdmin && <section className="metric-grid" aria-label="Financial health">
-          {metrics.map((metric) => (
-            <article className="metric-card" key={metric.label}>
-              <div className={`metric-icon ${metric.tone}`}>{metric.icon}</div>
-              <p>{metric.label}</p>
-              <strong>{metric.value}</strong>
-              <div className="metric-change">
-                <span
-                  className={metric.change.startsWith("-") ? "negative" : ""}
-                >
-                  {metric.change}
-                </span>{" "}
-                {metric.note}
-              </div>
-            </article>
-          ))}
+          {metrics.map((metric) => {
+            const isCashFlowMetric = metric.label === "Cash flow";
+            return (
+              <article className="metric-card" key={metric.label}>
+                <div className={`metric-icon ${metric.tone}`}>{metric.icon}</div>
+                <p>{metric.label}</p>
+                <strong>
+                  {isCashFlowMetric
+                    ? dashboardReportLoading
+                      ? "Loading..."
+                      : dashboardReportError
+                        ? "Unavailable"
+                        : formatMoney(
+                            cashFlowTotals.income - cashFlowTotals.expenses,
+                          )
+                    : metric.value}
+                </strong>
+                <div className="metric-change">
+                  <span
+                    className={
+                      !isCashFlowMetric && metric.change.startsWith("-")
+                        ? "negative"
+                        : ""
+                    }
+                  >
+                    {isCashFlowMetric ? "Live" : metric.change}
+                  </span>{" "}
+                  {isCashFlowMetric ? `for ${range}` : metric.note}
+                </div>
+              </article>
+            );
+          })}
         </section>}
+        {isAdmin && dashboardReportError ? (
+          <p
+            className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+          >
+            Live dashboard financial data could not be loaded: {dashboardReportError}
+          </p>
+        ) : null}
         {isAdmin && <section className="dashboard-grid">
           <article className="panel cash-panel">
             <div className="panel-header">
               <div>
-                <h2>Cash flow forecast</h2>
-                <p>Expected income and expenses</p>
+                <h2>Cash flow</h2>
+                <p>Monthly revenue and expenses from Profit &amp; Loss</p>
               </div>
               <div className="segmented">
-                {["30 days", "90 days"].map((item) => (
+                {["6 months", "12 months"].map((item) => (
                   <button
                     className={range === item ? "selected" : ""}
                     key={item}
@@ -434,47 +575,76 @@ function Admin() {
                 Expenses
               </span>
               <strong>
-                +$35,340 <small>projected</small>
+                {formatMoney(cashFlowTotals.income - cashFlowTotals.expenses)}{" "}
+                <small>net for period</small>
               </strong>
             </div>
-            <CashFlowChart range={range} />
+            {dashboardReportLoading ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                Loading monthly revenue and expenses...
+              </p>
+            ) : visibleCashFlow.length ? (
+              <CashFlowChart data={visibleCashFlow} />
+            ) : (
+              <p className="py-8 text-center text-sm text-slate-500">
+                {dashboardReportError
+                  ? "Monthly revenue and expenses are unavailable."
+                  : "No monthly revenue or expense data is available yet."}
+              </p>
+            )}
           </article>
           <article className="panel breakdown-panel">
             <div className="panel-header">
               <div>
                 <h2>Expense breakdown</h2>
-                <p>August 2026</p>
+                <p>{reportMonths[currentMonthIndex]?.label || "Current month"}</p>
               </div>
-              <button className="more-button" aria-label="More expense options">
-                •••
-              </button>
+              <Link className="text-button" to="/financial-reports/profit-loss">
+                View report
+              </Link>
             </div>
-            <div className="donut-area">
-              <div className="donut">
-                <div>
-                  <strong>$18,420</strong>
-                  <small>Total expenses</small>
+            {dashboardReportLoading ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                Loading expenses...
+              </p>
+            ) : expenseBreakdown.length ? (
+              <div className="donut-area">
+                <div className="donut" style={{ background: donutBackground }}>
+                  <div>
+                    <strong>{formatMoney(expenseTotal)}</strong>
+                    <small>Total expenses</small>
+                  </div>
+                </div>
+                <div className="breakdown-list">
+                  {expenseBreakdown.map((account, index) => (
+                    <span key={account.name} title={formatMoney(account.amount)}>
+                      <i
+                        className="dot"
+                        style={{
+                          backgroundColor:
+                            breakdownColors[index % breakdownColors.length],
+                        }}
+                      />
+                      {account.name}
+                      <b>
+                        {positiveExpenseTotal
+                          ? `${Math.round(
+                              (Math.max(0, account.amount) / positiveExpenseTotal) *
+                                100,
+                            )}%`
+                          : "0%"}
+                      </b>
+                    </span>
+                  ))}
                 </div>
               </div>
-              <div className="breakdown-list">
-                <span>
-                  <i className="dot payroll" />
-                  Payroll <b>42%</b>
-                </span>
-                <span>
-                  <i className="dot software" />
-                  Software <b>24%</b>
-                </span>
-                <span>
-                  <i className="dot operations" />
-                  Operations <b>18%</b>
-                </span>
-                <span>
-                  <i className="dot other" />
-                  Other <b>16%</b>
-                </span>
-              </div>
-            </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-slate-500">
+                {dashboardReportError
+                  ? "Expense breakdown is unavailable."
+                  : "No expenses have been posted this month."}
+              </p>
+            )}
           </article>
           <article className="panel transactions-panel" id="transactions">
             <div className="panel-header">
