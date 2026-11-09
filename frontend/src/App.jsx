@@ -211,7 +211,39 @@ const router = createBrowserRouter([
     path: "/financial-reports",
     element: (
       <PermissionRoute permission={["reports", "writeCheque"]}>
-        <FinancialReports />
+        <FinancialReports reportType="profit-loss" />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/financial-reports/profit-loss",
+    element: (
+      <PermissionRoute permission={["reports", "writeCheque"]}>
+        <FinancialReports reportType="profit-loss" />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/financial-reports/balance-sheet",
+    element: (
+      <PermissionRoute permission={["reports", "writeCheque"]}>
+        <FinancialReports reportType="balance-sheet" />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/suppliers/aging",
+    element: (
+      <PermissionRoute permission={["bills", "writeCheque"]}>
+        <FinancialReports reportType="supplier-aging" />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/customers/aging",
+    element: (
+      <PermissionRoute permission={["invoice", "bills"]}>
+        <FinancialReports reportType="customer-aging" />
       </PermissionRoute>
     ),
   },

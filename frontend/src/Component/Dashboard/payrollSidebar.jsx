@@ -100,13 +100,24 @@ const PayrollDashboardSidebar = () => {
         ) : null}
         {hasPermission("reports") || hasPermission("writeCheque") ? (
           <NavLink
-            to="/financial-reports"
+            to="/financial-reports/profit-loss"
             className={({ isActive }) =>
               `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`
             }
             end
           >
-            <FaBook /> <span>Financial reports</span>
+            <FaBook /> <span>Profit &amp; Loss</span>
+          </NavLink>
+        ) : null}
+        {hasPermission("reports") || hasPermission("writeCheque") ? (
+          <NavLink
+            to="/financial-reports/balance-sheet"
+            className={({ isActive }) =>
+              `${isActive ? "bg-teal-500" : ""} flex items-center space-x-4 block py-2.5 px-4 rounded text-white no-underline`
+            }
+            end
+          >
+            <FaBook /> <span>Balance Sheet</span>
           </NavLink>
         ) : null}
         {hasPermission("writeCheque") ? (

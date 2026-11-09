@@ -19,6 +19,7 @@ const MENU = [
       { label: "Center", href: "/suppliersCenter", permissions: ["writeCheque", "bills", "invoice"] },
       { label: "Creation", href: "/suppliers", permissions: ["writeCheque", "bills", "invoice"] },
       { label: "Bills", href: "/bill", permissions: ["bills"] },
+      { label: "Supplier Aging", href: "/suppliers/aging", permissions: ["bills", "writeCheque"] },
     ],
   },
   {
@@ -27,6 +28,7 @@ const MENU = [
       { label: "Center", href: "/customersCenter", permissions: ["invoice", "bills"] },
       { label: "Customer Creation", href: "/customers", permissions: ["invoice", "bills"] },
       { label: "Invoices", href: "/invoices", permissions: ["invoice", "bills"] },
+      { label: "Customer Aging", href: "/customers/aging", permissions: ["invoice", "bills"] },
     ],
   },
   {
@@ -51,7 +53,8 @@ const MENU = [
   {
     label: "Reports",
     items: [
-      { label: "Financial reports", href: "/financial-reports", permissions: ["reports", "writeCheque"] },
+      { label: "Profit & Loss", href: "/financial-reports/profit-loss", permissions: ["reports", "writeCheque"] },
+      { label: "Balance Sheet", href: "/financial-reports/balance-sheet", permissions: ["reports", "writeCheque"] },
     ],
   },
   { label: "Settings", href: "/settings", adminOnly: true },

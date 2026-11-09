@@ -163,9 +163,15 @@ const employeeWorkspaces = [
     permissions: ["taxBrackets"],
   },
   {
-    label: "Financial reports",
-    description: "Open the financial reports available to you.",
-    to: "/financial-reports",
+    label: "Profit & Loss",
+    description: "Review income, expenses, and net profit.",
+    to: "/financial-reports/profit-loss",
+    permissions: ["reports", "writeCheque"],
+  },
+  {
+    label: "Balance Sheet",
+    description: "Review account balances and financial position.",
+    to: "/financial-reports/balance-sheet",
     permissions: ["reports", "writeCheque"],
   },
 ];
