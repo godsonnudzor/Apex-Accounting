@@ -2822,11 +2822,23 @@ router.get("/api/journal/lookups", async (req, res) => {
     const { data: partyLines, error: partyLinesError } = await supabase
       .from("journal_lines")
       .select(
-        "supplier_id, customer_id, employee_id, debit, credit, journal_entries!inner(status)",
+        "supplier_id, customer_id, employee_id, debit, credit, journal_entries!inner(status, source)",
       )
       .eq("journal_entries.status", "posted");
     if (partyLinesError) throw partyLinesError;
     const partyBalances = (partyLines || []).reduce((balances, line) => {
+      const entry = relationRecord(line.journal_entries);
+      if (
+        [
+          "invoice",
+          "receipt",
+          "supplier_bill",
+          "supplier_credit",
+          "supplier_payment",
+        ].includes(entry?.source)
+      ) {
+        return balances;
+      }
       for (const partyType of ["supplier", "customer", "employee"]) {
         const partyId = line[`${partyType}_id`];
         if (partyId === null || partyId === undefined) continue;
