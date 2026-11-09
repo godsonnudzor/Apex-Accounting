@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getApiUrl, readApiResponse } from "../context/auth";
 
-const accountTypes = ["asset", "liability", "equity", "income", "expense"];
-const initialForm = { code: "", name: "", accountType: "asset", groupLedger: "" };
+const initialForm = { code: "", name: "", groupLedger: "" };
 
 function LedgerAccountCreate() {
   const [groups, setGroups] = useState([]);
@@ -40,17 +39,7 @@ function LedgerAccountCreate() {
 
   const updateForm = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-      ...(name === "groupLedger" && value
-        ? {
-            accountType:
-              groups.find((group) => group.name === value)?.account_type ||
-              current.accountType,
-          }
-        : {}),
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
     setError("");
     setMessage("");
   };
@@ -91,7 +80,7 @@ function LedgerAccountCreate() {
           </p>
           <h1 className="mt-1 text-2xl font-bold">Create ledger account</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Create an individual account and optionally assign it to a group ledger.
+            Create an account by selecting its group ledger. The account type comes from that group.
           </p>
         </header>
         <form onSubmit={saveAccount} className="space-y-5 p-5">
@@ -131,39 +120,29 @@ function LedgerAccountCreate() {
               />
             </label>
             <label className="text-sm font-medium">
-              Account type
-              <select
-                name="accountType"
-                value={form.accountType}
-                onChange={updateForm}
-                disabled={Boolean(selectedGroup)}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"
-              >
-                {accountTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type[0].toUpperCase() + type.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm font-medium">
               Group ledger
               <select
                 name="groupLedger"
+                required
                 value={form.groupLedger}
                 onChange={updateForm}
                 disabled={loading}
                 className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               >
-                <option value="">No group ledger</option>
+                <option value="">Select a group ledger</option>
                 {groups.map((group) => (
                   <option key={group.name} value={group.name}>
-                    {group.name} · {group.account_type}
+                    {group.name}
                   </option>
                 ))}
               </select>
             </label>
           </div>
+          {selectedGroup ? (
+            <p className="text-sm text-slate-600">
+              Account type: <span className="font-semibold capitalize">{selectedGroup.account_type}</span>
+            </p>
+          ) : null}
           {loading ? (
             <p className="text-sm text-slate-500">Loading group ledgers…</p>
           ) : null}

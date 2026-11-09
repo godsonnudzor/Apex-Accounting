@@ -918,44 +918,30 @@ router.post("/api/ledger/accounts", async (req, res) => {
       return res.status(403).json({ message: "Ledger permission required" });
     const code = String(req.body?.code || "").trim();
     const name = String(req.body?.name || "").trim();
-    const accountType = String(req.body?.accountType || "")
-      .trim()
-      .toLowerCase();
     const groupLedger = String(req.body?.groupLedger || "").trim();
-    if (
-      !code ||
-      !name ||
-      !["asset", "liability", "equity", "income", "expense"].includes(
-        accountType,
-      )
-    ) {
+    if (!code || !name || !groupLedger) {
       return res
         .status(400)
-        .json({ message: "Code, name, and a valid account type are required" });
+        .json({ message: "Code, name, and a group ledger are required" });
     }
-    if (groupLedger) {
-      const { data: groupAccount, error: groupError } = await supabase
-        .from("ledger_groups")
-        .select("account_type")
-        .eq("name", groupLedger)
-        .maybeSingle();
-      if (groupError) throw groupError;
-      if (
-        !groupAccount ||
-        groupAccount.account_type !== accountType
-      ) {
-        return res
-          .status(400)
-          .json({ message: "Select a valid Group Ledger option" });
-      }
+    const { data: groupAccount, error: groupError } = await supabase
+      .from("ledger_groups")
+      .select("account_type")
+      .eq("name", groupLedger)
+      .maybeSingle();
+    if (groupError) throw groupError;
+    if (!groupAccount) {
+      return res
+        .status(400)
+        .json({ message: "Select a valid Group Ledger option" });
     }
     const { data: account, error } = await supabase
       .from("ledger_accounts")
       .insert({
         code,
         name,
-        account_type: accountType,
-        group_ledger: groupLedger || null,
+        account_type: groupAccount.account_type,
+        group_ledger: groupLedger,
       })
       .select("id, code, name, account_type, group_ledger, is_active")
       .single();
