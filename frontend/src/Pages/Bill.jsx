@@ -192,7 +192,7 @@ function Bill() {
 					<button onClick={() => notify("Bill memorized")}>Memorise</button>
 					<button onClick={() => window.print()}>Print</button>
 					<button onClick={() => notify("Splits recalculated")}>Recalculate</button>
-					<button onClick={() => notify("Payment workflow opened")}>Pay Bill</button>
+					<button onClick={() => navigate("/supplier-payments", { state: { supplierId: bill.supplierId } })}>Pay Bill</button>
 				</div>
 			</header>
 

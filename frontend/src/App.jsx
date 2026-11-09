@@ -10,6 +10,7 @@ import Deshboard from "./Pages/Deshboard";
 import EmployeeCenter from "./Pages/EmployeeCenter";
 import Bill from "./Pages/Bill";
 import Invoice from "./Pages/Invoice";
+import Settlement from "./Pages/Settlement";
 import WriteCheque from "./Pages/WriteCheque";
 import Journal from "./Pages/Journal";
 import Suppliers from "./Pages/Suppliers";
@@ -172,6 +173,22 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission={["invoice", "bills"]}>
         <Invoice />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/receipts",
+    element: (
+      <PermissionRoute permission={["invoice", "bills"]}>
+        <Settlement settlementType="receipt" />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/supplier-payments",
+    element: (
+      <PermissionRoute permission={["bills", "writeCheque"]}>
+        <Settlement settlementType="supplier_payment" />
       </PermissionRoute>
     ),
   },

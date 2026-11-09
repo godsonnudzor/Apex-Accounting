@@ -151,6 +151,14 @@ const SuppliersCenter = () => {
           <button type="button" onClick={createSupplierTransaction} disabled={!selectedSupplier} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50">
             New Transactions
           </button>
+          <button
+            type="button"
+            onClick={() => navigate("/supplier-payments", { state: { supplierId: selectedSupplier.id } })}
+            disabled={!selectedSupplier || !selectedBills.some((bill) => Number(bill.open_balance) > 0)}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
+          >
+            Pay supplier
+          </button>
           <button type="button" onClick={() => window.print()} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-100">
             Print
           </button>
@@ -232,7 +240,7 @@ const SuppliersCenter = () => {
                       >
                         <td className="truncate px-3 py-2 font-medium" title={supplier.name}>{supplier.name}</td>
                         <td className="px-2 py-2">{supplier.currency || "GHS"}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{formatMoney(bills.filter((bill) => String(bill.supplier_id) === String(supplier.id)).reduce((sum, bill) => sum + Number(bill.signed_amount || 0), 0), supplier.currency || "GHS")}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{formatMoney(bills.filter((bill) => String(bill.supplier_id) === String(supplier.id)).reduce((sum, bill) => sum + Number(bill.open_balance || 0), 0), supplier.currency || "GHS")}</td>
                       </tr>
                     );
                   }) : (
@@ -359,7 +367,7 @@ const SuppliersCenter = () => {
                               <td className="whitespace-nowrap px-3 py-3">{bill.bill_date}</td>
                               <td className="whitespace-nowrap px-3 py-3">{bill.due_date || "—"}</td>
                               <td className="px-3 py-3 tabular-nums">{bill.age_days ?? "—"}</td>
-                              <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatMoney(bill.signed_amount, bill.currency || selectedSupplier.currency || "GHS")}</td>
+                              <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatMoney(bill.open_balance, bill.currency || selectedSupplier.currency || "GHS")}</td>
                               <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatMoney(bill.signed_amount, bill.currency || selectedSupplier.currency || "GHS")}</td>
                               <td className="min-w-64 px-3 py-2">
                                 {bill.lines?.length ? (

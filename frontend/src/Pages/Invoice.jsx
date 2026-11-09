@@ -250,7 +250,7 @@ function Invoice() {
           <button className="disabled-command">
             ♧ <span>Apply Credits</span>
           </button>
-          <button onClick={() => notify("Receive payment is ready")}>
+          <button onClick={() => navigate("/receipts", { state: { customerId: invoice.customerId } })}>
             ▣{" "}
             <span>
               Receive

@@ -938,13 +938,17 @@ router.post("/api/ledger/accounts", async (req, res) => {
 
 router.get("/api/cash-bank-accounts", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, [
+      "write_cheque",
+      "bills",
+      "invoice",
+    ]);
     if (!allowed)
       return res.status(403).json({ message: "Ledger permission required" });
     const { data: accounts, error } = await supabase
       .from("cash_bank_accounts")
       .select(
-        "id, account_name, account_number, bank_name, account_type, ledger_account_id, ledger_accounts(id, code, name, account_type)",
+        "id, account_name, account_number, bank_name, account_type, currency, ledger_account_id, ledger_accounts(id, code, name, account_type)",
       )
       .eq("is_active", true)
       .order("account_name");
@@ -1295,6 +1299,109 @@ const formatSupplierBill = (bill, now = new Date()) => ({
   supplier: Array.isArray(bill.supplier) ? bill.supplier[0] : bill.supplier,
 });
 
+const sumPaymentAllocations = async (column, documentIds) => {
+  if (!documentIds.length) return new Map();
+  const { data, error } = await supabase
+    .from("payment_allocations")
+    .select(`${column}, amount, payment_records!inner(settlement_type)`)
+    .in(column, documentIds);
+  if (error) throw error;
+  return (data || []).reduce((amounts, allocation) => {
+    const settlementType = Array.isArray(allocation.payment_records)
+      ? allocation.payment_records[0]?.settlement_type
+      : allocation.payment_records?.settlement_type;
+    if (!settlementType) return amounts;
+    const id = String(allocation[column]);
+    amounts.set(id, (amounts.get(id) || 0) + Number(allocation.amount || 0));
+    return amounts;
+  }, new Map());
+};
+
+const relationRecord = (relation) =>
+  Array.isArray(relation) ? relation[0] || null : relation || null;
+
+const withCustomerInvoiceBalances = async (invoices) => {
+  const paidAmounts = await sumPaymentAllocations(
+    "customer_invoice_id",
+    invoices.map((invoice) => invoice.id),
+  );
+  return invoices.map((invoice) => {
+    const openBalance =
+      invoice.status === "open"
+        ? Math.max(
+            0,
+            Number(invoice.total_amount || 0) -
+              (paidAmounts.get(String(invoice.id)) || 0),
+          )
+        : 0;
+    return {
+      ...invoice,
+      open_balance: Number(openBalance.toFixed(2)),
+    };
+  });
+};
+
+const withSupplierBillBalances = async (bills) => {
+  const paidAmounts = await sumPaymentAllocations(
+    "supplier_bill_id",
+    bills.map((bill) => bill.id),
+  );
+  const balances = new Map();
+  const groupedBills = new Map();
+
+  for (const bill of bills) {
+    const key = `${bill.supplier_id}:${String(bill.currency || "GHS").toUpperCase()}`;
+    if (!groupedBills.has(key)) groupedBills.set(key, []);
+    groupedBills.get(key).push(bill);
+  }
+
+  for (const group of groupedBills.values()) {
+    const credits = group
+      .filter((bill) => bill.document_type === "credit")
+      .sort((left, right) =>
+        String(left.bill_date).localeCompare(String(right.bill_date)) ||
+        Number(left.id) - Number(right.id),
+      )
+      .map((bill) => ({
+        id: String(bill.id),
+        remaining: Number(bill.total_amount || 0),
+      }));
+    let creditIndex = 0;
+
+    for (const bill of group
+      .filter((item) => item.document_type === "bill")
+      .sort((left, right) =>
+        String(left.bill_date).localeCompare(String(right.bill_date)) ||
+        Number(left.id) - Number(right.id),
+      )) {
+      let outstanding = Math.max(
+        0,
+        Number(bill.total_amount || 0) -
+          (paidAmounts.get(String(bill.id)) || 0),
+      );
+      while (outstanding > 0.005 && creditIndex < credits.length) {
+        const applied = Math.min(outstanding, credits[creditIndex].remaining);
+        outstanding -= applied;
+        credits[creditIndex].remaining -= applied;
+        if (credits[creditIndex].remaining <= 0.005) creditIndex += 1;
+      }
+      balances.set(String(bill.id), Number(Math.max(0, outstanding).toFixed(2)));
+    }
+
+    for (const credit of credits) {
+      balances.set(String(credit.id), Number((-credit.remaining).toFixed(2)));
+    }
+  }
+
+  return bills.map((bill) => ({
+    ...bill,
+    open_balance:
+      balances.get(String(bill.id)) ??
+      Number(bill.total_amount || 0) *
+        (bill.document_type === "credit" ? -1 : 1),
+  }));
+};
+
 router.get("/api/supplier-bills", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req, ["bills", "write_cheque"]);
@@ -1308,8 +1415,11 @@ router.get("/api/supplier-bills", async (req, res) => {
       .order("bill_date", { ascending: false })
       .order("id", { ascending: false });
     if (error) throw error;
+    const bills = await withSupplierBillBalances(
+      (data || []).map((bill) => formatSupplierBill(bill)),
+    );
     return res.json({
-      bills: (data || []).map((bill) => formatSupplierBill(bill)),
+      bills,
     });
   } catch (error) {
     console.error("Supplier bills lookup error:", error);
@@ -1489,13 +1599,25 @@ router.post("/api/supplier-bills", async (req, res) => {
       );
     if (linesError) throw linesError;
 
+    const { error: postingError } = await supabase.rpc(
+      "post_supplier_bill_journal",
+      {
+        p_supplier_bill_id: bill.id,
+        p_created_by: currentUser.id,
+      },
+    );
+    if (postingError) throw postingError;
+
     const { data: savedBill, error: savedBillError } = await supabase
       .from("supplier_bills")
       .select(supplierBillSelect)
       .eq("id", bill.id)
       .single();
     if (savedBillError) throw savedBillError;
-    return res.status(201).json({ bill: formatSupplierBill(savedBill) });
+    const [billWithBalance] = await withSupplierBillBalances([
+      formatSupplierBill(savedBill),
+    ]);
+    return res.status(201).json({ bill: billWithBalance });
   } catch (error) {
     if (insertedBillId) {
       const { error: rollbackError } = await supabase
@@ -1857,8 +1979,9 @@ const formatCustomerInvoice = (invoice) => ({
         : line.income_account,
     }))
     .sort((left, right) => left.line_number - right.line_number),
-  open_balance:
-    invoice.status === "open" ? Number(invoice.total_amount || 0) : 0,
+  open_balance: Number(invoice.open_balance ?? (
+    invoice.status === "open" ? Number(invoice.total_amount || 0) : 0
+  )),
 });
 
 router.get("/api/customer-invoices", async (req, res) => {
@@ -1879,7 +2002,8 @@ router.get("/api/customer-invoices", async (req, res) => {
       .order("invoice_date", { ascending: false })
       .order("id", { ascending: false });
     if (error) throw error;
-    return res.json({ invoices: (data || []).map(formatCustomerInvoice) });
+    const invoices = await withCustomerInvoiceBalances(data || []);
+    return res.json({ invoices: invoices.map(formatCustomerInvoice) });
   } catch (error) {
     console.error("Customer invoices lookup error:", error);
     return res
@@ -2375,6 +2499,7 @@ router.get("/api/reports/aging", async (req, res) => {
       )
       .order("bill_date", { ascending: true });
     if (error) throw error;
+    const bills = await withSupplierBillBalances(data || []);
     const { data: invoiceData, error: invoiceError } = await supabase
       .from("customer_invoices")
       .select(
@@ -2383,16 +2508,16 @@ router.get("/api/reports/aging", async (req, res) => {
       .eq("status", "open")
       .order("invoice_date", { ascending: true });
     if (invoiceError) throw invoiceError;
+    const invoices = await withCustomerInvoiceBalances(invoiceData || []);
     const suppliersById = new Map();
-    for (const bill of data || []) {
+    for (const bill of bills) {
       const supplier = Array.isArray(bill.supplier)
         ? bill.supplier[0]
         : bill.supplier;
       if (!supplier) continue;
       const ageDays = daysSinceDate(bill.bill_date);
-      const signedAmount =
-        Number(bill.total_amount || 0) *
-        (bill.document_type === "credit" ? -1 : 1);
+      const signedAmount = Number(bill.open_balance || 0);
+      if (signedAmount === 0) continue;
       const summary = suppliersById.get(String(supplier.id)) || {
         supplier_id: supplier.id,
         name: supplier.name,
@@ -2417,18 +2542,22 @@ router.get("/api/reports/aging", async (req, res) => {
         bill_date: bill.bill_date,
         due_date: bill.due_date,
         age_days: ageDays,
-        amount: signedAmount,
+        amount:
+          Number(bill.total_amount || 0) *
+          (bill.document_type === "credit" ? -1 : 1),
+        open_balance: signedAmount,
       });
       suppliersById.set(String(supplier.id), summary);
     }
     const customersById = new Map();
-    for (const invoice of invoiceData || []) {
+    for (const invoice of invoices) {
       const customer = Array.isArray(invoice.customer)
         ? invoice.customer[0]
         : invoice.customer;
       if (!customer) continue;
       const ageDays = daysSinceDate(invoice.invoice_date);
-      const amount = Number(invoice.total_amount || 0);
+      const amount = Number(invoice.open_balance || 0);
+      if (amount === 0) continue;
       const summary = customersById.get(String(customer.id)) || {
         customer_id: customer.id,
         name: customer.name,
@@ -2451,7 +2580,8 @@ router.get("/api/reports/aging", async (req, res) => {
         reference: invoice.invoice_number,
         invoice_date: invoice.invoice_date,
         age_days: ageDays,
-        amount,
+        amount: Number(invoice.total_amount || 0),
+        open_balance: amount,
       });
       customersById.set(String(customer.id), summary);
     }
@@ -2462,8 +2592,7 @@ router.get("/api/reports/aging", async (req, res) => {
       customers: [...customersById.values()].filter(
         (customer) => customer.total !== 0,
       ),
-      message:
-        "Supplier and customer aging is calculated from the bill or invoice date. Payment allocations are not yet recorded.",
+      message: "Outstanding balances include recorded receipts, payments, and supplier credits.",
     });
   } catch (error) {
     console.error("Aging report lookup error:", error);
@@ -2472,6 +2601,190 @@ router.get("/api/reports/aging", async (req, res) => {
       .json({ message: error?.message || "Unable to load aging reports" });
   }
 });
+
+router.get("/api/settlements/pending", async (req, res) => {
+  try {
+    const type = String(req.query?.type || "");
+    if (!["receipt", "supplier_payment"].includes(type)) {
+      return res.status(400).json({ message: "Select receipts or supplier payments" });
+    }
+    const currency = String(req.query?.currency || "").trim().toUpperCase();
+    if (currency && !/^[A-Z]{3,10}$/.test(currency)) {
+      return res.status(400).json({ message: "Enter a valid currency code" });
+    }
+    const partyId = String(req.query?.partyId || "");
+    if (!/^\d+$/.test(partyId) || Number(partyId) <= 0) {
+      return res.status(400).json({ message: "Select a valid customer or supplier" });
+    }
+    const permission =
+      type === "receipt" ? ["invoice", "bills"] : ["bills", "write_cheque"];
+    const { allowed } = await canUseAccounting(req, permission);
+    if (!allowed)
+      return res.status(403).json({ message: "Settlement permission required" });
+
+    if (type === "receipt") {
+      const { data, error } = await supabase
+        .from("customer_invoices")
+        .select(
+          "id, customer_id, invoice_number, invoice_date, currency, total_amount, status, customer:customers(id, name)",
+        )
+        .eq("status", "open")
+        .eq("customer_id", partyId)
+        .order("invoice_date", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) throw error;
+      const invoices = await withCustomerInvoiceBalances(
+        (data || []).filter(
+          (invoice) => !currency || invoice.currency.toUpperCase() === currency,
+        ),
+      );
+      return res.json({
+        transactions: invoices
+          .filter((invoice) => invoice.open_balance > 0)
+          .map((invoice) => ({
+            ...invoice,
+            customer: relationRecord(invoice.customer),
+          })),
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("supplier_bills")
+      .select(
+        "id, supplier_id, document_type, reference, bill_date, due_date, currency, total_amount, supplier:suppliers(id, name)",
+      )
+      .eq("supplier_id", partyId)
+      .order("bill_date", { ascending: true })
+      .order("id", { ascending: true });
+    if (error) throw error;
+    const bills = await withSupplierBillBalances(data || []);
+    return res.json({
+      transactions: bills
+        .filter(
+          (bill) =>
+            bill.document_type === "bill" &&
+            bill.open_balance > 0 &&
+            (!currency || bill.currency.toUpperCase() === currency),
+        )
+        .map((bill) => ({
+          ...bill,
+          supplier: relationRecord(bill.supplier),
+        })),
+    });
+  } catch (error) {
+    console.error("Pending settlement lookup error:", error);
+    return res.status(500).json({
+      message: error?.message || "Unable to load pending transactions",
+    });
+  }
+});
+
+const createSettlement = async (req, res, settlementType) => {
+  try {
+    const permission =
+      settlementType === "receipt"
+        ? ["invoice", "bills"]
+        : ["bills", "write_cheque"];
+    const { currentUser, allowed } = await canUseAccounting(req, permission);
+    if (!allowed)
+      return res.status(403).json({ message: "Settlement permission required" });
+
+    const partyId = Number(req.body?.partyId);
+    const cashBankAccountId = Number(req.body?.cashBankAccountId);
+    const settlementDate = String(req.body?.settlementDate || "").trim();
+    const paymentType = String(req.body?.paymentType || "").trim();
+    const reference = String(req.body?.reference || "").trim();
+    const memo = String(req.body?.memo || "").trim();
+    const rawAllocations = Array.isArray(req.body?.allocations)
+      ? req.body.allocations
+      : [];
+    if (!Number.isSafeInteger(partyId) || partyId <= 0) {
+      return res.status(400).json({ message: "Select a valid customer or supplier" });
+    }
+    if (!Number.isSafeInteger(cashBankAccountId) || cashBankAccountId <= 0) {
+      return res.status(400).json({ message: "Select a cash or bank account" });
+    }
+    const parsedSettlementDate = /^\d{4}-\d{2}-\d{2}$/.test(settlementDate)
+      ? new Date(`${settlementDate}T00:00:00Z`)
+      : null;
+    if (
+      !parsedSettlementDate ||
+      Number.isNaN(parsedSettlementDate.getTime()) ||
+      parsedSettlementDate.toISOString().slice(0, 10) !== settlementDate
+    ) {
+      return res.status(400).json({ message: "Enter a valid settlement date" });
+    }
+    if (!["cheque", "cash", "bank_transfer"].includes(paymentType)) {
+      return res.status(400).json({ message: "Select cash, cheque, or bank transfer" });
+    }
+    if (reference.length > 100 || memo.length > 5000) {
+      return res.status(400).json({ message: "Reference or memo is too long" });
+    }
+    if (!rawAllocations.length || rawAllocations.length > 100) {
+      return res.status(400).json({
+        message: "Select between 1 and 100 outstanding transactions",
+      });
+    }
+    const allocations = rawAllocations.map((allocation) => ({
+      documentId: Number(allocation?.documentId),
+      amount: Number(allocation?.amount),
+    }));
+    if (
+      allocations.some(
+        (allocation) =>
+          !Number.isSafeInteger(allocation.documentId) ||
+          allocation.documentId <= 0 ||
+          !Number.isFinite(allocation.amount) ||
+          allocation.amount <= 0 ||
+          Math.round(allocation.amount * 100) !== allocation.amount * 100,
+      )
+    ) {
+      return res.status(400).json({
+        message: "Every selected transaction needs a valid amount",
+      });
+    }
+    if (
+      new Set(allocations.map((allocation) => allocation.documentId)).size !==
+      allocations.length
+    ) {
+      return res.status(400).json({
+        message: "A transaction can only be selected once",
+      });
+    }
+
+    const { data, error } = await supabase.rpc("create_document_settlement", {
+      p_settlement_type: settlementType,
+      p_party_id: partyId,
+      p_settlement_date: settlementDate,
+      p_payment_type: paymentType,
+      p_reference: reference || null,
+      p_cash_bank_account_id: cashBankAccountId,
+      p_memo: memo || null,
+      p_allocations: allocations,
+      p_created_by: currentUser.id,
+    });
+    if (error) {
+      if (error.code === "P0001" || error.code === "22023") {
+        return res.status(400).json({ message: error.message });
+      }
+      throw error;
+    }
+    return res.status(201).json({ settlement: data });
+  } catch (error) {
+    console.error(`${settlementType} creation error:`, error);
+    return res.status(500).json({
+      message: error?.message || "Unable to save settlement",
+    });
+  }
+};
+
+router.post("/api/settlements/receipts", (req, res) =>
+  createSettlement(req, res, "receipt"),
+);
+
+router.post("/api/settlements/supplier-payments", (req, res) =>
+  createSettlement(req, res, "supplier_payment"),
+);
 
 router.get("/api/journal/lookups", async (req, res) => {
   try {
@@ -2523,10 +2836,10 @@ router.get("/api/journal/lookups", async (req, res) => {
     const [billResult, invoiceResult, payrollResult] = await Promise.all([
       supabase
         .from("supplier_bills")
-        .select("supplier_id, document_type, total_amount"),
+        .select("id, supplier_id, document_type, currency, bill_date, total_amount"),
       supabase
         .from("customer_invoices")
-        .select("customer_id, total_amount")
+        .select("id, customer_id, currency, total_amount, status")
         .eq("status", "open"),
       supabase
         .from("payroll_entries")
@@ -2537,17 +2850,20 @@ router.get("/api/journal/lookups", async (req, res) => {
     if (invoiceResult.error) throw invoiceResult.error;
     if (payrollResult.error) throw payrollResult.error;
 
-    for (const bill of billResult.data || []) {
+    const bills = await withSupplierBillBalances(billResult.data || []);
+    const invoices = await withCustomerInvoiceBalances(
+      invoiceResult.data || [],
+    );
+    for (const bill of bills) {
       const key = `supplier:${bill.supplier_id}`;
-      const sign = bill.document_type === "credit" ? -1 : 1;
       partyBalances[key] =
         (partyBalances[key] || 0) +
-        sign * Number(bill.total_amount || 0);
+        Number(bill.open_balance || 0);
     }
-    for (const invoice of invoiceResult.data || []) {
+    for (const invoice of invoices) {
       const key = `customer:${invoice.customer_id}`;
       partyBalances[key] =
-        (partyBalances[key] || 0) + Number(invoice.total_amount || 0);
+        (partyBalances[key] || 0) + Number(invoice.open_balance || 0);
     }
     for (const payrollEntry of payrollResult.data || []) {
       const key = `employee:${payrollEntry.employee_id}`;
