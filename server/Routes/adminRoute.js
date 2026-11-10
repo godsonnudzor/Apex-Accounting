@@ -2491,13 +2491,20 @@ router.get("/api/reports/financial/details", async (req, res) => {
       )
       .map((entry) => ({
         ...entry,
-        lines: (entry.journal_lines || []).filter((line) =>
-          partyType
+        lines: (entry.journal_lines || []).flatMap((line, lineIndex) => {
+          const matches = partyType
             ? Number(line[`${partyType}_id`]) === partyId
             : account
               ? line.account === account
-              : reportAccounts.has(line.account),
-        ),
+              : reportAccounts.has(line.account);
+          if (!matches) return [];
+          const split = (entry.journal_lines || [])
+            .filter((_, index) => index !== lineIndex)
+            .map((splitLine) => splitLine.account)
+            .filter(Boolean)
+            .join(", ");
+          return [{ ...line, split }];
+        }),
       }))
       .filter((entry) => entry.lines.length);
     return res.json({ account, partyType, partyId: partyType ? partyId : null, month, entries: details });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getApiUrl } from "../context/auth";
+import QuickReport from "../components/QuickReport";
 
 const money = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 
@@ -17,6 +18,7 @@ const FinancialReports = ({ reportType = "profit-loss" }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [detail, setDetail] = useState(null);
+  const [detailAccount, setDetailAccount] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const isAging = reportType === "supplier-aging" || reportType === "customer-aging";
   const agingRows = reportType === "supplier-aging" ? aging.suppliers : aging.customers;
@@ -70,6 +72,7 @@ const FinancialReports = ({ reportType = "profit-loss" }) => {
   const showLedgerDetails = async (account) => {
     setDetailLoading(true);
     setDetail(null);
+    setDetailAccount(account);
     try {
       const params = new URLSearchParams({
         account: `${account.code} - ${account.name}`,
@@ -231,11 +234,14 @@ const FinancialReports = ({ reportType = "profit-loss" }) => {
               )}
             </div>
           </section>
-          {detail ? (
+          {detailAccount ? (
             <div
               className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4"
               role="presentation"
-              onClick={() => setDetail(null)}
+              onClick={() => {
+                setDetail(null);
+                setDetailAccount(null);
+              }}
             >
               <section
                 className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-6 shadow-xl"
@@ -243,59 +249,16 @@ const FinancialReports = ({ reportType = "profit-loss" }) => {
                 aria-modal="true"
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Quick ledger report
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {detail.account}
-                      {detail.month ? ` · ${detail.month}` : ""}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded border border-slate-300 px-3 py-1 text-sm"
-                    onClick={() => setDetail(null)}
-                  >
-                    Close
-                  </button>
-                </div>
-                {detailLoading ? (
-                  <p className="text-slate-500">Loading details...</p>
-                ) : detail.entries.length ? (
-                  <div className="space-y-3">
-                    {detail.entries.map((entry) => (
-                      <article
-                        key={entry.id}
-                        className="rounded border border-slate-200 p-4"
-                      >
-                        <div className="flex flex-wrap justify-between gap-2">
-                          <strong>{entry.entry_date}</strong>
-                          <span className="text-slate-500">
-                            {entry.reference || entry.source}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-700">
-                          {entry.description || "No description"}
-                        </p>
-                        {entry.lines.map((line) => (
-                          <div
-                            key={`${entry.id}-${line.account}`}
-                            className="mt-2 flex justify-between text-sm"
-                          >
-                            <span>{line.memo || line.account}</span>
-                            <span>
-                              Debit {money(line.debit)} · Credit {money(line.credit)}
-                            </span>
-                          </div>
-                        ))}
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-500">No posted entries found.</p>
-                )}
+                <QuickReport
+                  account={detailAccount}
+                  entries={detail?.entries || []}
+                  loading={detailLoading}
+                  onRefresh={() => showLedgerDetails(detailAccount)}
+                  onClose={() => {
+                    setDetail(null);
+                    setDetailAccount(null);
+                  }}
+                />
               </section>
             </div>
           ) : null}
