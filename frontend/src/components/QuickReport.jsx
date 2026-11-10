@@ -8,6 +8,8 @@ const columns = [
   ["name", "Name"],
   ["memo", "Memo"],
   ["split", "Split"],
+  ["debit", "Debit"],
+  ["credit", "Credit"],
   ["amount", "Amount"],
   ["balance", "Balance"],
 ];
@@ -205,6 +207,8 @@ const QuickReport = ({
               "",
             memo: line.memo || entry.description || "",
             split: line.split || "",
+            debit: Number(line.debit || 0),
+            credit: Number(line.credit || 0),
             amount:
               (Number(line.debit || 0) - Number(line.credit || 0)) *
               (["liability", "equity", "income"].includes(
@@ -319,7 +323,7 @@ const QuickReport = ({
       activeColumns.map(([, label]) => label),
       ...rows.map((row) =>
         activeColumns.map(([key]) =>
-          ["amount", "balance"].includes(key)
+          ["amount", "balance", "debit", "credit"].includes(key)
             ? formatMoney(row[key], settings)
             : row[key] || "",
         ),
@@ -346,7 +350,7 @@ const QuickReport = ({
       ...rows.map((row) =>
         activeColumns
           .map(([key]) =>
-            ["amount", "balance"].includes(key)
+            ["amount", "balance", "debit", "credit"].includes(key)
               ? formatMoney(row[key], settings)
               : row[key] || "",
           )
@@ -469,7 +473,7 @@ const QuickReport = ({
               {activeColumns.map(([key, label]) => (
                 <th
                   key={key}
-                  className={`whitespace-nowrap px-2 py-2 font-semibold ${["amount", "balance"].includes(key) ? "text-right" : ""}`}
+                  className={`whitespace-nowrap px-2 py-2 font-semibold ${["amount", "balance", "debit", "credit"].includes(key) ? "text-right" : ""}`}
                 >
                   {label}
                 </th>
@@ -485,9 +489,9 @@ const QuickReport = ({
                   {activeColumns.map(([key]) => (
                     <td
                       key={key}
-                      className={`px-2 py-1.5 ${["type", "date", "number", "amount", "balance"].includes(key) ? "whitespace-nowrap" : "max-w-56 truncate"} ${["amount", "balance"].includes(key) ? "text-right" : ""} ${key === "type" ? "capitalize" : ""}`}
+                      className={`px-2 py-1.5 ${["type", "date", "number", "amount", "balance", "debit", "credit"].includes(key) ? "whitespace-nowrap" : "max-w-56 truncate"} ${["amount", "balance", "debit", "credit"].includes(key) ? "text-right" : ""} ${key === "type" ? "capitalize" : ""}`}
                     >
-                      {["amount", "balance"].includes(key)
+                      {["amount", "balance", "debit", "credit"].includes(key)
                         ? formatMoney(row[key], settings)
                         : row[key] || "—"}
                     </td>
@@ -502,17 +506,26 @@ const QuickReport = ({
             <tfoot className="border-t-2 border-slate-300 font-semibold">
               <tr>
                 {activeColumns.map(([key], index) => {
+                  if (["debit", "credit"].includes(key)) {
+                    const total = rows.reduce((sum, row) => sum + row[key], 0);
+                    return <td key={key} className="px-2 py-2 text-right">{formatMoney(total, settings)}</td>;
+                  }
                   if (key === "amount") {
                     return <td key={key} className="px-2 py-2 text-right">{formatMoney(amountTotal, settings)}</td>;
                   }
                   if (key === "balance") {
                     return <td key={key} className="px-2 py-2 text-right">{formatMoney(endingBalance, settings)}</td>;
                   }
-                  return index === activeColumns.findIndex(([columnKey]) => !["amount", "balance"].includes(columnKey)) ? (
+                  return (
                     <td key={key} className="px-2 py-2">
-                      Total
+                      {index === activeColumns.findIndex(
+                        ([columnKey]) =>
+                          !["amount", "balance", "debit", "credit"].includes(columnKey),
+                      )
+                        ? "Total"
+                        : ""}
                     </td>
-                  ) : <td key={key} className="px-2 py-2" />;
+                  );
                 })}
               </tr>
             </tfoot>
