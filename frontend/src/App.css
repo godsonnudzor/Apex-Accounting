@@ -1563,4 +1563,29 @@ button {
   color: #1f2933; text-decoration: none;
 }
 .dd-panel a:hover { background: #eef1f4; }
+.dark-mode .dd-nav {
+  width: fit-content;
+  padding: 2px;
+  border: 1px solid #d9dee3;
+  border-radius: 8px;
+  background: #fff;
+}
+.dark-mode .dd-trigger {
+  color: #1f2933;
+  background: #fff;
+}
+.dark-mode .dd-trigger:hover,
+.dark-mode .dd-trigger[aria-expanded="true"] {
+  background: #eef1f4;
+}
+.dark-mode .dd-panel {
+  background: #fff;
+  border-color: #d9dee3;
+}
+.dark-mode .dd-panel a {
+  color: #1f2933;
+}
+.dark-mode .dd-panel a:hover {
+  background: #eef1f4;
+}
 @media (prefers-reduced-motion: reduce) { .dd-arrow { transition: none; } }
