@@ -22,7 +22,6 @@ const ChartOfAccounts = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [ledgerYear, setLedgerYear] = useState(String(new Date().getFullYear()));
 
   const loadAccounts = async () => {
     const response = await fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" });
@@ -231,9 +230,9 @@ const ChartOfAccounts = () => {
           ? {
               partyType: account.partyType,
               partyId: String(account.partyId),
-              year: ledgerYear,
+              year: "all",
             }
-          : { account: `${account.code} - ${account.name}`, year: ledgerYear },
+          : { account: `${account.code} - ${account.name}`, year: "all" },
       );
       const response = await fetch(`${getApiUrl("/api/reports/financial/details")}?${params}`, { credentials: "include" });
       const result = await response.json();
@@ -378,7 +377,7 @@ const ChartOfAccounts = () => {
 
         {selectedAccount ? (
           <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div className="mb-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wider text-teal-600">
                   Individual ledger report
@@ -389,20 +388,6 @@ const ChartOfAccounts = () => {
                     : `${selectedAccount.code} - ${selectedAccount.name}`}
                 </h2>
               </div>
-              <label className="text-xs font-semibold text-slate-500">
-                Year
-                <input
-                  className="mt-1 block w-28 rounded border border-slate-300 px-2 py-2 text-sm"
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  value={ledgerYear}
-                  onChange={(event) => setLedgerYear(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") openLedgerReport(selectedAccount);
-                  }}
-                />
-              </label>
             </div>
             <QuickReport
               account={selectedAccount}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import QuickReportCustomize from "./QuickReportCustomize";
 
 const columns = [
   ["type", "Type"],
@@ -10,17 +11,136 @@ const columns = [
   ["amount", "Amount"],
   ["balance", "Balance"],
 ];
-const defaultVisibleColumns = Object.fromEntries(
-  columns.map(([key]) => [key, true]),
-);
+const columnKeys = columns.map(([key]) => key);
+const dateRangeOptions = [
+  ["all", "All"],
+  ["today", "Today"],
+  ["this-week", "This Week"],
+  ["this-month", "This Month"],
+  ["this-quarter", "This Quarter"],
+  ["this-year", "This Year"],
+  ["last-month", "Last Month"],
+  ["last-year", "Last Year"],
+  ["custom", "Custom"],
+];
+const defaultSettings = {
+  dateRange: "all",
+  fromDate: "",
+  toDate: "",
+  reportBasis: "accrual",
+  visibleColumns: Object.fromEntries(columnKeys.map((key) => [key, true])),
+  columnOrder: columnKeys,
+  sortBy: "default",
+  sortDirection: "ascending",
+  lookFor: "",
+  transactionTypes: [],
+  hideZeroAmounts: false,
+  showHeader: true,
+  showReportTitle: true,
+  showAccountName: true,
+  showDateRange: true,
+  showBasis: true,
+  showTotals: true,
+  showGeneratedDate: true,
+  fontFamily: "Arial, sans-serif",
+  fontSize: 12,
+  decimalPlaces: 2,
+  currencyDisplay: "code",
+  negativeStyle: "parentheses",
+};
+const cashSources = new Set(["receipt", "supplier_payment"]);
 
-const money = (value) => {
+const localDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDateBounds = (settings) => {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfQuarter = new Date(
+    now.getFullYear(),
+    Math.floor(now.getMonth() / 3) * 3,
+    1,
+  );
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+  const lastYearStart = new Date(now.getFullYear() - 1, 0, 1);
+  const lastYearEnd = new Date(now.getFullYear() - 1, 11, 31);
+
+  const ranges = {
+    all: [null, null],
+    today: [localDateString(now), localDateString(now)],
+    "this-week": [localDateString(startOfWeek), localDateString(now)],
+    "this-month": [localDateString(startOfMonth), localDateString(now)],
+    "this-quarter": [localDateString(startOfQuarter), localDateString(now)],
+    "this-year": [localDateString(startOfYear), localDateString(now)],
+    "last-month": [
+      localDateString(lastMonthStart),
+      localDateString(lastMonthEnd),
+    ],
+    "last-year": [localDateString(lastYearStart), localDateString(lastYearEnd)],
+    custom: [settings.fromDate || null, settings.toDate || null],
+  };
+  return ranges[settings.dateRange] || ranges.all;
+};
+
+const formatMoney = (value, settings) => {
   const amount = Number(value || 0);
   const formatted = Math.abs(amount).toLocaleString("en-GH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: settings.decimalPlaces,
+    maximumFractionDigits: settings.decimalPlaces,
   });
-  return amount < 0 ? `(${formatted})` : formatted;
+  const signed =
+    amount < 0
+      ? settings.negativeStyle === "parentheses"
+        ? `(${formatted})`
+        : `-${formatted}`
+      : formatted;
+  const currency =
+    settings.currencyDisplay === "code"
+      ? "GHC "
+      : settings.currencyDisplay === "symbol"
+        ? "GH₵ "
+        : "";
+  return `${currency}${signed}`;
+};
+
+const normalizeSettings = (settings) => {
+  const savedOrder = Array.isArray(settings?.columnOrder)
+    ? [...new Set(settings.columnOrder.filter((key) => columnKeys.includes(key)))]
+    : defaultSettings.columnOrder;
+  const sortBy =
+    settings?.sortBy === "date-desc"
+      ? "date"
+      : columnKeys.includes(settings?.sortBy) || settings?.sortBy === "default"
+        ? settings.sortBy
+        : defaultSettings.sortBy;
+  return {
+    ...defaultSettings,
+    ...settings,
+    sortBy,
+    sortDirection:
+      settings?.sortBy === "date-desc"
+        ? "descending"
+        : settings?.sortDirection || defaultSettings.sortDirection,
+    visibleColumns: {
+      ...defaultSettings.visibleColumns,
+      ...(settings?.visibleColumns || {}),
+    },
+    columnOrder: [
+      ...savedOrder,
+      ...columnKeys.filter((key) => !savedOrder.includes(key)),
+    ],
+    transactionTypes: Array.isArray(settings?.transactionTypes)
+      ? settings.transactionTypes
+      : [],
+  };
 };
 
 const QuickReport = ({
@@ -30,14 +150,6 @@ const QuickReport = ({
   onRefresh,
   onClose,
 }) => {
-  const [customizing, setCustomizing] = useState(false);
-  const [headerVisible, setHeaderVisible] = useState(true);
-  const [dateRange, setDateRange] = useState("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [sortBy, setSortBy] = useState("default");
-  const [visibleColumns, setVisibleColumns] = useState(defaultVisibleColumns);
-  const [message, setMessage] = useState("");
   const accountName = account?.partyType
     ? `${account.partyType[0].toUpperCase()}${account.partyType.slice(1)}: ${account.name}`
     : `${account?.code || ""} - ${account?.name || account?.account || ""}`.replace(
@@ -45,106 +157,170 @@ const QuickReport = ({
         "",
       );
   const reportKey = account?.code || accountName;
+  const [settings, setSettings] = useState(defaultSettings);
+  const [customizing, setCustomizing] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-      setVisibleColumns(defaultVisibleColumns);
-      setSortBy("default");
-      setMessage("");
-      try {
-        const saved = window.localStorage.getItem(`quick-report:${reportKey}`);
-        if (!saved) return;
-        const preferences = JSON.parse(saved);
-        if (
-          !preferences ||
-          typeof preferences.visibleColumns !== "object" ||
-          !["default", "date-desc", "type"].includes(preferences.sortBy)
-        ) {
-          throw new Error("Saved report preferences are invalid.");
-        }
-        const restoredColumns = Object.fromEntries(
-          columns.map(([key]) => [
-            key,
-            typeof preferences.visibleColumns[key] === "boolean"
-              ? preferences.visibleColumns[key]
-              : true,
-          ]),
-        );
-        setVisibleColumns(restoredColumns);
-        setSortBy(preferences.sortBy);
-      } catch (loadError) {
-        setMessage(`Unable to load saved report layout: ${loadError.message}`);
-      }
+    setSettings(defaultSettings);
+    setMessage("");
+    try {
+      const saved = window.localStorage.getItem(`quick-report:${reportKey}`);
+      if (saved) setSettings(normalizeSettings(JSON.parse(saved)));
+    } catch (loadError) {
+      setMessage(`Unable to load saved report settings: ${loadError.message}`);
+    }
   }, [reportKey]);
-  const normalBalanceSign = ["liability", "equity", "income"].includes(
-    account?.account_type,
-  )
-    ? -1
-    : 1;
 
-  const rows = useMemo(() => {
+  const sourceRows = useMemo(() => {
+    const [fromDate, toDate] = getDateBounds(settings);
+    const term = settings.lookFor.trim().toLowerCase();
     const chronological = entries
-      .flatMap((entry) =>
-        (entry.lines || []).map((line, lineIndex) => ({
-          id: `${entry.id}-${lineIndex}`,
-          type: String(entry.source || "Journal").replaceAll("_", " "),
-          date: String(entry.entry_date || ""),
-          number: entry.reference || `JE-${entry.id}`,
-          name: line.party_name || line.name || entry.payee || "",
-          memo: line.memo || entry.description || "",
-          split: line.split || "",
-          amount:
-            (Number(line.debit || 0) - Number(line.credit || 0)) *
-            normalBalanceSign,
-        })),
+      .filter(
+        (entry) =>
+          settings.reportBasis !== "cash" ||
+          cashSources.has(String(entry.source || "").toLowerCase()),
       )
-      .sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
+      .flatMap((entry) =>
+        (entry.lines || []).map((line, lineIndex) => {
+          const employee = line.employee;
+          const employeeName = employee
+            ? [employee.first_name, employee.last_name].filter(Boolean).join(" ") ||
+              employee.users?.name ||
+              ""
+            : "";
+          const row = {
+            id: `${entry.id}-${lineIndex}`,
+            type: String(entry.source || "Journal").replaceAll("_", " "),
+            date: String(entry.entry_date || ""),
+            number: entry.reference || `JE-${entry.id}`,
+            name:
+              line.party_name ||
+              line.supplier?.name ||
+              line.customer?.name ||
+              employeeName ||
+              (Array.isArray(entry.payment_records)
+                ? entry.payment_records[0]?.payee
+                : entry.payment_records?.payee) ||
+              "",
+            memo: line.memo || entry.description || "",
+            split: line.split || "",
+            amount:
+              (Number(line.debit || 0) - Number(line.credit || 0)) *
+              (["liability", "equity", "income"].includes(
+                account?.account_type,
+              )
+                ? -1
+                : 1),
+          };
+          return row;
+        }),
+      )
+      .sort(
+        (left, right) =>
+          left.date.localeCompare(right.date) || left.id.localeCompare(right.id),
+      );
 
     let balance = 0;
     const balancedRows = chronological.map((row) => {
       balance += row.amount;
       return { ...row, balance };
     });
-    const filteredRows =
-      dateRange === "custom"
-        ? balancedRows.filter(
-            (row) =>
-              (!fromDate || row.date >= fromDate) &&
-              (!toDate || row.date <= toDate),
-          )
-        : balancedRows;
-
-    if (sortBy === "date-desc") {
-      return [...filteredRows].reverse();
-    }
-    if (sortBy === "type") {
-      return [...filteredRows].sort(
-        (left, right) =>
-          left.type.localeCompare(right.type) ||
-          left.date.localeCompare(right.date),
-      );
-    }
-    return filteredRows;
-  }, [dateRange, entries, fromDate, normalBalanceSign, sortBy, toDate]);
-
-  const toggleColumn = (key) => {
-    setVisibleColumns((current) => {
-      if (current[key] && Object.values(current).filter(Boolean).length === 1) {
-        setMessage("At least one report column must remain visible.");
-        return current;
+    return balancedRows.filter((row) => {
+      if (fromDate && row.date < fromDate) return false;
+      if (toDate && row.date > toDate) return false;
+      if (settings.transactionTypes.includes(row.type.replaceAll(" ", "_"))) {
+        return false;
       }
-      setMessage("");
-      return { ...current, [key]: !current[key] };
+      if (
+        term &&
+        ![row.name, row.memo, row.split, row.number, row.type]
+          .join(" ")
+          .toLowerCase()
+          .includes(term)
+      ) {
+        return false;
+      }
+      return !settings.hideZeroAmounts || row.amount !== 0;
     });
+  }, [account?.account_type, entries, settings]);
+
+  const rows = useMemo(() => {
+    const sortKey = settings.sortBy === "default" ? "date" : settings.sortBy;
+    const direction = settings.sortDirection === "descending" ? -1 : 1;
+    const sorted = [...sourceRows].sort((left, right) => {
+      const leftValue = left[sortKey];
+      const rightValue = right[sortKey];
+      if (typeof leftValue === "number" && typeof rightValue === "number") {
+        return (leftValue - rightValue) * direction;
+      }
+      return (
+        String(leftValue || "").localeCompare(String(rightValue || ""), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }) * direction
+      );
+    });
+    return sorted;
+  }, [settings.sortBy, settings.sortDirection, sourceRows]);
+
+  const transactionTypes = useMemo(
+    () => [...new Set(entries.map((entry) => String(entry.source || "journal").toLowerCase()))].sort(),
+    [entries],
+  );
+  const activeColumns = settings.columnOrder
+    .map((key) => columns.find(([columnKey]) => columnKey === key))
+    .filter(([key]) => settings.visibleColumns[key]);
+  const amountTotal = rows.reduce((total, row) => total + row.amount, 0);
+  const endingBalance = sourceRows.at(-1)?.balance || 0;
+  const [fromDate, toDate] = getDateBounds(settings);
+  const dateRangeLabel =
+    settings.dateRange === "all"
+      ? "All Transactions"
+      : `${fromDate || "Beginning"} – ${toDate || "Today"}`;
+
+  const applySettings = (nextSettings) => {
+    const normalized = normalizeSettings(nextSettings);
+    setSettings(normalized);
+    setCustomizing(false);
+    setMessage("");
+  };
+
+  const updateDateBound = (key, value) => {
+    const otherKey = key === "fromDate" ? "toDate" : "fromDate";
+    const invalidRange =
+      value &&
+      settings[otherKey] &&
+      (key === "fromDate"
+        ? value > settings.toDate
+        : value < settings.fromDate);
+    if (invalidRange) {
+      setMessage("The start date must be on or before the end date.");
+      return;
+    }
+    setMessage("");
+    setSettings((current) => ({ ...current, [key]: value }));
+  };
+
+  const rememberReport = () => {
+    try {
+      window.localStorage.setItem(
+        `quick-report:${reportKey}`,
+        JSON.stringify(settings),
+      );
+      setMessage("Report settings saved for this browser.");
+    } catch (saveError) {
+      setMessage(`Unable to save report settings: ${saveError.message}`);
+    }
   };
 
   const exportCsv = () => {
-    const activeColumns = columns.filter(([key]) => visibleColumns[key]);
     const csvRows = [
       activeColumns.map(([, label]) => label),
       ...rows.map((row) =>
         activeColumns.map(([key]) =>
-          key === "amount" || key === "balance"
-            ? money(row[key])
+          ["amount", "balance"].includes(key)
+            ? formatMoney(row[key], settings)
             : row[key] || "",
         ),
       ),
@@ -154,7 +330,9 @@ const QuickReport = ({
         row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","),
       )
       .join("\r\n");
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
+    );
     const link = document.createElement("a");
     link.href = url;
     link.download = `quick-report-${account?.code || "account"}.csv`;
@@ -163,36 +341,30 @@ const QuickReport = ({
   };
 
   const emailReport = () => {
-    const body = rows
-      .map(
-        (row) =>
-          `${row.date} | ${row.type} | ${row.number} | ${row.memo} | ${money(row.amount)}`,
-      )
-      .join("\n");
+    const body = [
+      activeColumns.map(([, label]) => label).join(" | "),
+      ...rows.map((row) =>
+        activeColumns
+          .map(([key]) =>
+            ["amount", "balance"].includes(key)
+              ? formatMoney(row[key], settings)
+              : row[key] || "",
+          )
+          .join(" | "),
+      ),
+    ].join("\n");
     window.location.href = `mailto:?subject=${encodeURIComponent(
       `Quick Report - ${accountName}`,
     )}&body=${encodeURIComponent(body)}`;
   };
 
-  const rememberReport = () => {
-    try {
-      window.localStorage.setItem(
-        `quick-report:${reportKey}`,
-        JSON.stringify({ visibleColumns, sortBy }),
-      );
-      setMessage("Report layout saved for this browser.");
-    } catch (saveError) {
-      setMessage(`Unable to save report layout: ${saveError.message}`);
-    }
-  };
-
-  const amountTotal = rows.reduce((total, row) => total + row.amount, 0);
-  const endingBalance = rows.at(-1)?.balance || 0;
-
   return (
-    <section className="overflow-hidden border border-slate-300 bg-white text-slate-800 shadow-sm">
-      <div className="quick-report-toolbar flex flex-wrap items-center gap-1 border-b border-slate-300 bg-slate-100 p-2">
-        <button type="button" onClick={() => setCustomizing((value) => !value)} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50">
+    <section
+      className="overflow-hidden border border-slate-300 bg-white text-slate-800 shadow-sm print:border-0 print:shadow-none"
+      style={{ fontFamily: settings.fontFamily, fontSize: `${settings.fontSize}px` }}
+    >
+      <div className="quick-report-toolbar flex flex-wrap items-center gap-1 border-b border-slate-300 bg-slate-100 p-2 print:hidden">
+        <button type="button" onClick={() => setCustomizing(true)} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50">
           Customise Report
         </button>
         <button type="button" onClick={rememberReport} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50">
@@ -207,8 +379,12 @@ const QuickReport = ({
         <button type="button" onClick={exportCsv} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50">
           Excel
         </button>
-        <button type="button" onClick={() => setHeaderVisible((value) => !value)} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50">
-          {headerVisible ? "Hide Header" : "Show Header"}
+        <button
+          type="button"
+          onClick={() => applySettings({ ...settings, showHeader: !settings.showHeader })}
+          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50"
+        >
+          {settings.showHeader ? "Hide Header" : "Show Header"}
         </button>
         {onRefresh ? (
           <button type="button" onClick={onRefresh} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold hover:bg-slate-50">
@@ -222,16 +398,19 @@ const QuickReport = ({
         ) : null}
       </div>
 
-      <div className="quick-report-filters flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-300 bg-slate-50 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-300 bg-slate-50 px-3 py-2 text-xs print:hidden">
         <label className="flex items-center gap-2">
           Dates
           <select
-            value={dateRange}
-            onChange={(event) => setDateRange(event.target.value)}
+            value={settings.dateRange}
+            onChange={(event) =>
+              setSettings((current) => ({ ...current, dateRange: event.target.value }))
+            }
             className="rounded border border-slate-300 bg-white px-2 py-1"
           >
-            <option value="all">All</option>
-            <option value="custom">Custom</option>
+            {dateRangeOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
           </select>
         </label>
         <label className="flex items-center gap-2">
@@ -239,9 +418,9 @@ const QuickReport = ({
           <input
             aria-label="From date"
             type="date"
-            value={fromDate}
-            disabled={dateRange !== "custom"}
-            onChange={(event) => setFromDate(event.target.value)}
+            value={settings.fromDate}
+            disabled={settings.dateRange !== "custom"}
+            onChange={(event) => updateDateBound("fromDate", event.target.value)}
             className="rounded border border-slate-300 bg-white px-2 py-1 disabled:bg-slate-100"
           />
         </label>
@@ -250,113 +429,112 @@ const QuickReport = ({
           <input
             aria-label="To date"
             type="date"
-            value={toDate}
-            disabled={dateRange !== "custom"}
-            onChange={(event) => setToDate(event.target.value)}
+            value={settings.toDate}
+            disabled={settings.dateRange !== "custom"}
+            onChange={(event) => updateDateBound("toDate", event.target.value)}
             className="rounded border border-slate-300 bg-white px-2 py-1 disabled:bg-slate-100"
           />
         </label>
         <label className="ml-auto flex items-center gap-2">
           Sort By
           <select
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value)}
+            value={settings.sortBy}
+            onChange={(event) =>
+              setSettings((current) => ({ ...current, sortBy: event.target.value }))
+            }
             className="rounded border border-slate-300 bg-white px-2 py-1"
           >
             <option value="default">Default</option>
-            <option value="date-desc">Date (newest first)</option>
-            <option value="type">Type</option>
+            {columns.map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
           </select>
         </label>
       </div>
 
-      {customizing ? (
-        <div className="quick-report-customize flex flex-wrap gap-x-4 gap-y-2 border-b border-slate-200 px-3 py-2 text-xs">
-          {columns.map(([key, label]) => (
-            <label key={key} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={visibleColumns[key]}
-                onChange={() => toggleColumn(key)}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      ) : null}
-      {message ? (
-        <p className="px-3 py-2 text-xs text-teal-800" role="status">
-          {message}
-        </p>
-      ) : null}
-
-      {headerVisible ? (
+      {message ? <p className="px-3 py-2 text-xs text-teal-800" role="status">{message}</p> : null}
+      {settings.showHeader ? (
         <header className="quick-report-heading px-4 py-4 text-center">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-blue-900">
-            Account QuickReport
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-slate-800">{accountName}</p>
-          <p className="mt-1 text-xs text-slate-500">All Transactions</p>
+          {settings.showReportTitle ? <h2 className="text-sm font-bold uppercase tracking-wide text-blue-900">Account QuickReport</h2> : null}
+          {settings.showAccountName ? <p className="mt-1 text-sm font-semibold text-slate-800">{accountName}</p> : null}
+          {settings.showDateRange ? <p className="mt-1 text-xs text-slate-500">{dateRangeLabel}</p> : null}
+          {settings.showBasis ? <p className="mt-1 text-xs capitalize text-slate-500">{settings.reportBasis} Basis</p> : null}
         </header>
       ) : null}
 
-      <div className="quick-report-table-wrap overflow-x-auto">
-        <table className="w-full min-w-[860px] text-left text-xs">
-          <thead className="border-y border-slate-300 text-slate-600">
+      <div className="quick-report-table-wrap overflow-x-auto print:overflow-visible">
+        <table className="w-full min-w-[860px] text-left print:min-w-0">
+          <thead className="border-y border-slate-300 text-slate-600 print:table-header-group">
             <tr>
-              {columns.map(([key, label]) =>
-                visibleColumns[key] ? (
-                  <th
-                    key={key}
-                    className={`whitespace-nowrap px-2 py-2 font-semibold ${["amount", "balance"].includes(key) ? "text-right" : ""}`}
-                  >
-                    {label}
-                  </th>
-                ) : null,
-              )}
+              {activeColumns.map(([key, label]) => (
+                <th
+                  key={key}
+                  className={`whitespace-nowrap px-2 py-2 font-semibold ${["amount", "balance"].includes(key) ? "text-right" : ""}`}
+                >
+                  {label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={columns.filter(([key]) => visibleColumns[key]).length} className="px-3 py-8 text-center text-slate-500">
-                  Loading report...
-                </td>
-              </tr>
+              <tr><td colSpan={activeColumns.length} className="px-3 py-8 text-center text-slate-500">Loading report...</td></tr>
             ) : rows.length ? (
               rows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  {visibleColumns.type ? <td className="whitespace-nowrap px-2 py-1.5 capitalize">{row.type}</td> : null}
-                  {visibleColumns.date ? <td className="whitespace-nowrap px-2 py-1.5">{row.date}</td> : null}
-                  {visibleColumns.number ? <td className="whitespace-nowrap px-2 py-1.5">{row.number}</td> : null}
-                  {visibleColumns.name ? <td className="max-w-40 truncate px-2 py-1.5">{row.name || "—"}</td> : null}
-                  {visibleColumns.memo ? <td className="max-w-56 truncate px-2 py-1.5">{row.memo || "—"}</td> : null}
-                  {visibleColumns.split ? <td className="max-w-48 truncate px-2 py-1.5">{row.split || "—"}</td> : null}
-                  {visibleColumns.amount ? <td className="whitespace-nowrap px-2 py-1.5 text-right">{money(row.amount)}</td> : null}
-                  {visibleColumns.balance ? <td className="whitespace-nowrap px-2 py-1.5 text-right">{money(row.balance)}</td> : null}
+                  {activeColumns.map(([key]) => (
+                    <td
+                      key={key}
+                      className={`px-2 py-1.5 ${["type", "date", "number", "amount", "balance"].includes(key) ? "whitespace-nowrap" : "max-w-56 truncate"} ${["amount", "balance"].includes(key) ? "text-right" : ""} ${key === "type" ? "capitalize" : ""}`}
+                    >
+                      {["amount", "balance"].includes(key)
+                        ? formatMoney(row[key], settings)
+                        : row[key] || "—"}
+                    </td>
+                  ))}
                 </tr>
               ))
             ) : (
-              <tr>
-                <td colSpan={columns.filter(([key]) => visibleColumns[key]).length} className="px-3 py-8 text-center text-slate-500">
-                  No transactions found for this report.
-                </td>
-              </tr>
+              <tr><td colSpan={activeColumns.length} className="px-3 py-8 text-center text-slate-500">No transactions found for this report.</td></tr>
             )}
           </tbody>
-          {!loading && rows.length ? (
+          {!loading && rows.length && settings.showTotals ? (
             <tfoot className="border-t-2 border-slate-300 font-semibold">
               <tr>
-                <td colSpan={columns.filter(([key]) => visibleColumns[key] && !["amount", "balance"].includes(key)).length || 1} className="px-2 py-2">
-                  Total
-                </td>
-                {visibleColumns.amount ? <td className="px-2 py-2 text-right">{money(amountTotal)}</td> : null}
-                {visibleColumns.balance ? <td className="px-2 py-2 text-right">{money(endingBalance)}</td> : null}
+                {activeColumns.map(([key], index) => {
+                  if (key === "amount") {
+                    return <td key={key} className="px-2 py-2 text-right">{formatMoney(amountTotal, settings)}</td>;
+                  }
+                  if (key === "balance") {
+                    return <td key={key} className="px-2 py-2 text-right">{formatMoney(endingBalance, settings)}</td>;
+                  }
+                  return index === activeColumns.findIndex(([columnKey]) => !["amount", "balance"].includes(columnKey)) ? (
+                    <td key={key} className="px-2 py-2">
+                      Total
+                    </td>
+                  ) : <td key={key} className="px-2 py-2" />;
+                })}
               </tr>
             </tfoot>
           ) : null}
         </table>
       </div>
+      {settings.showGeneratedDate ? (
+        <footer className="quick-report-page-footer px-3 py-2 text-right text-xs text-slate-500">
+          Generated {new Date().toLocaleDateString()}
+        </footer>
+      ) : null}
+      {customizing ? (
+        <QuickReportCustomize
+          key={reportKey}
+          accountName={accountName}
+          columns={columns}
+          settings={normalizeSettings(settings)}
+          transactionTypes={transactionTypes}
+          onApply={applySettings}
+          onCancel={() => setCustomizing(false)}
+        />
+      ) : null}
     </section>
   );
 };

@@ -76,7 +76,7 @@ const FinancialReports = ({ reportType = "profit-loss" }) => {
     try {
       const params = new URLSearchParams({
         account: `${account.code} - ${account.name}`,
-        year,
+        year: "all",
       });
       const response = await fetch(
         `${getApiUrl("/api/reports/financial/details")}?${params}`,

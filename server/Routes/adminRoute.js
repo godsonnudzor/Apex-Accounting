@@ -2436,9 +2436,12 @@ router.get("/api/reports/financial/details", async (req, res) => {
     const partyType = String(req.query?.partyType || "").trim();
     const partyId = Number(req.query?.partyId);
     const report = String(req.query?.report || "").trim();
+    const allYears = req.query?.year === "all";
     const year = /^\d{4}$/.test(String(req.query?.year || ""))
       ? String(req.query.year)
-      : String(new Date().getUTCFullYear());
+      : allYears
+        ? null
+        : String(new Date().getUTCFullYear());
     const month = String(req.query?.month || "").trim();
     const reportTypes =
       report === "profit-loss"
@@ -2466,7 +2469,7 @@ router.get("/api/reports/financial/details", async (req, res) => {
     const { data: entries, error } = await supabase
       .from("journal_entries")
       .select(
-        "id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo, supplier_id, customer_id, employee_id)",
+        "id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo, supplier_id, customer_id, employee_id, supplier:suppliers(name), customer:customers(name), employee:employees(first_name, last_name, users(name))), payment_records(payee)",
       )
       .eq("status", "posted")
       .order("entry_date", { ascending: false })
@@ -2486,7 +2489,7 @@ router.get("/api/reports/financial/details", async (req, res) => {
     const details = (entries || [])
       .filter(
         (entry) =>
-          String(entry.entry_date).startsWith(year) &&
+          (!year || String(entry.entry_date).startsWith(year)) &&
           (!month || String(entry.entry_date).startsWith(month)),
       )
       .map((entry) => ({
