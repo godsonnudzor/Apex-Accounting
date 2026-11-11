@@ -7,8 +7,27 @@ const money = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const amountSummary = (snapshot) =>
-  `Debit ${money(snapshot?.debitTotal)} / Credit ${money(snapshot?.creditTotal)}`;
+const getLineTotals = (snapshot) => {
+  const lines = snapshot?.lines || [];
+  if (!lines.length) {
+    return {
+      debit: Number(snapshot?.debitTotal || 0),
+      credit: Number(snapshot?.creditTotal || 0),
+    };
+  }
+  return lines.reduce(
+    (totals, line) => ({
+      debit: totals.debit + Number(line.debit || 0),
+      credit: totals.credit + Number(line.credit || 0),
+    }),
+    { debit: 0, credit: 0 },
+  );
+};
+
+const amountSummary = (snapshot) => {
+  const totals = getLineTotals(snapshot);
+  return `Debit ${money(totals.debit)} / Credit ${money(totals.credit)}`;
+};
 
 const lineAmountDetails = (snapshot) =>
   (snapshot?.lines || []).map((line, index) => (

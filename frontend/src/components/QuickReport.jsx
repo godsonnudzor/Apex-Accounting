@@ -168,6 +168,9 @@ const QuickReport = ({
   const [entryLoading, setEntryLoading] = useState(false);
   const [entryBusy, setEntryBusy] = useState(false);
   const [entryError, setEntryError] = useState("");
+  const [availableAllocations, setAvailableAllocations] = useState([]);
+  const [availableAllocationId, setAvailableAllocationId] = useState("");
+  const [allocationLookupError, setAllocationLookupError] = useState("");
 
   useEffect(() => {
     setSettings(defaultSettings);
@@ -372,6 +375,9 @@ const QuickReport = ({
 
   const openEntry = async (row) => {
     setEntryError("");
+    setAllocationLookupError("");
+    setAvailableAllocations([]);
+    setAvailableAllocationId("");
     setEntryForm(null);
     setOpenedEntry(null);
     setEntryLoading(true);
@@ -385,11 +391,37 @@ const QuickReport = ({
         throw new Error(result.message || "Unable to open journal entry");
       }
       const entry = result.entry;
+      const payment = entry.payment_records?.[0] || null;
+      const savedAllocations = (payment?.payment_allocations || []).map((allocation) => {
+        const document = allocation.customer_invoice || allocation.supplier_bill;
+        return {
+          documentId: allocation.customer_invoice_id || allocation.supplier_bill_id,
+          amount: String(allocation.amount || ""),
+          label:
+            document?.invoice_number ||
+            document?.reference ||
+            `Document ${allocation.customer_invoice_id || allocation.supplier_bill_id}`,
+        };
+      });
       setOpenedEntry(entry);
       setEntryForm({
         entryDate: entry.entry_date || "",
         reference: entry.reference || "",
         description: entry.description || "",
+        payment: payment
+          ? {
+              paymentType: payment.payment_type || "",
+              payee: payment.payee || "",
+              memo: payment.memo || "",
+              bankAccount: payment.bank_account || "",
+              cashBankAccountId: payment.cash_bank_account_id || null,
+              settlementType: payment.settlement_type || "",
+              customerId: payment.customer_id || null,
+              supplierId: payment.supplier_id || null,
+              currency: payment.currency || "GHS",
+            }
+          : null,
+        allocations: savedAllocations,
         lines: (entry.journal_lines || []).map((line) => ({
           account: line.account || "",
           debit: String(line.debit || ""),
@@ -400,6 +432,40 @@ const QuickReport = ({
           employee_id: line.employee_id,
         })),
       });
+      if (payment?.settlement_type) {
+        try {
+          const query = new URLSearchParams({
+            type: payment.settlement_type,
+            partyId: String(payment.customer_id || payment.supplier_id || ""),
+            currency: String(payment.currency || "GHS").toUpperCase(),
+          });
+          const pendingResponse = await fetch(
+            getApiUrl(`/api/settlements-pending?${query}`),
+            { credentials: "include" },
+          );
+          const pendingResult = await readApiResponse(pendingResponse);
+          if (!pendingResponse.ok) {
+            throw new Error(
+              pendingResult.message || "Unable to load additional linked documents",
+            );
+          }
+          const savedIds = new Set(savedAllocations.map((item) => String(item.documentId)));
+          setAvailableAllocations(
+            (pendingResult.transactions || [])
+              .filter((document) => !savedIds.has(String(document.id)))
+              .map((document) => ({
+                documentId: document.id,
+                amount: String(document.open_balance || ""),
+                label:
+                  document.invoice_number ||
+                  document.reference ||
+                  `Document ${document.id}`,
+              })),
+          );
+        } catch (allocationError) {
+          setAllocationLookupError(allocationError.message);
+        }
+      }
     } catch (loadError) {
       setEntryError(loadError.message);
     } finally {
@@ -412,21 +478,101 @@ const QuickReport = ({
   };
 
   const updateEntryLine = (index, key, value) => {
+    setEntryForm((current) => {
+      const lines = current.lines.map((line, lineIndex) =>
+        lineIndex === index ? { ...line, [key]: value } : line,
+      );
+      if (isDirectPayment()) {
+        const linkedCashAccount = openedEntry.payment_records[0].bank_account;
+        const cashIndex = lines.findIndex((line) => line.account === linkedCashAccount);
+        if (cashIndex >= 0) {
+          const expenseTotal = lines.reduce(
+            (total, line, lineIndex) =>
+              total + (lineIndex === cashIndex ? 0 : Number(line.debit || 0)),
+            0,
+          );
+          lines[cashIndex] = {
+            ...lines[cashIndex],
+            debit: "0",
+            credit: String(expenseTotal),
+          };
+        }
+      }
+      return { ...current, lines };
+    });
+  };
+
+  const updatePayment = (key, value) => {
     setEntryForm((current) => ({
       ...current,
-      lines: current.lines.map((line, lineIndex) =>
-        lineIndex === index ? { ...line, [key]: value } : line,
+      payment: { ...current.payment, [key]: value },
+    }));
+  };
+
+  const updateAllocation = (index, key, value) => {
+    setEntryForm((current) => ({
+      ...current,
+      allocations: current.allocations.map((allocation, allocationIndex) =>
+        allocationIndex === index
+          ? { ...allocation, [key]: value }
+          : allocation,
       ),
     }));
   };
+
+  const addAllocation = () => {
+    const allocation = availableAllocations.find(
+      (item) => String(item.documentId) === String(availableAllocationId),
+    );
+    if (!allocation) return;
+    setEntryForm((current) => ({
+      ...current,
+      allocations: [...current.allocations, allocation],
+    }));
+    setAvailableAllocations((current) =>
+      current.filter((item) => String(item.documentId) !== String(availableAllocationId)),
+    );
+    setAvailableAllocationId("");
+  };
+
+  const removeAllocation = (index) => {
+    const [removed] = entryForm.allocations.slice(index, index + 1);
+    setEntryForm((current) => ({
+      ...current,
+      allocations: current.allocations.filter((_, allocationIndex) => allocationIndex !== index),
+    }));
+    if (removed) {
+      setAvailableAllocations((current) => [...current, removed]);
+    }
+  };
+
+  const isDirectPayment = (entry = openedEntry) =>
+    Boolean(
+      entry &&
+        ["cheque", "cash", "bank_transfer"].includes(entry.source) &&
+        entry.payment_records?.[0] &&
+        !entry.payment_records[0].settlement_type,
+    );
+
+  const isSettlement = (entry = openedEntry) =>
+    Boolean(
+      entry &&
+        ["receipt", "supplier_payment"].includes(entry.source) &&
+        entry.payment_records?.[0]?.settlement_type === entry.source,
+    );
+
+  const canEditEntry = (entry = openedEntry) =>
+    Boolean(
+      entry?.status === "posted" &&
+        (entry.source === "manual" || isDirectPayment(entry) || isSettlement(entry)),
+    );
 
   const saveEntry = async (event) => {
     event.preventDefault();
     if (
       !openedEntry ||
       !entryForm ||
-      openedEntry.source !== "manual" ||
-      openedEntry.status !== "posted"
+      !canEditEntry()
     ) return;
     setEntryBusy(true);
     setEntryError("");
@@ -439,6 +585,17 @@ const QuickReport = ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...entryForm,
+            payment: entryForm.payment
+              ? {
+                  paymentType: entryForm.payment.paymentType,
+                  payee: entryForm.payment.payee,
+                  memo: entryForm.payment.memo,
+                }
+              : undefined,
+            allocations: entryForm.allocations?.map((allocation) => ({
+              documentId: allocation.documentId,
+              amount: Number(allocation.amount),
+            })),
             page: `${window.location.pathname} — ${accountName}`,
           }),
         },
@@ -601,7 +758,7 @@ const QuickReport = ({
       ) : null}
 
       <p className="px-3 py-2 text-xs text-slate-500 print:hidden">
-        Double-click a transaction to open its ledger entry. Only manual journal entries can be changed or voided.
+        Double-click a transaction to open its ledger entry. Manual journals, direct payments, receipts, and supplier payments can be edited with their linked records.
       </p>
       <div className="quick-report-table-wrap overflow-x-auto print:overflow-visible">
         <table className="w-full min-w-[860px] text-left print:min-w-0">
@@ -719,7 +876,11 @@ const QuickReport = ({
                 <p className="text-sm text-slate-500">
                   {openedEntry?.source === "manual"
                     ? "Manual journal entry"
-                    : "System-generated entry · read-only"}
+                    : isDirectPayment()
+                      ? "Direct payment and linked ledger posting"
+                      : isSettlement()
+                        ? "Settlement and linked invoice/bill allocations"
+                        : "System-generated entry · read-only"}
                 </p>
               </div>
               <button
@@ -751,7 +912,7 @@ const QuickReport = ({
                       className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
                       type="date"
                       value={entryForm.entryDate}
-                      disabled={openedEntry.source !== "manual" || entryBusy}
+                      disabled={!canEditEntry() || entryBusy}
                       onChange={(event) => updateEntryForm("entryDate", event.target.value)}
                       required
                     />
@@ -761,7 +922,7 @@ const QuickReport = ({
                     <input
                       className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
                       value={entryForm.reference}
-                      disabled={openedEntry.source !== "manual" || entryBusy}
+                      disabled={!canEditEntry() || entryBusy}
                       onChange={(event) => updateEntryForm("reference", event.target.value)}
                     />
                   </label>
@@ -770,12 +931,158 @@ const QuickReport = ({
                     <input
                       className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
                       value={entryForm.description}
-                      disabled={openedEntry.source !== "manual" || entryBusy}
+                      disabled={!canEditEntry() || entryBusy}
                       onChange={(event) => updateEntryForm("description", event.target.value)}
                       required
                     />
                   </label>
                 </div>
+                {entryForm.payment && canEditEntry() ? (
+                  <section className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                      Payment details
+                    </h3>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="text-sm font-medium">
+                        Method
+                        <select
+                          className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2"
+                          value={entryForm.payment.paymentType}
+                          disabled={entryBusy}
+                          onChange={(event) => updatePayment("paymentType", event.target.value)}
+                        >
+                          <option value="bank_transfer">Bank transfer</option>
+                          <option value="cash">Cash</option>
+                          <option value="cheque">Cheque</option>
+                        </select>
+                      </label>
+                      {isDirectPayment() ? (
+                        <label className="text-sm font-medium">
+                          Payee
+                          <input
+                            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                            value={entryForm.payment.payee}
+                            disabled={entryBusy}
+                            onChange={(event) => updatePayment("payee", event.target.value)}
+                            required
+                          />
+                        </label>
+                      ) : (
+                        <label className="text-sm font-medium">
+                          Party
+                          <input
+                            className="mt-1 w-full rounded border border-slate-300 bg-slate-100 px-3 py-2"
+                            value={entryForm.payment.payee}
+                            readOnly
+                          />
+                        </label>
+                      )}
+                      <label className="text-sm font-medium">
+                        Linked cash/bank account
+                        <input
+                          className="mt-1 w-full rounded border border-slate-300 bg-slate-100 px-3 py-2"
+                          value={entryForm.payment.bankAccount}
+                          readOnly
+                        />
+                      </label>
+                      <label className="text-sm font-medium md:col-span-3">
+                        Payment memo
+                        <input
+                          className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                          value={entryForm.payment.memo}
+                          disabled={entryBusy}
+                          onChange={(event) => updatePayment("memo", event.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </section>
+                ) : null}
+                {isSettlement() && canEditEntry() ? (
+                  <section className="mt-4 rounded border border-slate-200 p-3">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800">
+                          Linked {openedEntry.source === "receipt" ? "invoices" : "supplier bills"}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Allocation changes update document balances and the linked journal posting together.
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold">
+                        Total: {formatMoney(
+                          entryForm.allocations.reduce(
+                            (total, allocation) => total + Number(allocation.amount || 0),
+                            0,
+                          ),
+                          entryForm.payment.currency,
+                        )}
+                      </span>
+                    </div>
+                    {allocationLookupError ? (
+                      <p className="mb-3 text-xs text-amber-800" role="status">
+                        {allocationLookupError}
+                      </p>
+                    ) : null}
+                    <div className="space-y-2">
+                      {entryForm.allocations.map((allocation, index) => (
+                        <div
+                          key={`${allocation.documentId}-${index}`}
+                          className="grid items-center gap-2 rounded bg-slate-50 p-2 md:grid-cols-[1fr_180px_auto]"
+                        >
+                          <span className="text-sm font-medium">{allocation.label}</span>
+                          <label className="text-xs text-slate-600">
+                            Amount
+                            <input
+                              className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-right text-sm"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={allocation.amount}
+                              disabled={entryBusy}
+                              onChange={(event) =>
+                                updateAllocation(index, "amount", event.target.value)
+                              }
+                              required
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-red-700 disabled:opacity-50"
+                            disabled={entryBusy || entryForm.allocations.length <= 1}
+                            onClick={() => removeAllocation(index)}
+                          >
+                            Remove link
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    {availableAllocations.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <select
+                          className="min-w-64 rounded border border-slate-300 px-3 py-2 text-sm"
+                          value={availableAllocationId}
+                          disabled={entryBusy}
+                          onChange={(event) => setAvailableAllocationId(event.target.value)}
+                        >
+                          <option value="">Add an open document…</option>
+                          {availableAllocations.map((allocation) => (
+                            <option key={allocation.documentId} value={allocation.documentId}>
+                              {allocation.label} · {formatMoney(allocation.amount, entryForm.payment.currency)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                          disabled={entryBusy || !availableAllocationId}
+                          onClick={addAllocation}
+                        >
+                          Add document link
+                        </button>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-[700px] text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
@@ -784,50 +1091,68 @@ const QuickReport = ({
                         <th className="px-2 py-2 text-right">Debit</th>
                         <th className="px-2 py-2 text-right">Credit</th>
                         <th className="px-2 py-2">Memo</th>
-                        {openedEntry.source === "manual" ? <th /> : null}
+                        {openedEntry.source === "manual" || isDirectPayment() ? <th /> : null}
                       </tr>
                     </thead>
                     <tbody>
-                      {entryForm.lines.map((line, index) => (
-                        <tr key={`${openedEntry.id}-${index}`} className="border-t border-slate-100">
-                          {["account", "debit", "credit", "memo"].map((key) => (
-                            <td key={key} className="px-2 py-2">
-                              <input
-                                className={`w-full rounded border border-slate-300 px-2 py-1.5 ${key === "debit" || key === "credit" ? "text-right" : ""}`}
-                                aria-label={`${key} for journal line ${index + 1}`}
-                                type={key === "debit" || key === "credit" ? "number" : "text"}
-                                min={key === "debit" || key === "credit" ? "0" : undefined}
-                                step={key === "debit" || key === "credit" ? "0.01" : undefined}
-                                value={line[key]}
-                                disabled={openedEntry.source !== "manual" || entryBusy}
-                                onChange={(event) => updateEntryLine(index, key, event.target.value)}
-                                required={key === "account"}
-                              />
-                            </td>
-                          ))}
-                          {openedEntry.source === "manual" ? (
-                            <td className="px-2 py-2">
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-red-700 disabled:opacity-50"
-                                disabled={entryBusy || entryForm.lines.length <= 2}
-                                onClick={() =>
-                                  setEntryForm((current) => ({
-                                    ...current,
-                                    lines: current.lines.filter((_, lineIndex) => lineIndex !== index),
-                                  }))
-                                }
-                              >
-                                Remove
-                              </button>
-                            </td>
-                          ) : null}
-                        </tr>
-                      ))}
+                      {entryForm.lines.map((line, index) => {
+                        const directPayment = isDirectPayment();
+                        const linkedCashLine =
+                          directPayment &&
+                          line.account === openedEntry.payment_records[0].bank_account;
+                        return (
+                          <tr key={`${openedEntry.id}-${index}`} className="border-t border-slate-100">
+                            {["account", "debit", "credit", "memo"].map((key) => (
+                              <td key={key} className="px-2 py-2">
+                                <input
+                                  className={`w-full rounded border border-slate-300 px-2 py-1.5 ${key === "debit" || key === "credit" ? "text-right" : ""}`}
+                                  aria-label={`${key} for journal line ${index + 1}`}
+                                  type={key === "debit" || key === "credit" ? "number" : "text"}
+                                  min={key === "debit" || key === "credit" ? "0" : undefined}
+                                  step={key === "debit" || key === "credit" ? "0.01" : undefined}
+                                  value={line[key]}
+                                  disabled={
+                                    !canEditEntry() ||
+                                    entryBusy ||
+                                    isSettlement() ||
+                                    (directPayment &&
+                                      (key === "credit" ||
+                                          (key === "account" && linkedCashLine) ||
+                                          (key === "debit" && linkedCashLine)))
+                                  }
+                                  onChange={(event) => updateEntryLine(index, key, event.target.value)}
+                                  required={key === "account" && !isSettlement()}
+                                />
+                              </td>
+                            ))}
+                            {openedEntry.source === "manual" || directPayment ? (
+                              <td className="px-2 py-2">
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-red-700 disabled:opacity-50"
+                                  disabled={
+                                    entryBusy ||
+                                    entryForm.lines.length <= 2 ||
+                                    (directPayment && linkedCashLine)
+                                  }
+                                  onClick={() =>
+                                    setEntryForm((current) => ({
+                                      ...current,
+                                      lines: current.lines.filter((_, lineIndex) => lineIndex !== index),
+                                    }))
+                                  }
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            ) : null}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
-                {openedEntry.source === "manual" ? (
+                {openedEntry.source === "manual" || isDirectPayment() ? (
                   <div className="mt-4 flex flex-wrap justify-between gap-3">
                     <button
                       type="button"
@@ -846,22 +1171,34 @@ const QuickReport = ({
                       Add line
                     </button>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="rounded border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
-                        disabled={entryBusy || openedEntry.status !== "posted"}
-                        onClick={voidEntry}
-                      >
-                        {entryBusy ? "Saving…" : "Void entry"}
-                      </button>
+                      {openedEntry.source === "manual" ? (
+                        <button
+                          type="button"
+                          className="rounded border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                          disabled={entryBusy || openedEntry.status !== "posted"}
+                          onClick={voidEntry}
+                        >
+                          {entryBusy ? "Saving…" : "Void entry"}
+                        </button>
+                      ) : null}
                       <button
                         type="submit"
                         className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                        disabled={entryBusy || openedEntry.status !== "posted"}
+                        disabled={entryBusy || !canEditEntry()}
                       >
                         {entryBusy ? "Saving…" : "Save changes"}
                       </button>
                     </div>
+                  </div>
+                ) : isSettlement() && canEditEntry() ? (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      disabled={entryBusy || !canEditEntry()}
+                    >
+                      {entryBusy ? "Saving…" : "Save payment and allocation changes"}
+                    </button>
                   </div>
                 ) : null}
               </form>

@@ -2981,7 +2981,7 @@ router.get("/api/journal", async (req, res) => {
       const { data: entry, error: entryError } = await supabase
         .from("journal_entries")
         .select(
-          "id, entry_date, reference, description, source, status, journal_lines(id, account, debit, credit, memo, supplier_id, customer_id, employee_id), payment_records(id, payment_type, payment_number, payee, amount)",
+          "id, entry_date, reference, description, source, status, journal_lines(id, account, debit, credit, memo, supplier_id, customer_id, employee_id), payment_records(id, payment_type, payment_number, payment_date, payee, bank_account, cash_bank_account_id, amount, memo, settlement_type, customer_id, supplier_id, currency, payment_allocations(id, amount, customer_invoice_id, supplier_bill_id, customer_invoice:customer_invoices(id, invoice_number, currency), supplier_bill:supplier_bills(id, reference, currency, document_type)))",
         )
         .eq("id", entryId)
         .maybeSingle();
@@ -3035,6 +3035,12 @@ router.post("/api/journal", async (req, res) => {
     const description = String(req.body?.description || "").trim();
     const reference = String(req.body?.reference || "").trim() || null;
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const rawAllocations = Array.isArray(req.body?.allocations)
+      ? req.body.allocations
+      : [];
+    const rawPayment = req.body?.payment && typeof req.body.payment === "object"
+      ? req.body.payment
+      : {};
     const hasInvalidParty = lines.some((line) => {
       const partyType = String(line.partyType || "").trim();
       const partyId = line.partyId;
@@ -3193,10 +3199,9 @@ router.patch("/api/journal", async (req, res) => {
       !/^\d{4}-\d{2}-\d{2}$/.test(entryDate) ||
       Number.isNaN(parsedEntryDate.getTime()) ||
       parsedEntryDate.toISOString().slice(0, 10) !== entryDate ||
-      !description ||
-      lines.length < 2
+      !description
     )
-      return res.status(400).json({ message: "Date, description, and at least two journal lines are required" });
+      return res.status(400).json({ message: "Enter a valid date and description" });
 
     const normalizedLines = lines.map((line) => {
       const debit = Number(line.debit || 0);
@@ -3234,18 +3239,68 @@ router.patch("/api/journal", async (req, res) => {
     if (normalizedLines.some((line) => line === null))
       return res.status(400).json({ message: "One or more journal lines are invalid" });
 
-    const debitTotal = normalizedLines.reduce((sum, line) => sum + line.debit, 0);
-    const creditTotal = normalizedLines.reduce((sum, line) => sum + line.credit, 0);
-    if (Math.abs(debitTotal - creditTotal) > 0.005)
-      return res.status(400).json({ message: "Debits and credits must balance" });
+    if (lines.length && lines.length < 2)
+      return res.status(400).json({ message: "At least two journal lines are required" });
+    if (normalizedLines.length) {
+      const debitTotal = normalizedLines.reduce((sum, line) => sum + line.debit, 0);
+      const creditTotal = normalizedLines.reduce((sum, line) => sum + line.credit, 0);
+      if (Math.abs(debitTotal - creditTotal) > 0.005)
+        return res.status(400).json({ message: "Debits and credits must balance" });
+    }
+
+    if (
+      rawPayment.paymentType !== undefined &&
+      !["cheque", "cash", "bank_transfer"].includes(rawPayment.paymentType)
+    ) {
+      return res.status(400).json({ message: "Select cheque, cash, or bank transfer" });
+    }
+    if (
+      rawPayment.payee !== undefined &&
+      (!String(rawPayment.payee).trim() || String(rawPayment.payee).trim().length > 200)
+    ) {
+      return res.status(400).json({ message: "Enter a valid payee name" });
+    }
+    if (
+      rawPayment.memo !== undefined &&
+      String(rawPayment.memo).trim().length > 5000
+    ) {
+      return res.status(400).json({ message: "Payment memo is too long" });
+    }
+    const allocations = rawAllocations.map((allocation) => ({
+      documentId: Number(allocation?.documentId),
+      amount: Number(allocation?.amount),
+    }));
+    if (
+      allocations.length > 100 ||
+      allocations.some(
+        (allocation) =>
+          !Number.isSafeInteger(allocation.documentId) ||
+          allocation.documentId < 1 ||
+          !Number.isFinite(allocation.amount) ||
+          allocation.amount <= 0 ||
+          Math.round(allocation.amount * 100) !== allocation.amount * 100,
+      ) ||
+      new Set(allocations.map((allocation) => allocation.documentId)).size !==
+        allocations.length
+    ) {
+      return res.status(400).json({ message: "One or more payment allocations are invalid" });
+    }
 
     const actorName = await getAccountingActorName(currentUser);
-    const { error } = await supabase.rpc("update_manual_journal_entry", {
+    const { error } = await supabase.rpc("update_user_entered_journal_entry", {
       p_entry_id: entryId,
-      p_entry_date: entryDate,
-      p_reference: reference || null,
-      p_description: description,
-      p_lines: normalizedLines,
+      p_payload: {
+        entryDate,
+        reference: reference || null,
+        description,
+        lines: normalizedLines,
+        payment: {
+          paymentType: rawPayment.paymentType,
+          payee: String(rawPayment.payee || "").trim(),
+          memo: String(rawPayment.memo || "").trim(),
+        },
+        allocations,
+      },
       p_actor_id: currentUser.id,
       p_actor_name: actorName,
       p_page: String(req.body?.page || "").trim().slice(0, 200) || "Ledger report",
