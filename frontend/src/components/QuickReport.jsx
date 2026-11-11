@@ -376,9 +376,10 @@ const QuickReport = ({
     setOpenedEntry(null);
     setEntryLoading(true);
     try {
-      const response = await fetch(getApiUrl(`/api/journal/${row.entryId}`), {
-        credentials: "include",
-      });
+      const response = await fetch(
+        getApiUrl(`/api/journal?id=${encodeURIComponent(row.entryId)}`),
+        { credentials: "include" },
+      );
       const result = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(result.message || "Unable to open journal entry");
@@ -431,7 +432,7 @@ const QuickReport = ({
     setEntryError("");
     try {
       const response = await fetch(
-        getApiUrl(`/api/journal/${openedEntry.id}`),
+        getApiUrl(`/api/journal?id=${encodeURIComponent(openedEntry.id)}`),
         {
           method: "PATCH",
           credentials: "include",
@@ -470,7 +471,7 @@ const QuickReport = ({
     setEntryError("");
     try {
       const response = await fetch(
-        getApiUrl(`/api/journal/${openedEntry.id}`),
+        getApiUrl(`/api/journal?id=${encodeURIComponent(openedEntry.id)}`),
         {
           method: "DELETE",
           credentials: "include",

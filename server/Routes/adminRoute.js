@@ -2973,6 +2973,24 @@ router.get("/api/journal", async (req, res) => {
     const { allowed } = await canUseAccounting(req);
     if (!allowed)
       return res.status(403).json({ message: "Journal permission required" });
+    if (req.query?.id !== undefined) {
+      const entryId = Number(req.query.id);
+      if (!Number.isSafeInteger(entryId) || entryId < 1)
+        return res.status(400).json({ message: "Invalid journal entry ID" });
+
+      const { data: entry, error: entryError } = await supabase
+        .from("journal_entries")
+        .select(
+          "id, entry_date, reference, description, source, status, journal_lines(id, account, debit, credit, memo, supplier_id, customer_id, employee_id), payment_records(id, payment_type, payment_number, payee, amount)",
+        )
+        .eq("id", entryId)
+        .maybeSingle();
+      if (entryError) throw entryError;
+      if (!entry)
+        return res.status(404).json({ message: "Journal entry not found" });
+      return res.json({ entry });
+    }
+
     const status = String(req.query?.status || "");
     if (status && !["draft", "posted"].includes(status)) {
       return res.status(400).json({ message: "Invalid journal status" });
@@ -3005,33 +3023,6 @@ router.get("/api/journal", async (req, res) => {
     return res
       .status(500)
       .json({ message: error?.message || "Unable to load journal entries" });
-  }
-});
-
-router.get("/api/journal/:id", async (req, res) => {
-  try {
-    const { allowed } = await canUseAccounting(req);
-    if (!allowed)
-      return res.status(403).json({ message: "Journal permission required" });
-    const entryId = Number(req.params.id);
-    if (!Number.isSafeInteger(entryId) || entryId < 1)
-      return res.status(400).json({ message: "Invalid journal entry ID" });
-
-    const { data, error } = await supabase
-      .from("journal_entries")
-      .select(
-        "id, entry_date, reference, description, source, status, journal_lines(id, account, debit, credit, memo, supplier_id, customer_id, employee_id), payment_records(id, payment_type, payment_number, payee, amount)",
-      )
-      .eq("id", entryId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return res.status(404).json({ message: "Journal entry not found" });
-    return res.json({ entry: data });
-  } catch (error) {
-    console.error("Journal entry lookup error:", error);
-    return res
-      .status(500)
-      .json({ message: error?.message || "Unable to load journal entry" });
   }
 });
 
@@ -3185,12 +3176,12 @@ router.post("/api/journal", async (req, res) => {
   }
 });
 
-router.patch("/api/journal/:id", async (req, res) => {
+router.patch("/api/journal", async (req, res) => {
   try {
     const { currentUser, allowed } = await canUseAccounting(req);
     if (!allowed)
       return res.status(403).json({ message: "Journal permission required" });
-    const entryId = Number(req.params.id);
+    const entryId = Number(req.query?.id);
     const entryDate = String(req.body?.entryDate || "").trim();
     const description = String(req.body?.description || "").trim();
     const reference = String(req.body?.reference || "").trim();
@@ -3269,12 +3260,12 @@ router.patch("/api/journal/:id", async (req, res) => {
   }
 });
 
-router.delete("/api/journal/:id", async (req, res) => {
+router.delete("/api/journal", async (req, res) => {
   try {
     const { currentUser, allowed } = await canUseAccounting(req);
     if (!allowed)
       return res.status(403).json({ message: "Journal permission required" });
-    const entryId = Number(req.params.id);
+    const entryId = Number(req.query?.id);
     if (!Number.isSafeInteger(entryId) || entryId < 1)
       return res.status(400).json({ message: "Invalid journal entry ID" });
 
