@@ -2147,16 +2147,20 @@ router.post("/api/customer-invoices", async (req, res) => {
 
     const { data: account, error: accountError } = await supabase
       .from("ledger_accounts")
-      .select("id, code, name")
+      .select("id, code, name, group_ledger")
       .eq("id", accountId)
       .eq("is_active", true)
       .eq("account_type", "asset")
+      .ilike("group_ledger", "Account Receivable")
       .maybeSingle();
     if (accountError) throw accountError;
     if (!account)
       return res
         .status(400)
-        .json({ message: "Choose an active receivable account" });
+        .json({
+          message:
+            "Choose an active ledger account from the Account Receivable group",
+        });
 
     const incomeAccountIds = [
       ...new Set(normalizedLines.map((line) => line.income_account_id)),

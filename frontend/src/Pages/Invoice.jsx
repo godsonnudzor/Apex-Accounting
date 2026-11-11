@@ -50,14 +50,20 @@ function Invoice() {
 
       setCustomers(customerResult.customers || []);
       setAccounts(accountResult.accounts || []);
+      const receivableAccounts = (accountResult.accounts || []).filter(
+        (account) =>
+          account.account_type === "asset" &&
+          String(account.group_ledger || "").trim().toLowerCase() ===
+            "account receivable",
+      );
       setInvoice((current) => ({
         ...current,
         account:
-          current.account && (accountResult.accounts || []).some(
+          current.account && receivableAccounts.some(
             (account) => String(account.id) === String(current.account),
           )
             ? current.account
-            : String((accountResult.accounts || []).find((account) => account.account_type === "asset")?.id || ""),
+            : String(receivableAccounts[0]?.id || ""),
       }));
     };
 
@@ -74,6 +80,12 @@ function Invoice() {
         0,
       ),
     [lines],
+  );
+  const receivableAccounts = accounts.filter(
+    (account) =>
+      account.account_type === "asset" &&
+      String(account.group_ledger || "").trim().toLowerCase() ===
+        "account receivable",
   );
   const selectedCustomer = customers.find((customer) => String(customer.id) === String(invoice.customerId));
 
@@ -136,8 +148,16 @@ function Invoice() {
       setLookupError("Select a customer before saving this invoice.");
       return;
     }
-    if (!invoice.account) {
-      setLookupError("Select a receivable account before saving this invoice.");
+    if (
+      !receivableAccounts.some(
+        (account) => String(account.id) === String(invoice.account),
+      )
+    ) {
+      setLookupError(
+        receivableAccounts.length
+          ? "Select an account from the Account Receivable group."
+          : "No active Account Receivable ledger is available. Create one in Chart of Accounts before saving this invoice.",
+      );
       return;
     }
     if (!enteredLines.length || enteredLines.some((line) => (
@@ -281,15 +301,25 @@ function Invoice() {
           name="account"
           value={invoice.account}
           onChange={updateInvoice}
+          disabled={lookupLoading || receivableAccounts.length === 0}
           aria-label="Receivable account"
         >
-          <option value="">{lookupLoading ? "Loading ledger accounts..." : "Select ledger account"}</option>
-          {accounts.filter((account) => account.account_type === "asset").map((account) => (
+          <option value="">
+            {lookupLoading
+              ? "Loading receivable accounts..."
+              : receivableAccounts.length
+                ? "Select Accounts Receivable ledger"
+                : "No Accounts Receivable ledger available"}
+          </option>
+          {receivableAccounts.map((account) => (
             <option key={account.id} value={account.id}>
               {account.code} - {account.name}
             </option>
           ))}
         </select>
+        <p className="invoice-help">
+          Cash and bank accounts, including UBA, are selected when recording a customer receipt.
+        </p>
         <label>TEMPLATE</label>
         <select
           name="template"
