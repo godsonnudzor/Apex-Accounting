@@ -38,6 +38,7 @@ import { bracketsLoader } from "./routes/brackets";
 import TaxDataTable from "./components/TaxDataTable";
 import { useLoaderData } from "react-router-dom";
 import GroupAccount from "./Pages/GroupAccount";
+import AuditTrail from "./Pages/AuditTrail";
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
@@ -214,6 +215,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="writeCheque">
         <Journal />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/audit-trail",
+    element: (
+      <PermissionRoute permission="writeCheque">
+        <AuditTrail />
       </PermissionRoute>
     ),
   },

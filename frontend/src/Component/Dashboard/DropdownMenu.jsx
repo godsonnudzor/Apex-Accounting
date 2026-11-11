@@ -11,6 +11,7 @@ const MENU = [
       { label: "Chart of Accounts", href: "/chart-of-accounts", permissions: ["writeCheque"] },
       { label: "Create Ledger Account", href: "/ledger-accounts/new", permissions: ["writeCheque"] },
       { label: "Journal Entries", href: "/journal", permissions: ["writeCheque"] },
+      { label: "Audit Trail", href: "/audit-trail", permissions: ["writeCheque"] },
       { label: "Group Ledgers", href: "/GroupAccount", permissions: ["groupAccount"] },
     ],
   },

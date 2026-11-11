@@ -805,6 +805,25 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
   };
 };
 
+const getAccountingActorName = async (user) => {
+  const { data, error } = await supabase
+    .from("users")
+    .select("name, email")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.name || data?.email || user.email || "Unknown user";
+};
+
+const getJournalMutationErrorStatus = (error) => {
+  if (error?.code === "P0001" && /not found/i.test(error.message || "")) {
+    return 404;
+  }
+  if (error?.code === "P0001") return 409;
+  if (["22P02", "23503", "23514"].includes(error?.code)) return 400;
+  return 500;
+};
+
 router.get("/api/ledger/accounts", async (req, res) => {
   try {
     if (req.query?.resource === "groups") {
@@ -2469,7 +2488,7 @@ router.get("/api/reports/financial/details", async (req, res) => {
     const { data: entries, error } = await supabase
       .from("journal_entries")
       .select(
-        "id, entry_date, reference, description, source, journal_lines(account, debit, credit, memo, supplier_id, customer_id, employee_id, supplier:suppliers(name), customer:customers(name), employee:employees(first_name, last_name, users(name))), payment_records(payee)",
+        "id, entry_date, reference, description, source, journal_lines(id, account, debit, credit, memo, supplier_id, customer_id, employee_id, supplier:suppliers(name), customer:customers(name), employee:employees(first_name, last_name, users(name))), payment_records(payee)",
       )
       .eq("status", "posted")
       .order("entry_date", { ascending: false })
@@ -2989,6 +3008,33 @@ router.get("/api/journal", async (req, res) => {
   }
 });
 
+router.get("/api/journal/:id", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Journal permission required" });
+    const entryId = Number(req.params.id);
+    if (!Number.isSafeInteger(entryId) || entryId < 1)
+      return res.status(400).json({ message: "Invalid journal entry ID" });
+
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .select(
+        "id, entry_date, reference, description, source, status, journal_lines(id, account, debit, credit, memo, supplier_id, customer_id, employee_id), payment_records(id, payment_type, payment_number, payee, amount)",
+      )
+      .eq("id", entryId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ message: "Journal entry not found" });
+    return res.json({ entry: data });
+  } catch (error) {
+    console.error("Journal entry lookup error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to load journal entry" });
+  }
+});
+
 router.post("/api/journal", async (req, res) => {
   try {
     const { currentUser, allowed } = await canUseAccounting(req);
@@ -3136,6 +3182,138 @@ router.post("/api/journal", async (req, res) => {
     return res
       .status(500)
       .json({ message: error?.message || "Unable to save journal entry" });
+  }
+});
+
+router.patch("/api/journal/:id", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Journal permission required" });
+    const entryId = Number(req.params.id);
+    const entryDate = String(req.body?.entryDate || "").trim();
+    const description = String(req.body?.description || "").trim();
+    const reference = String(req.body?.reference || "").trim();
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const parsedEntryDate = new Date(`${entryDate}T00:00:00.000Z`);
+    if (!Number.isSafeInteger(entryId) || entryId < 1)
+      return res.status(400).json({ message: "Invalid journal entry ID" });
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(entryDate) ||
+      Number.isNaN(parsedEntryDate.getTime()) ||
+      parsedEntryDate.toISOString().slice(0, 10) !== entryDate ||
+      !description ||
+      lines.length < 2
+    )
+      return res.status(400).json({ message: "Date, description, and at least two journal lines are required" });
+
+    const normalizedLines = lines.map((line) => {
+      const debit = Number(line.debit || 0);
+      const credit = Number(line.credit || 0);
+      const partyIds = ["supplier_id", "customer_id", "employee_id"].map(
+        (key) => line[key] === "" || line[key] === undefined || line[key] === null
+          ? null
+          : Number(line[key]),
+      );
+      if (
+        !String(line.account || "").trim() ||
+        !Number.isFinite(debit) ||
+        !Number.isFinite(credit) ||
+        debit < 0 ||
+        credit < 0 ||
+        Math.abs(debit * 100 - Math.round(debit * 100)) > 0.00001 ||
+        Math.abs(credit * 100 - Math.round(credit * 100)) > 0.00001 ||
+        (debit > 0 && credit > 0) ||
+        (debit === 0 && credit === 0) ||
+        partyIds.filter((id) => id !== null).length > 1 ||
+        partyIds.some((id) => id !== null && (!Number.isSafeInteger(id) || id < 1))
+      ) {
+        return null;
+      }
+      return {
+        account: String(line.account).trim(),
+        debit,
+        credit,
+        memo: String(line.memo || "").trim() || null,
+        supplier_id: partyIds[0],
+        customer_id: partyIds[1],
+        employee_id: partyIds[2],
+      };
+    });
+    if (normalizedLines.some((line) => line === null))
+      return res.status(400).json({ message: "One or more journal lines are invalid" });
+
+    const debitTotal = normalizedLines.reduce((sum, line) => sum + line.debit, 0);
+    const creditTotal = normalizedLines.reduce((sum, line) => sum + line.credit, 0);
+    if (Math.abs(debitTotal - creditTotal) > 0.005)
+      return res.status(400).json({ message: "Debits and credits must balance" });
+
+    const actorName = await getAccountingActorName(currentUser);
+    const { error } = await supabase.rpc("update_manual_journal_entry", {
+      p_entry_id: entryId,
+      p_entry_date: entryDate,
+      p_reference: reference || null,
+      p_description: description,
+      p_lines: normalizedLines,
+      p_actor_id: currentUser.id,
+      p_actor_name: actorName,
+      p_page: String(req.body?.page || "").trim().slice(0, 200) || "Ledger report",
+    });
+    if (error) throw error;
+    return res.json({ message: "Journal entry updated" });
+  } catch (error) {
+    console.error("Journal update error:", error);
+    return res
+      .status(getJournalMutationErrorStatus(error))
+      .json({ message: error?.message || "Unable to update journal entry" });
+  }
+});
+
+router.delete("/api/journal/:id", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Journal permission required" });
+    const entryId = Number(req.params.id);
+    if (!Number.isSafeInteger(entryId) || entryId < 1)
+      return res.status(400).json({ message: "Invalid journal entry ID" });
+
+    const actorName = await getAccountingActorName(currentUser);
+    const { error } = await supabase.rpc("void_manual_journal_entry", {
+      p_entry_id: entryId,
+      p_actor_id: currentUser.id,
+      p_actor_name: actorName,
+      p_page: String(req.body?.page || "").trim().slice(0, 200) || "Ledger report",
+    });
+    if (error) throw error;
+    return res.json({ message: "Journal entry voided" });
+  } catch (error) {
+    console.error("Journal void error:", error);
+    return res
+      .status(getJournalMutationErrorStatus(error))
+      .json({ message: error?.message || "Unable to void journal entry" });
+  }
+});
+
+router.get("/api/audit-trail", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Audit trail permission required" });
+    const { data, error } = await supabase
+      .from("accounting_audit_trail")
+      .select(
+        "id, actor_name, action, entry_id, page, previous_values, new_values, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    return res.json({ events: data || [] });
+  } catch (error) {
+    console.error("Accounting audit trail lookup error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to load the audit trail" });
   }
 });
 

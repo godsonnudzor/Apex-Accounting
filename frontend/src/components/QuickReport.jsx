@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getApiUrl, readApiResponse } from "../context/auth";
 import QuickReportCustomize from "./QuickReportCustomize";
 
 const columns = [
@@ -162,6 +163,11 @@ const QuickReport = ({
   const [settings, setSettings] = useState(defaultSettings);
   const [customizing, setCustomizing] = useState(false);
   const [message, setMessage] = useState("");
+  const [openedEntry, setOpenedEntry] = useState(null);
+  const [entryForm, setEntryForm] = useState(null);
+  const [entryLoading, setEntryLoading] = useState(false);
+  const [entryBusy, setEntryBusy] = useState(false);
+  const [entryError, setEntryError] = useState("");
 
   useEffect(() => {
     setSettings(defaultSettings);
@@ -193,6 +199,8 @@ const QuickReport = ({
             : "";
           const row = {
             id: `${entry.id}-${lineIndex}`,
+            entryId: entry.id,
+            source: entry.source,
             type: String(entry.source || "Journal").replaceAll("_", " "),
             date: String(entry.entry_date || ""),
             number: entry.reference || `JE-${entry.id}`,
@@ -362,6 +370,131 @@ const QuickReport = ({
     )}&body=${encodeURIComponent(body)}`;
   };
 
+  const openEntry = async (row) => {
+    setEntryError("");
+    setEntryForm(null);
+    setOpenedEntry(null);
+    setEntryLoading(true);
+    try {
+      const response = await fetch(getApiUrl(`/api/journal/${row.entryId}`), {
+        credentials: "include",
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to open journal entry");
+      }
+      const entry = result.entry;
+      setOpenedEntry(entry);
+      setEntryForm({
+        entryDate: entry.entry_date || "",
+        reference: entry.reference || "",
+        description: entry.description || "",
+        lines: (entry.journal_lines || []).map((line) => ({
+          account: line.account || "",
+          debit: String(line.debit || ""),
+          credit: String(line.credit || ""),
+          memo: line.memo || "",
+          supplier_id: line.supplier_id,
+          customer_id: line.customer_id,
+          employee_id: line.employee_id,
+        })),
+      });
+    } catch (loadError) {
+      setEntryError(loadError.message);
+    } finally {
+      setEntryLoading(false);
+    }
+  };
+
+  const updateEntryForm = (key, value) => {
+    setEntryForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const updateEntryLine = (index, key, value) => {
+    setEntryForm((current) => ({
+      ...current,
+      lines: current.lines.map((line, lineIndex) =>
+        lineIndex === index ? { ...line, [key]: value } : line,
+      ),
+    }));
+  };
+
+  const saveEntry = async (event) => {
+    event.preventDefault();
+    if (
+      !openedEntry ||
+      !entryForm ||
+      openedEntry.source !== "manual" ||
+      openedEntry.status !== "posted"
+    ) return;
+    setEntryBusy(true);
+    setEntryError("");
+    try {
+      const response = await fetch(
+        getApiUrl(`/api/journal/${openedEntry.id}`),
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...entryForm,
+            page: `${window.location.pathname} — ${accountName}`,
+          }),
+        },
+      );
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to update journal entry");
+      }
+      setOpenedEntry(null);
+      setEntryForm(null);
+      setMessage(`Journal entry ${openedEntry.id} updated.`);
+      await onRefresh?.();
+    } catch (saveError) {
+      setEntryError(saveError.message);
+    } finally {
+      setEntryBusy(false);
+    }
+  };
+
+  const voidEntry = async () => {
+    if (
+      !openedEntry ||
+      openedEntry.source !== "manual" ||
+      openedEntry.status !== "posted" ||
+      !window.confirm("Void this manual journal entry? It will remain in the audit trail.")
+    ) {
+      return;
+    }
+    setEntryBusy(true);
+    setEntryError("");
+    try {
+      const response = await fetch(
+        getApiUrl(`/api/journal/${openedEntry.id}`),
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            page: `${window.location.pathname} — ${accountName}`,
+          }),
+        },
+      );
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to void journal entry");
+      }
+      setOpenedEntry(null);
+      setEntryForm(null);
+      setMessage(`Journal entry ${openedEntry.id} voided.`);
+      await onRefresh?.();
+    } catch (voidError) {
+      setEntryError(voidError.message);
+    } finally {
+      setEntryBusy(false);
+    }
+  };
+
   return (
     <section
       className="overflow-hidden border border-slate-300 bg-white text-slate-800 shadow-sm print:border-0 print:shadow-none"
@@ -466,6 +599,9 @@ const QuickReport = ({
         </header>
       ) : null}
 
+      <p className="px-3 py-2 text-xs text-slate-500 print:hidden">
+        Double-click a transaction to open its ledger entry. Only manual journal entries can be changed or voided.
+      </p>
       <div className="quick-report-table-wrap overflow-x-auto print:overflow-visible">
         <table className="w-full min-w-[860px] text-left print:min-w-0">
           <thead className="border-y border-slate-300 text-slate-600 print:table-header-group">
@@ -485,7 +621,16 @@ const QuickReport = ({
               <tr><td colSpan={activeColumns.length} className="px-3 py-8 text-center text-slate-500">Loading report...</td></tr>
             ) : rows.length ? (
               rows.map((row) => (
-                <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr
+                  key={row.id}
+                  className="cursor-pointer border-b border-slate-100 hover:bg-teal-50 focus:bg-teal-50"
+                  title="Double-click to open ledger entry"
+                  tabIndex={0}
+                  onDoubleClick={() => openEntry(row)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") openEntry(row);
+                  }}
+                >
                   {activeColumns.map(([key]) => (
                     <td
                       key={key}
@@ -547,6 +692,181 @@ const QuickReport = ({
           onApply={applySettings}
           onCancel={() => setCustomizing(false)}
         />
+      ) : null}
+      {openedEntry || entryLoading || entryError ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 print:hidden"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !entryBusy) {
+              setOpenedEntry(null);
+              setEntryError("");
+            }
+          }}
+        >
+          <section
+            className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white p-5 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-report-entry-title"
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="quick-report-entry-title" className="text-lg font-bold text-slate-900">
+                  Ledger entry {openedEntry?.reference || `#${openedEntry?.id || ""}`}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {openedEntry?.source === "manual"
+                    ? "Manual journal entry"
+                    : "System-generated entry · read-only"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-3 py-1 text-sm"
+                onClick={() => {
+                  setOpenedEntry(null);
+                  setEntryForm(null);
+                  setEntryError("");
+                }}
+                disabled={entryBusy}
+              >
+                Close
+              </button>
+            </div>
+            {entryLoading ? (
+              <p className="py-8 text-center text-slate-500">Loading ledger entry…</p>
+            ) : entryError ? (
+              <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                {entryError}
+              </p>
+            ) : null}
+            {openedEntry && entryForm ? (
+              <form onSubmit={saveEntry}>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="text-sm font-medium">
+                    Date
+                    <input
+                      className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                      type="date"
+                      value={entryForm.entryDate}
+                      disabled={openedEntry.source !== "manual" || entryBusy}
+                      onChange={(event) => updateEntryForm("entryDate", event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="text-sm font-medium">
+                    Reference
+                    <input
+                      className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                      value={entryForm.reference}
+                      disabled={openedEntry.source !== "manual" || entryBusy}
+                      onChange={(event) => updateEntryForm("reference", event.target.value)}
+                    />
+                  </label>
+                  <label className="text-sm font-medium">
+                    Description
+                    <input
+                      className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                      value={entryForm.description}
+                      disabled={openedEntry.source !== "manual" || entryBusy}
+                      onChange={(event) => updateEntryForm("description", event.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[700px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                      <tr>
+                        <th className="px-2 py-2">Account</th>
+                        <th className="px-2 py-2 text-right">Debit</th>
+                        <th className="px-2 py-2 text-right">Credit</th>
+                        <th className="px-2 py-2">Memo</th>
+                        {openedEntry.source === "manual" ? <th /> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entryForm.lines.map((line, index) => (
+                        <tr key={`${openedEntry.id}-${index}`} className="border-t border-slate-100">
+                          {["account", "debit", "credit", "memo"].map((key) => (
+                            <td key={key} className="px-2 py-2">
+                              <input
+                                className={`w-full rounded border border-slate-300 px-2 py-1.5 ${key === "debit" || key === "credit" ? "text-right" : ""}`}
+                                aria-label={`${key} for journal line ${index + 1}`}
+                                type={key === "debit" || key === "credit" ? "number" : "text"}
+                                min={key === "debit" || key === "credit" ? "0" : undefined}
+                                step={key === "debit" || key === "credit" ? "0.01" : undefined}
+                                value={line[key]}
+                                disabled={openedEntry.source !== "manual" || entryBusy}
+                                onChange={(event) => updateEntryLine(index, key, event.target.value)}
+                                required={key === "account"}
+                              />
+                            </td>
+                          ))}
+                          {openedEntry.source === "manual" ? (
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-red-700 disabled:opacity-50"
+                                disabled={entryBusy || entryForm.lines.length <= 2}
+                                onClick={() =>
+                                  setEntryForm((current) => ({
+                                    ...current,
+                                    lines: current.lines.filter((_, lineIndex) => lineIndex !== index),
+                                  }))
+                                }
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {openedEntry.source === "manual" ? (
+                  <div className="mt-4 flex flex-wrap justify-between gap-3">
+                    <button
+                      type="button"
+                      className="rounded border border-slate-300 px-3 py-2 text-sm"
+                      disabled={entryBusy}
+                      onClick={() =>
+                        setEntryForm((current) => ({
+                          ...current,
+                          lines: [
+                            ...current.lines,
+                            { account: "", debit: "", credit: "", memo: "" },
+                          ],
+                        }))
+                      }
+                    >
+                      Add line
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="rounded border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                        disabled={entryBusy || openedEntry.status !== "posted"}
+                        onClick={voidEntry}
+                      >
+                        {entryBusy ? "Saving…" : "Void entry"}
+                      </button>
+                      <button
+                        type="submit"
+                        className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        disabled={entryBusy || openedEntry.status !== "posted"}
+                      >
+                        {entryBusy ? "Saving…" : "Save changes"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </form>
+            ) : null}
+          </section>
+        </div>
       ) : null}
     </section>
   );
