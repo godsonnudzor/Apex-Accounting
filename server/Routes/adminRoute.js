@@ -3035,12 +3035,6 @@ router.post("/api/journal", async (req, res) => {
     const description = String(req.body?.description || "").trim();
     const reference = String(req.body?.reference || "").trim() || null;
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
-    const rawAllocations = Array.isArray(req.body?.allocations)
-      ? req.body.allocations
-      : [];
-    const rawPayment = req.body?.payment && typeof req.body.payment === "object"
-      ? req.body.payment
-      : {};
     const hasInvalidParty = lines.some((line) => {
       const partyType = String(line.partyType || "").trim();
       const partyId = line.partyId;
@@ -3192,6 +3186,13 @@ router.patch("/api/journal", async (req, res) => {
     const description = String(req.body?.description || "").trim();
     const reference = String(req.body?.reference || "").trim();
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const rawAllocations = Array.isArray(req.body?.allocations)
+      ? req.body.allocations
+      : [];
+    const rawPayment =
+      req.body?.payment && typeof req.body.payment === "object"
+        ? req.body.payment
+        : {};
     const parsedEntryDate = new Date(`${entryDate}T00:00:00.000Z`);
     if (!Number.isSafeInteger(entryId) || entryId < 1)
       return res.status(400).json({ message: "Invalid journal entry ID" });

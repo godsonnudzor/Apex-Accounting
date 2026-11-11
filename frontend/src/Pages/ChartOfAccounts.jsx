@@ -393,6 +393,7 @@ const ChartOfAccounts = () => {
               account={selectedAccount}
               entries={ledgerEntries}
               loading={ledgerLoading}
+              sourcePage="Chart of Accounts · Individual Ledger"
               onRefresh={() => openLedgerReport(selectedAccount)}
               onClose={() => setSelectedAccount(null)}
             />

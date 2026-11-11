@@ -253,6 +253,7 @@ const FinancialReports = ({ reportType = "profit-loss" }) => {
                   account={detailAccount}
                   entries={detail?.entries || []}
                   loading={detailLoading}
+                  sourcePage={`${reportTitle} report · ledger details`}
                   onRefresh={() => showLedgerDetails(detailAccount)}
                   onClose={() => {
                     setDetail(null);

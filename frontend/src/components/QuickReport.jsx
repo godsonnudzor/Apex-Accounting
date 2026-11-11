@@ -150,6 +150,7 @@ const QuickReport = ({
   account,
   entries = [],
   loading = false,
+  sourcePage = "Ledger report",
   onRefresh,
   onClose,
 }) => {
@@ -160,6 +161,7 @@ const QuickReport = ({
         "",
       );
   const reportKey = account?.code || accountName;
+  const originatingPage = `${sourcePage} — ${accountName}`;
   const [settings, setSettings] = useState(defaultSettings);
   const [customizing, setCustomizing] = useState(false);
   const [message, setMessage] = useState("");
@@ -596,7 +598,7 @@ const QuickReport = ({
               documentId: allocation.documentId,
               amount: Number(allocation.amount),
             })),
-            page: `${window.location.pathname} — ${accountName}`,
+            page: originatingPage,
           }),
         },
       );
@@ -634,7 +636,7 @@ const QuickReport = ({
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            page: `${window.location.pathname} — ${accountName}`,
+            page: originatingPage,
           }),
         },
       );
@@ -873,6 +875,9 @@ const QuickReport = ({
                 <h2 id="quick-report-entry-title" className="text-lg font-bold text-slate-900">
                   Ledger entry {openedEntry?.reference || `#${openedEntry?.id || ""}`}
                 </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Opened from: {originatingPage}
+                </p>
                 <p className="text-sm text-slate-500">
                   {openedEntry?.source === "manual"
                     ? "Manual journal entry"
