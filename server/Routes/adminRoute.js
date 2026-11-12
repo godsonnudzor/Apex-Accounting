@@ -3376,6 +3376,10 @@ router.post("/api/payments", async (req, res) => {
     const paymentType = String(req.body?.paymentType || "").trim();
     const payee = String(req.body?.payee || "").trim();
     const paymentDate = String(req.body?.paymentDate || "").trim();
+    const supplierId =
+      req.body?.supplierId === null || req.body?.supplierId === undefined
+        ? null
+        : Number(req.body.supplierId);
     const cashBankAccountId = Number(req.body?.cashBankAccountId);
     const amount = Number(req.body?.amount || 0);
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
@@ -3392,8 +3396,27 @@ router.post("/api/payments", async (req, res) => {
         .status(400)
         .json({
           message:
-            "Payment type, date, payee, cash or bank account, amount, and expense lines are required",
+            "Payment type, date, payee, cash or bank account, amount, and account lines are required",
         });
+    if (
+      supplierId !== null &&
+      (!Number.isSafeInteger(supplierId) || supplierId <= 0)
+    )
+      return res.status(400).json({ message: "Select a valid supplier" });
+    let supplier = null;
+    if (supplierId !== null) {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("id, name")
+        .eq("id", supplierId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data || data.name !== payee)
+        return res.status(400).json({
+          message: "The selected supplier does not match the payment payee",
+        });
+      supplier = data;
+    }
     const { data: cashBankAccount, error: cashBankAccountError } =
       await supabase
         .from("cash_bank_accounts")
@@ -3423,6 +3446,21 @@ router.post("/api/payments", async (req, res) => {
       return res
         .status(400)
         .json({ message: "Every payment line needs an account and amount" });
+    const { data: ledgerAccounts, error: ledgerAccountsError } = await supabase
+      .from("ledger_accounts")
+      .select("code, name, account_type")
+      .eq("is_active", true);
+    if (ledgerAccountsError) throw ledgerAccountsError;
+    const ledgerAccountByName = new Map(
+      (ledgerAccounts || []).map((account) => [
+        `${account.code} - ${account.name}`,
+        account,
+      ]),
+    );
+    if (normalizedLines.some((line) => !ledgerAccountByName.has(line.account)))
+      return res.status(400).json({
+        message: "Every payment line must use an active ledger account",
+      });
     const lineTotal = normalizedLines.reduce(
       (sum, line) => sum + line.debit,
       0,
@@ -3449,6 +3487,11 @@ router.post("/api/payments", async (req, res) => {
         ...normalizedLines.map((line) => ({
           ...line,
           journal_entry_id: entry.id,
+          supplier_id:
+            supplier &&
+            ledgerAccountByName.get(line.account)?.account_type === "liability"
+              ? supplier.id
+              : null,
         })),
         {
           journal_entry_id: entry.id,
@@ -3469,6 +3512,7 @@ router.post("/api/payments", async (req, res) => {
         payee,
         bank_account: linkedBankAccount,
         cash_bank_account_id: cashBankAccountId,
+        supplier_id: supplier?.id || null,
         amount,
         memo: req.body?.memo || null,
         created_by: currentUser.id,

@@ -72,10 +72,12 @@ function WriteCheque() {
     number: "",
     date: today,
     payee: "",
+    supplierId: null,
     address: "",
     memo: "",
     printLater: false,
   });
+  const [selectedPayee, setSelectedPayee] = useState("");
   const [splits, setSplits] = useState([
     emptySplit(),
     emptySplit(),
@@ -173,6 +175,24 @@ function WriteCheque() {
       [name]: type === "checkbox" ? checked : value,
     }));
   };
+  const updatePayee = (event) => {
+    const value = event.target.value;
+    const [type, id] = value.split(":");
+    const supplier =
+      type === "supplier"
+        ? suppliers.find((item) => String(item.id) === id)
+        : null;
+    const employee =
+      type === "employee"
+        ? employees.find((item) => String(item.id) === id)
+        : null;
+    setSelectedPayee(value);
+    setTransaction((current) => ({
+      ...current,
+      payee: supplier?.name || employee?.name || "",
+      supplierId: supplier?.id || null,
+    }));
+  };
   const updateSplit = (index, event) => {
     const { name, value } = event.target;
     setSplits((current) =>
@@ -190,9 +210,11 @@ function WriteCheque() {
       ...current,
       number: "",
       payee: "",
+      supplierId: null,
       address: "",
       memo: "",
     }));
+    setSelectedPayee("");
     setSplits([emptySplit(), emptySplit(), emptySplit()]);
     notify("Transaction cleared");
   };
@@ -215,6 +237,7 @@ function WriteCheque() {
           paymentNumber: transaction.number,
           paymentDate: transaction.date,
           payee: transaction.payee,
+          supplierId: transaction.supplierId,
           cashBankAccountId: Number(transaction.bank),
           bankAccount: linkedLedgerAccount
             ? `${linkedLedgerAccount.code} - ${linkedLedgerAccount.name}`
@@ -373,15 +396,15 @@ function WriteCheque() {
               PAY TO THE ORDER OF
               <select
                 name="payee"
-                value={transaction.payee}
-                onChange={updateTransaction}
+                value={selectedPayee}
+                onChange={updatePayee}
               >
                 <option value="">Select supplier or employee</option>
                 <optgroup label="Suppliers">
                   {suppliers.map((supplier) => (
                     <option
                       key={`supplier-${supplier.id}`}
-                      value={supplier.name}
+                      value={`supplier:${supplier.id}`}
                     >
                       {supplier.name}
                     </option>
@@ -391,7 +414,7 @@ function WriteCheque() {
                   {employees.map((employee) => (
                     <option
                       key={`employee-${employee.id}`}
-                      value={employee.name}
+                      value={`employee:${employee.id}`}
                     >
                       {employee.name}
                     </option>
@@ -424,7 +447,7 @@ function WriteCheque() {
           </div>
 
           <div className="cheque-section-bar">
-            <strong>Expenses</strong>
+            <strong>Account splits</strong>
             <span>{formatMoney(amount)}</span>
             <strong>Items</strong>
             <span>{formatMoney(amount)}</span>
@@ -432,7 +455,7 @@ function WriteCheque() {
           <div
             className="cheque-table"
             role="table"
-            aria-label="Cheque expense splits"
+            aria-label="Cheque account splits"
           >
             <div className="cheque-table-head">
               <span>ACCOUNT</span>
@@ -509,7 +532,7 @@ function WriteCheque() {
                 : "Needs account and amount"}
             </strong>
             <span>
-              Credit bank {formatMoney(amount)} | Debit expenses{" "}
+              Credit cash/bank {formatMoney(amount)} | Debit selected accounts{" "}
               {formatMoney(amount)}
             </span>
           </div>
@@ -540,7 +563,7 @@ function WriteCheque() {
               <h2>PAYEE DETAILS</h2>
               {(() => {
                 const supplier = suppliers.find(
-                  (item) => item.name === transaction.payee,
+                  (item) => String(item.id) === String(transaction.supplierId),
                 );
                 const employee = employees.find(
                   (item) => item.name === transaction.payee,
@@ -588,8 +611,8 @@ function WriteCheque() {
             <strong>-{formatMoney(amount)}</strong>
           </div>
           <div className="effect-row">
-            <span>Expense splits</span>
-            <strong>+{formatMoney(amount)}</strong>
+            <span>Debit account splits</span>
+            <strong>{formatMoney(amount)}</strong>
           </div>
           <hr />
           <h2>NOTES</h2>
