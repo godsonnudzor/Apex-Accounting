@@ -170,6 +170,8 @@ const QuickReport = ({
   const [entryLoading, setEntryLoading] = useState(false);
   const [entryBusy, setEntryBusy] = useState(false);
   const [entryError, setEntryError] = useState("");
+  const [ledgerAccounts, setLedgerAccounts] = useState([]);
+  const [ledgerAccountError, setLedgerAccountError] = useState("");
   const [availableAllocations, setAvailableAllocations] = useState([]);
   const [availableAllocationId, setAvailableAllocationId] = useState("");
   const [allocationLookupError, setAllocationLookupError] = useState("");
@@ -184,6 +186,25 @@ const QuickReport = ({
       setMessage(`Unable to load saved report settings: ${loadError.message}`);
     }
   }, [reportKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" })
+      .then(async (response) => {
+        const result = await readApiResponse(response);
+        if (!response.ok)
+          throw new Error(result.message || "Unable to load ledger accounts");
+        if (!Array.isArray(result.accounts))
+          throw new Error("Ledger accounts were not returned");
+        if (!cancelled) setLedgerAccounts(result.accounts);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setLedgerAccountError(loadError.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const sourceRows = useMemo(() => {
     const [fromDate, toDate] = getDateBounds(settings);
@@ -485,6 +506,21 @@ const QuickReport = ({
         lineIndex === index ? { ...line, [key]: value } : line,
       );
       if (isDirectPayment()) {
+        if (key === "account") {
+          const account = ledgerAccounts.find(
+            (item) => `${item.code} - ${item.name}` === value,
+          );
+          const payableAccount =
+            account?.account_type === "liability" &&
+            account?.group_ledger === "Account Payable";
+          lines[index] = {
+            ...lines[index],
+            supplier_id: payableAccount
+              ? Number(current.payment?.supplierId || lines[index].supplier_id) ||
+                null
+              : null,
+          };
+        }
         const linkedCashAccount = openedEntry.payment_records[0].bank_account;
         const cashIndex = lines.findIndex((line) => line.account === linkedCashAccount);
         if (cashIndex >= 0) {
@@ -1089,6 +1125,11 @@ const QuickReport = ({
                   </section>
                 ) : null}
                 <div className="mt-4 overflow-x-auto">
+                  {ledgerAccountError ? (
+                    <p className="mb-2 text-xs text-red-700" role="alert">
+                      {ledgerAccountError}
+                    </p>
+                  ) : null}
                   <table className="w-full min-w-[700px] text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                       <tr>
@@ -1109,25 +1150,62 @@ const QuickReport = ({
                           <tr key={`${openedEntry.id}-${index}`} className="border-t border-slate-100">
                             {["account", "debit", "credit", "memo"].map((key) => (
                               <td key={key} className="px-2 py-2">
-                                <input
-                                  className={`w-full rounded border border-slate-300 px-2 py-1.5 ${key === "debit" || key === "credit" ? "text-right" : ""}`}
-                                  aria-label={`${key} for journal line ${index + 1}`}
-                                  type={key === "debit" || key === "credit" ? "number" : "text"}
-                                  min={key === "debit" || key === "credit" ? "0" : undefined}
-                                  step={key === "debit" || key === "credit" ? "0.01" : undefined}
-                                  value={line[key]}
-                                  disabled={
-                                    !canEditEntry() ||
-                                    entryBusy ||
-                                    isSettlement() ||
-                                    (directPayment &&
-                                      (key === "credit" ||
+                                {key === "account" && ledgerAccounts.length ? (
+                                  <select
+                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1.5"
+                                    aria-label={`Account for journal line ${index + 1}`}
+                                    value={line.account}
+                                    disabled={
+                                      !canEditEntry() ||
+                                      entryBusy ||
+                                      isSettlement() ||
+                                      (directPayment && linkedCashLine)
+                                    }
+                                    onChange={(event) =>
+                                      updateEntryLine(index, key, event.target.value)
+                                    }
+                                    required={!isSettlement()}
+                                  >
+                                    {!ledgerAccounts.some(
+                                      (item) =>
+                                        `${item.code} - ${item.name}` === line.account,
+                                    ) ? (
+                                      <option value={line.account}>
+                                        Current: {line.account}
+                                      </option>
+                                    ) : null}
+                                    {ledgerAccounts.map((item) => {
+                                      const accountName = `${item.code} - ${item.name}`;
+                                      return (
+                                        <option key={item.id} value={accountName}>
+                                          {accountName}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                ) : (
+                                  <input
+                                    className={`w-full rounded border border-slate-300 px-2 py-1.5 ${key === "debit" || key === "credit" ? "text-right" : ""}`}
+                                    aria-label={`${key} for journal line ${index + 1}`}
+                                    type={key === "debit" || key === "credit" ? "number" : "text"}
+                                    min={key === "debit" || key === "credit" ? "0" : undefined}
+                                    step={key === "debit" || key === "credit" ? "0.01" : undefined}
+                                    value={line[key]}
+                                    disabled={
+                                      !canEditEntry() ||
+                                      entryBusy ||
+                                      isSettlement() ||
+                                      (directPayment &&
+                                        (key === "credit" ||
                                           (key === "account" && linkedCashLine) ||
                                           (key === "debit" && linkedCashLine)))
-                                  }
-                                  onChange={(event) => updateEntryLine(index, key, event.target.value)}
-                                  required={key === "account" && !isSettlement()}
-                                />
+                                    }
+                                    onChange={(event) =>
+                                      updateEntryLine(index, key, event.target.value)
+                                    }
+                                    required={key === "account" && !isSettlement()}
+                                  />
+                                )}
                               </td>
                             ))}
                             {openedEntry.source === "manual" || directPayment ? (
