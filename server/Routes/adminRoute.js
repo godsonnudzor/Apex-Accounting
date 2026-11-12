@@ -1382,12 +1382,116 @@ const withCustomerInvoiceBalances = async (invoices) => {
   });
 };
 
-const withSupplierBillBalances = async (bills) => {
+const getDirectSupplierPayablePayments = async (bills) => {
+  const supplierIds = [
+    ...new Set(bills.map((bill) => Number(bill.supplier_id)).filter(Boolean)),
+  ];
+  if (!supplierIds.length)
+    return { amounts: new Map(), linkedAmounts: new Map() };
+
+  const [supplierResult, payableAccountResult] = await Promise.all([
+    supabase.from("suppliers").select("id, name").in("id", supplierIds),
+    supabase
+      .from("ledger_accounts")
+      .select("code, name")
+      .eq("account_type", "liability")
+      .eq("group_ledger", "Account Payable"),
+  ]);
+  if (supplierResult.error) throw supplierResult.error;
+  if (payableAccountResult.error) throw payableAccountResult.error;
+
+  const payableAccounts = (payableAccountResult.data || []).map(
+    (account) => `${account.code} - ${account.name}`,
+  );
+  if (!payableAccounts.length)
+    return { amounts: new Map(), linkedAmounts: new Map() };
+
+  const supplierIdsByName = new Map();
+  for (const supplier of supplierResult.data || []) {
+    const name = String(supplier.name || "").trim();
+    if (!name) continue;
+    supplierIdsByName.set(
+      name,
+      supplierIdsByName.has(name) ? null : Number(supplier.id),
+    );
+  }
+  const supplierNames = [...supplierIdsByName.keys()];
+  const paymentSelect =
+    "id, journal_entry_id, supplier_id, payee, currency, journal_entries!inner(status, source)";
+  const paymentQueries = [
+    supabase
+      .from("payment_records")
+      .select(paymentSelect)
+      .is("settlement_type", null)
+      .in("supplier_id", supplierIds)
+      .eq("journal_entries.status", "posted")
+      .in("journal_entries.source", ["cheque", "cash", "bank_transfer"]),
+  ];
+  if (supplierNames.length) {
+    paymentQueries.push(
+      supabase
+        .from("payment_records")
+        .select(paymentSelect)
+        .is("settlement_type", null)
+        .in("payee", supplierNames)
+        .eq("journal_entries.status", "posted")
+        .in("journal_entries.source", ["cheque", "cash", "bank_transfer"]),
+    );
+  }
+  const paymentResults = await Promise.all(paymentQueries);
+  for (const result of paymentResults) {
+    if (result.error) throw result.error;
+  }
+
+  const paymentsByEntry = new Map();
+  for (const payment of paymentResults.flatMap((result) => result.data || [])) {
+    const supplierId =
+      Number(payment.supplier_id) ||
+      supplierIdsByName.get(String(payment.payee || "").trim());
+    if (!supplierIds.includes(Number(supplierId))) continue;
+    paymentsByEntry.set(String(payment.journal_entry_id), {
+      supplierId: Number(supplierId),
+      currency: String(payment.currency || "GHS").toUpperCase(),
+    });
+  }
+  if (!paymentsByEntry.size)
+    return { amounts: new Map(), linkedAmounts: new Map() };
+
+  const { data: lines, error: linesError } = await supabase
+    .from("journal_lines")
+    .select("journal_entry_id, account, debit, supplier_id")
+    .in("journal_entry_id", [...paymentsByEntry.keys()])
+    .in("account", payableAccounts)
+    .gt("debit", 0);
+  if (linesError) throw linesError;
+
+  const amounts = new Map();
+  const linkedAmounts = new Map();
+  (lines || []).forEach((line) => {
+    const payment = paymentsByEntry.get(String(line.journal_entry_id));
+    if (!payment) return;
+    const key = `${payment.supplierId}:${payment.currency}`;
+    amounts.set(key, (amounts.get(key) || 0) + Number(line.debit || 0));
+    if (Number(line.supplier_id) === payment.supplierId) {
+      linkedAmounts.set(
+        key,
+        (linkedAmounts.get(key) || 0) + Number(line.debit || 0),
+      );
+    }
+  });
+  return { amounts, linkedAmounts };
+};
+
+const getSupplierBillBalanceDetails = async (bills) => {
+  if (!bills.length)
+    return { bills: [], linkedPaymentApplications: new Map() };
   const paidAmounts = await sumPaymentAllocations(
     "supplier_bill_id",
     bills.map((bill) => bill.id),
   );
+  const directPayments = await getDirectSupplierPayablePayments(bills);
   const balances = new Map();
+  const linkedPaymentApplications = new Map();
   const groupedBills = new Map();
 
   for (const bill of bills) {
@@ -1397,6 +1501,14 @@ const withSupplierBillBalances = async (bills) => {
   }
 
   for (const group of groupedBills.values()) {
+    const firstBill = group[0];
+    const groupKey =
+      `${firstBill.supplier_id}:` +
+      String(firstBill.currency || "GHS").toUpperCase();
+    let directPaymentRemaining = directPayments.amounts.get(groupKey) || 0;
+    let linkedPaymentRemaining =
+      directPayments.linkedAmounts.get(groupKey) || 0;
+    let linkedPaymentApplied = 0;
     const credits = group
       .filter((bill) => bill.document_type === "credit")
       .sort((left, right) =>
@@ -1426,22 +1538,53 @@ const withSupplierBillBalances = async (bills) => {
         credits[creditIndex].remaining -= applied;
         if (credits[creditIndex].remaining <= 0.005) creditIndex += 1;
       }
+      const directPaymentApplied = Math.min(
+        outstanding,
+        directPaymentRemaining,
+      );
+      outstanding -= directPaymentApplied;
+      directPaymentRemaining -= directPaymentApplied;
+      const linkedPaymentAppliedForBill = Math.min(
+        directPaymentApplied,
+        linkedPaymentRemaining,
+      );
+      linkedPaymentRemaining -= linkedPaymentAppliedForBill;
+      linkedPaymentApplied += linkedPaymentAppliedForBill;
       balances.set(String(bill.id), Number(Math.max(0, outstanding).toFixed(2)));
     }
+    for (const credit of credits) {
+      if (directPaymentRemaining <= 0.005) break;
+      const applied = Math.min(credit.remaining, directPaymentRemaining);
+      credit.remaining -= applied;
+      directPaymentRemaining -= applied;
+      const linkedPaymentAppliedToCredit = Math.min(
+        applied,
+        linkedPaymentRemaining,
+      );
+      linkedPaymentRemaining -= linkedPaymentAppliedToCredit;
+      linkedPaymentApplied += linkedPaymentAppliedToCredit;
+    }
+    linkedPaymentApplications.set(groupKey, linkedPaymentApplied);
 
     for (const credit of credits) {
       balances.set(String(credit.id), Number((-credit.remaining).toFixed(2)));
     }
   }
 
-  return bills.map((bill) => ({
-    ...bill,
-    open_balance:
-      balances.get(String(bill.id)) ??
-      Number(bill.total_amount || 0) *
-        (bill.document_type === "credit" ? -1 : 1),
-  }));
+  return {
+    bills: bills.map((bill) => ({
+      ...bill,
+      open_balance:
+        balances.get(String(bill.id)) ??
+        Number(bill.total_amount || 0) *
+          (bill.document_type === "credit" ? -1 : 1),
+    })),
+    linkedPaymentApplications,
+  };
 };
+
+const withSupplierBillBalances = async (bills) =>
+  (await getSupplierBillBalanceDetails(bills)).bills;
 
 router.get("/api/supplier-bills", async (req, res) => {
   try {
@@ -1655,9 +1798,19 @@ router.post("/api/supplier-bills", async (req, res) => {
       .eq("id", bill.id)
       .single();
     if (savedBillError) throw savedBillError;
-    const [billWithBalance] = await withSupplierBillBalances([
-      formatSupplierBill(savedBill),
-    ]);
+    const { data: supplierBills, error: supplierBillsError } = await supabase
+      .from("supplier_bills")
+      .select(supplierBillSelect)
+      .eq("supplier_id", savedBill.supplier_id)
+      .order("bill_date", { ascending: true })
+      .order("id", { ascending: true });
+    if (supplierBillsError) throw supplierBillsError;
+    const supplierBalances = await withSupplierBillBalances(
+      (supplierBills || []).map((item) => formatSupplierBill(item)),
+    );
+    const billWithBalance = supplierBalances.find(
+      (item) => String(item.id) === String(savedBill.id),
+    );
     return res.status(201).json({ bill: billWithBalance });
   } catch (error) {
     if (insertedBillId) {
@@ -2925,7 +3078,15 @@ router.get("/api/journal/lookups", async (req, res) => {
     if (invoiceResult.error) throw invoiceResult.error;
     if (payrollResult.error) throw payrollResult.error;
 
-    const bills = await withSupplierBillBalances(billResult.data || []);
+    const billBalanceDetails = await getSupplierBillBalanceDetails(
+      billResult.data || [],
+    );
+    for (const [groupKey, amount] of billBalanceDetails.linkedPaymentApplications) {
+      const supplierId = groupKey.split(":")[0];
+      const key = `supplier:${supplierId}`;
+      partyBalances[key] = (partyBalances[key] || 0) + amount;
+    }
+    const bills = billBalanceDetails.bills;
     const invoices = await withCustomerInvoiceBalances(
       invoiceResult.data || [],
     );
@@ -3448,7 +3609,7 @@ router.post("/api/payments", async (req, res) => {
         .json({ message: "Every payment line needs an account and amount" });
     const { data: ledgerAccounts, error: ledgerAccountsError } = await supabase
       .from("ledger_accounts")
-      .select("code, name, account_type")
+      .select("code, name, account_type, group_ledger")
       .eq("is_active", true);
     if (ledgerAccountsError) throw ledgerAccountsError;
     const ledgerAccountByName = new Map(
@@ -3489,7 +3650,9 @@ router.post("/api/payments", async (req, res) => {
           journal_entry_id: entry.id,
           supplier_id:
             supplier &&
-            ledgerAccountByName.get(line.account)?.account_type === "liability"
+            ledgerAccountByName.get(line.account)?.account_type === "liability" &&
+            ledgerAccountByName.get(line.account)?.group_ledger ===
+              "Account Payable"
               ? supplier.id
               : null,
         })),

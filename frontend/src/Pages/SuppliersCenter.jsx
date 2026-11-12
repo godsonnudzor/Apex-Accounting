@@ -29,20 +29,34 @@ const SuppliersCenter = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      const [supplierResponse, billResponse, accountResponse] = await Promise.all([
+      const [supplierResponse, billResponse, accountResponse, partyResponse] = await Promise.all([
         fetch(getApiUrl("/api/suppliers?includeInactive=true"), { credentials: "include" }),
         fetch(getApiUrl("/api/supplier-bills"), { credentials: "include" }),
         fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
+        fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" }),
       ]);
-      const [supplierResult, billResult, accountResult] = await Promise.all([
+      const [supplierResult, billResult, accountResult, partyResult] = await Promise.all([
         supplierResponse.json(),
         billResponse.json(),
         accountResponse.json(),
+        partyResponse.json(),
       ]);
       if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
       if (!billResponse.ok) throw new Error(billResult.message || "Unable to load supplier transactions");
       if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
-      setSuppliers(supplierResult.suppliers || []);
+      if (!partyResponse.ok) throw new Error(partyResult.message || "Unable to load supplier balances");
+      const balances = new Map(
+        (partyResult.suppliers || []).map((supplier) => [
+          String(supplier.id),
+          Number(supplier.balance || 0),
+        ]),
+      );
+      setSuppliers(
+        (supplierResult.suppliers || []).map((supplier) => ({
+          ...supplier,
+          balance: balances.get(String(supplier.id)) || 0,
+        })),
+      );
       setBills(billResult.bills || []);
       setAccounts(accountResult.accounts || []);
     };
@@ -240,7 +254,7 @@ const SuppliersCenter = () => {
                       >
                         <td className="truncate px-3 py-2 font-medium" title={supplier.name}>{supplier.name}</td>
                         <td className="px-2 py-2">{supplier.currency || "GHS"}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{formatMoney(bills.filter((bill) => String(bill.supplier_id) === String(supplier.id)).reduce((sum, bill) => sum + Number(bill.open_balance || 0), 0), supplier.currency || "GHS")}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{formatMoney(supplier.balance, supplier.currency || "GHS")}</td>
                       </tr>
                     );
                   }) : (

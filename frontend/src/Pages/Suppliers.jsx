@@ -48,6 +48,11 @@ const initialForm = {
 
 const inputClassName = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100";
 const sectionClassName = "rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
+const formatMoney = (amount, currency) =>
+  `${currency} ${Number(amount || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 const Field = ({ label, children, className = "" }) => (
   <label className={`block text-sm font-medium text-slate-700 ${className}`}>
@@ -112,6 +117,9 @@ const Suppliers = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [supplierBalance, setSupplierBalance] = useState(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
@@ -133,6 +141,37 @@ const Suppliers = () => {
     setError("");
     setMessage("");
   }, [location.state]);
+
+  useEffect(() => {
+    if (!editingId) {
+      setSupplierBalance(null);
+      setBalanceError("");
+      return undefined;
+    }
+    let cancelled = false;
+    setBalanceLoading(true);
+    setBalanceError("");
+    fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(result.message || "Unable to load supplier balance");
+        const supplier = (result.suppliers || []).find(
+          (item) => String(item.id) === String(editingId),
+        );
+        if (!supplier) throw new Error("Supplier balance was not returned");
+        if (!cancelled) setSupplierBalance(Number(supplier.balance || 0));
+      })
+      .catch((loadError) => {
+        if (!cancelled) setBalanceError(loadError.message);
+      })
+      .finally(() => {
+        if (!cancelled) setBalanceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId]);
 
   const expenseAccounts = useMemo(
     () => accounts.filter((account) => account.account_type === "expense"),
@@ -410,8 +449,18 @@ const Suppliers = () => {
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current balance</p>
-            <p className="mt-1 text-sm font-semibold text-slate-800">Not calculated</p>
-            <p className="text-xs text-slate-500">Not yet linked to posted bills.</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">
+              {!editingId
+                ? "Save supplier to view balance"
+                : balanceLoading
+                  ? "Loading..."
+                  : supplierBalance === null
+                    ? "Unavailable"
+                    : formatMoney(supplierBalance, form.currency)}
+            </p>
+            <p className="text-xs text-slate-500">
+              {balanceError || "Matches the supplier ledger balance."}
+            </p>
           </div>
         </div>
 
