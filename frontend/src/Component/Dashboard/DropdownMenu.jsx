@@ -39,6 +39,8 @@ const MENU = [
     label: "Banking",
     items: [
       { label: "Write Cheque", href: "/write-cheque", permissions: ["writeCheque"] },
+      { label: "Make Deposit", href: "/deposits", permissions: ["writeCheque"] },
+      { label: "Deposit History", href: "/deposits?view=history", permissions: ["writeCheque"] },
     ],
   },
   {

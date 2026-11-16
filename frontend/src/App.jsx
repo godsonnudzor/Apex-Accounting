@@ -12,6 +12,7 @@ import Bill from "./Pages/Bill";
 import Invoice from "./Pages/Invoice";
 import Settlement from "./Pages/Settlement";
 import WriteCheque from "./Pages/WriteCheque";
+import Deposit from "./Pages/Deposit";
 import Journal from "./Pages/Journal";
 import Suppliers from "./Pages/Suppliers";
 import SuppliersCenter from "./Pages/SuppliersCenter";
@@ -207,6 +208,14 @@ const router = createBrowserRouter([
     element: (
       <PermissionRoute permission="writeCheque">
         <WriteCheque />
+      </PermissionRoute>
+    ),
+  },
+  {
+    path: "/deposits",
+    element: (
+      <PermissionRoute permission="writeCheque">
+        <Deposit />
       </PermissionRoute>
     ),
   },

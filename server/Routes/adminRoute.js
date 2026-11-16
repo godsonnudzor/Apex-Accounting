@@ -2444,6 +2444,216 @@ router.post("/api/customer-invoices", async (req, res) => {
   }
 });
 
+router.get("/api/deposits", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Deposit permission required" });
+    const { data, error } = await supabase
+      .from("deposit_records")
+      .select(
+        "id, journal_entry_id, deposit_date, reference, currency, subtotal, cash_back_amount, memo, created_at, cash_bank_accounts(account_name), deposit_lines(id)",
+      )
+      .order("deposit_date", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    return res.json({
+      deposits: (data || []).map((deposit) => ({
+        ...deposit,
+        account_name:
+          relationRecord(deposit.cash_bank_accounts)?.account_name || "",
+        line_count: (deposit.deposit_lines || []).length,
+      })),
+    });
+  } catch (error) {
+    console.error("Deposit history lookup error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to load deposit history" });
+  }
+});
+
+router.get("/api/deposits/payments", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Deposit permission required" });
+    const currency = String(req.query?.currency || "GHS")
+      .trim()
+      .toUpperCase();
+    if (!/^[A-Z]{3,10}$/.test(currency))
+      return res.status(400).json({ message: "Select a valid currency" });
+    const { data, error } = await supabase
+      .from("payment_records")
+      .select(
+        "id, payment_type, payment_number, payment_date, payee, amount, memo, currency, cash_bank_account_id, customers(name), cash_bank_accounts!inner(id, account_name, currency, ledger_accounts!inner(code, name)), deposit_lines(id)",
+      )
+      .eq("settlement_type", "receipt")
+      .eq("currency", currency)
+      .is("deposit_lines.id", null)
+      .order("payment_date", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    return res.json({
+      payments: (data || []).map((payment) => {
+        const cashAccount = relationRecord(payment.cash_bank_accounts);
+        const linkedLedgerAccount = relationRecord(cashAccount?.ledger_accounts);
+        return {
+          id: payment.id,
+          payment_type: payment.payment_type,
+          payment_number: payment.payment_number,
+          payment_date: payment.payment_date,
+          payee:
+            relationRecord(payment.customers)?.name || payment.payee,
+          amount: Number(payment.amount),
+          memo: payment.memo,
+          currency: payment.currency,
+          cash_bank_account_id: payment.cash_bank_account_id,
+          fromAccount: linkedLedgerAccount
+            ? `${linkedLedgerAccount.code} - ${linkedLedgerAccount.name}`
+            : "",
+        };
+      }),
+    });
+  } catch (error) {
+    console.error("Undeposited payment lookup error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to load received payments" });
+  }
+});
+
+router.post("/api/deposits", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Deposit permission required" });
+
+    const depositDate = String(req.body?.depositDate || "").trim();
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(depositDate)
+      ? new Date(`${depositDate}T00:00:00Z`)
+      : null;
+    if (
+      !parsedDate ||
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== depositDate
+    )
+      return res.status(400).json({ message: "Enter a valid deposit date" });
+
+    const cashBankAccountId = Number(req.body?.cashBankAccountId);
+    const cashBackAmount = Number(req.body?.cashBackAmount || 0);
+    const rawLines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    if (!Number.isSafeInteger(cashBankAccountId) || cashBankAccountId <= 0)
+      return res.status(400).json({ message: "Select a valid deposit account" });
+    if (!rawLines.length || rawLines.length > 100)
+      return res.status(400).json({
+        message: "A deposit must have between 1 and 100 payment lines",
+      });
+    if (
+      !Number.isFinite(cashBackAmount) ||
+      cashBackAmount < 0 ||
+      cashBackAmount > 999999999999.99 ||
+      Math.abs(cashBackAmount * 100 - Math.round(cashBackAmount * 100)) > 1e-7
+    )
+      return res.status(400).json({ message: "Enter a valid cash back amount" });
+    const lines = rawLines.map((line) => ({
+      paymentRecordId:
+        line?.paymentRecordId === null ||
+        line?.paymentRecordId === undefined ||
+        line?.paymentRecordId === ""
+          ? null
+          : Number(line.paymentRecordId),
+      receivedFrom: String(line?.receivedFrom || "").trim(),
+      fromAccount: String(line?.fromAccount || "").trim(),
+      memo: String(line?.memo || "").trim(),
+      chequeNumber: String(line?.chequeNumber || "").trim(),
+      paymentMethod: String(line?.paymentMethod || "").trim().toLowerCase(),
+      amount: Number(line?.amount),
+    }));
+    if (
+      lines.some(
+        (line) =>
+          (line.paymentRecordId !== null &&
+            (!Number.isSafeInteger(line.paymentRecordId) ||
+              line.paymentRecordId <= 0)) ||
+          !line.receivedFrom ||
+          line.receivedFrom.length > 200 ||
+          !line.fromAccount ||
+          line.fromAccount.length > 150 ||
+          line.memo.length > 5000 ||
+          line.chequeNumber.length > 100 ||
+          !["cash", "cheque", "bank_transfer"].includes(line.paymentMethod) ||
+          !Number.isFinite(line.amount) ||
+          line.amount <= 0 ||
+          line.amount > 999999999999.99 ||
+          Math.abs(line.amount * 100 - Math.round(line.amount * 100)) > 1e-7
+      )
+    )
+      return res.status(400).json({
+        message:
+          "Each line needs a name, account, valid payment method, and positive amount with up to two decimals",
+      });
+    const subtotalCents = lines.reduce(
+      (sum, line) => sum + Math.round(line.amount * 100),
+      0,
+    );
+    if (subtotalCents > 99999999999999)
+      return res.status(400).json({ message: "Deposit total exceeds the supported amount" });
+    if (subtotalCents <= Math.round(cashBackAmount * 100))
+      return res.status(400).json({
+        message: "Cash back must be less than the deposit subtotal",
+      });
+
+    const reference = String(req.body?.reference || "").trim();
+    const memo = String(req.body?.memo || "").trim();
+    const cashBackAccount = String(req.body?.cashBackAccount || "").trim();
+    const cashBackMemo = String(req.body?.cashBackMemo || "").trim();
+    if (
+      reference.length > 100 ||
+      memo.length > 5000 ||
+      cashBackAccount.length > 150 ||
+      cashBackMemo.length > 5000
+    )
+      return res.status(400).json({ message: "Deposit details are too long" });
+    if (cashBackAmount > 0 && !cashBackAccount)
+      return res.status(400).json({
+        message: "Select an asset account for the cash back",
+      });
+
+    const { data: entryId, error } = await supabase.rpc(
+      "create_accounting_deposit",
+      {
+        p_deposit_date: depositDate,
+        p_reference: reference || null,
+        p_memo: memo || null,
+        p_cash_bank_account_id: cashBankAccountId,
+        p_cash_back_account: cashBackAmount > 0 ? cashBackAccount : null,
+        p_cash_back_memo: cashBackMemo || null,
+        p_cash_back_amount: cashBackAmount,
+        p_lines: lines,
+        p_created_by: currentUser.id,
+      },
+    );
+    if (error) {
+      if (error.code === "23505")
+        return res.status(409).json({
+          message: "A selected customer payment was already included in another deposit",
+        });
+      if (["P0001", "22023", "23503", "23514"].includes(error.code))
+        return res.status(400).json({ message: error.message });
+      throw error;
+    }
+    return res.status(201).json({ entryId });
+  } catch (error) {
+    console.error("Deposit creation error:", error);
+    return res
+      .status(500)
+      .json({ message: error?.message || "Unable to save deposit" });
+  }
+});
+
 router.get("/api/payments/history", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);

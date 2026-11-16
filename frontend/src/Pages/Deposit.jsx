@@ -1,0 +1,645 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { getApiUrl, readApiResponse } from "../context/auth";
+
+const today = new Date().toISOString().slice(0, 10);
+const emptyLine = () => ({
+  receivedFrom: "",
+  fromAccount: "",
+  memo: "",
+  chequeNumber: "",
+  paymentMethod: "cash",
+  amount: "",
+  paymentRecordId: null,
+});
+const hasAtMostTwoDecimals = (amount) =>
+  Math.abs(amount * 100 - Math.round(amount * 100)) < 1e-7;
+const money = (amount, currency) =>
+  `${currency === "GHS" ? "GHC" : currency} ${Number(amount || 0).toLocaleString(
+    undefined,
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+  )}`;
+const apiResult = async (response, fallback) => {
+  const result = await readApiResponse(response);
+  if (!response.ok) throw new Error(result.message || fallback);
+  return result;
+};
+
+function Deposit() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const showingHistory = searchParams.get("view") === "history";
+  const [accounts, setAccounts] = useState([]);
+  const [ledgerAccounts, setLedgerAccounts] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [availablePayments, setAvailablePayments] = useState([]);
+  const [lines, setLines] = useState([emptyLine()]);
+  const [depositToId, setDepositToId] = useState("");
+  const [depositDate, setDepositDate] = useState(today);
+  const [reference, setReference] = useState("");
+  const [memo, setMemo] = useState("");
+  const [cashBackAccount, setCashBackAccount] = useState("");
+  const [cashBackMemo, setCashBackMemo] = useState("");
+  const [cashBackAmount, setCashBackAmount] = useState("");
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const depositTo = accounts.find(
+    (account) => String(account.id) === depositToId,
+  );
+  const currency = String(depositTo?.currency || "GHS").toUpperCase();
+  const subtotal = useMemo(
+    () =>
+      lines.reduce(
+        (sum, line) => sum + Math.round((Number(line.amount) || 0) * 100),
+        0,
+      ) / 100,
+    [lines],
+  );
+  const cashBack = Number(cashBackAmount) || 0;
+  const depositTotal = subtotal - cashBack;
+  const selectedPaymentIds = useMemo(
+    () => new Set(lines.filter((line) => line.paymentRecordId).map((line) => String(line.paymentRecordId))),
+    [lines],
+  );
+  const cashBackAccounts = ledgerAccounts.filter(
+    (account) => account.account_type === "asset" && account.is_active,
+  );
+
+  const loadHistory = async () => {
+    const response = await fetch(getApiUrl("/api/deposits"), {
+      credentials: "include",
+    });
+    const result = await apiResult(response, "Unable to load deposit history");
+    setHistory(result.deposits || []);
+  };
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load cash and bank accounts"),
+      ),
+      fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load ledger accounts"),
+      ),
+      fetch(getApiUrl("/api/deposits"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load deposit history"),
+      ),
+    ])
+      .then(([cashResult, ledgerResult, historyResult]) => {
+        if (!active) return;
+        const activeAccounts = cashResult.accounts || [];
+        setAccounts(activeAccounts);
+        setLedgerAccounts(ledgerResult.accounts || []);
+        setHistory(historyResult.deposits || []);
+        setDepositToId(String(activeAccounts[0]?.id || ""));
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const updateLine = (index, field, value) => {
+    setLines((current) =>
+      current.map((line, lineIndex) =>
+        lineIndex === index ? { ...line, [field]: value } : line,
+      ),
+    );
+    setError("");
+  };
+
+  const loadPayments = async () => {
+    if (!depositToId) {
+      setError("Choose a deposit-to account before selecting received payments.");
+      return;
+    }
+    setPaymentsLoading(true);
+    setError("");
+    try {
+      const query = new URLSearchParams({ currency });
+      const response = await fetch(
+        getApiUrl(`/api/deposits/payments?${query.toString()}`),
+        { credentials: "include" },
+      );
+      const result = await apiResult(response, "Unable to load received payments");
+      setAvailablePayments(result.payments || []);
+      setPaymentDialogOpen(true);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  const addPayment = (payment) => {
+    if (selectedPaymentIds.has(String(payment.id))) return;
+    const paymentLine = {
+      receivedFrom: payment.payee,
+      fromAccount: payment.fromAccount,
+      memo: payment.memo || "",
+      chequeNumber: payment.payment_number || "",
+      paymentMethod: payment.payment_type,
+      amount: String(payment.amount),
+      paymentRecordId: payment.id,
+    };
+    setLines((current) => {
+      const firstEmpty = current.findIndex(
+        (line) =>
+          !line.paymentRecordId &&
+          !line.receivedFrom &&
+          !line.fromAccount &&
+          !line.amount,
+      );
+      if (firstEmpty < 0) return [...current, paymentLine];
+      return current.map((line, index) =>
+        index === firstEmpty ? paymentLine : line,
+      );
+    });
+    setPaymentDialogOpen(false);
+    setError("");
+  };
+
+  const resetDeposit = () => {
+    setLines([emptyLine()]);
+    setDepositDate(today);
+    setReference("");
+    setMemo("");
+    setCashBackAccount("");
+    setCashBackMemo("");
+    setCashBackAmount("");
+    setError("");
+    setNotice("");
+  };
+
+  const saveDeposit = async (event, startAnother = false) => {
+    event?.preventDefault();
+    setError("");
+    setNotice("");
+    const depositLines = lines.filter(
+      (line) =>
+        line.receivedFrom ||
+        line.fromAccount ||
+        line.memo ||
+        line.chequeNumber ||
+        line.amount ||
+        line.paymentRecordId,
+    );
+    if (!depositToId) {
+      setError("Choose an active cash or bank account to deposit into.");
+      return;
+    }
+    if (!depositLines.length) {
+      setError("Add at least one payment line to this deposit.");
+      return;
+    }
+    if (
+      depositLines.some(
+        (line) =>
+          !line.receivedFrom.trim() ||
+          !line.fromAccount.trim() ||
+          !Number.isFinite(Number(line.amount)) ||
+          Number(line.amount) <= 0 ||
+          !hasAtMostTwoDecimals(Number(line.amount)),
+      )
+    ) {
+      setError("Each line needs a received-from name, source account, and positive amount with up to two decimals.");
+      return;
+    }
+    if (
+      !Number.isFinite(cashBack) ||
+      cashBack < 0 ||
+      !hasAtMostTwoDecimals(cashBack) ||
+      cashBack >= subtotal
+    ) {
+      setError("Cash back must be zero or a positive amount less than the deposit subtotal.");
+      return;
+    }
+    if (cashBack > 0 && !cashBackAccount) {
+      setError("Choose an asset account for the cash back.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(getApiUrl("/api/deposits"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          depositDate,
+          reference,
+          memo,
+          cashBankAccountId: Number(depositToId),
+          cashBackAccount,
+          cashBackMemo,
+          cashBackAmount: cashBack,
+          lines: depositLines.map((line) => ({
+            ...line,
+            amount: Number(line.amount),
+          })),
+        }),
+      });
+      const result = await apiResult(response, "Unable to save deposit");
+      setNotice(`Deposit ${result.entryId} saved and posted.`);
+      if (startAnother) {
+        resetDeposit();
+        setNotice(`Deposit ${result.entryId} saved. You can start another deposit.`);
+      } else {
+        navigate("/deposits?view=history", { replace: true });
+      }
+      try {
+        await loadHistory();
+      } catch (historyError) {
+        setError(
+          `Deposit ${result.entryId} was posted, but history could not be refreshed: ${historyError.message}`,
+        );
+      }
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (showingHistory) {
+    return (
+      <main className="deposit-app">
+        <header className="deposit-header">
+          <div>
+            <p className="deposit-eyebrow">Banking · Accounting</p>
+            <h1>Deposit history</h1>
+            <p>Review posted deposits and their accounting lines.</p>
+          </div>
+          <Link className="deposit-primary-link" to="/deposits">
+            + Make a deposit
+          </Link>
+        </header>
+        {error ? <p className="deposit-alert error" role="alert">{error}</p> : null}
+        {notice ? <p className="deposit-alert success" role="status">{notice}</p> : null}
+        <section className="deposit-history-card">
+          {loading ? (
+            <p className="deposit-empty">Loading deposits…</p>
+          ) : history.length ? (
+            <div className="deposit-history-scroll">
+              <table className="deposit-history-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Deposit to</th>
+                    <th>Reference</th>
+                    <th>Memo</th>
+                    <th>Payments</th>
+                    <th className="number-cell">Subtotal</th>
+                    <th className="number-cell">Cash back</th>
+                    <th className="number-cell">Deposit total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((deposit) => (
+                    <tr key={deposit.id}>
+                      <td>{deposit.deposit_date}</td>
+                      <td>{deposit.account_name}</td>
+                      <td>{deposit.reference || "—"}</td>
+                      <td>{deposit.memo || "—"}</td>
+                      <td>{deposit.line_count}</td>
+                      <td className="number-cell">{money(deposit.subtotal, deposit.currency)}</td>
+                      <td className="number-cell">{money(deposit.cash_back_amount, deposit.currency)}</td>
+                      <td className="number-cell strong-cell">{money(Number(deposit.subtotal) - Number(deposit.cash_back_amount), deposit.currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="deposit-empty">No deposits have been posted yet.</p>
+          )}
+        </section>
+        <nav className="deposit-bottom-links" aria-label="Accounting links">
+          <Link to="/journal">Journal</Link>
+          <Link to="/deposits">New deposit</Link>
+        </nav>
+      </main>
+    );
+  }
+
+  return (
+    <main className="deposit-app">
+      <header className="deposit-toolbar">
+        <div className="deposit-toolbar-title">
+          <span className="deposit-mark" aria-hidden="true">↗</span>
+          <div>
+            <p className="deposit-eyebrow">Banking</p>
+            <h1>Make a deposit</h1>
+          </div>
+        </div>
+        <nav className="deposit-toolbar-links" aria-label="Deposit actions">
+          <button type="button" onClick={loadPayments} disabled={paymentsLoading}>
+            {paymentsLoading ? "Loading payments…" : "Payments"}
+          </button>
+          <Link to="/deposits?view=history">History</Link>
+          <Link to="/journal">Journal</Link>
+        </nav>
+      </header>
+
+      <form className="deposit-form" onSubmit={(event) => saveDeposit(event)}>
+        {error ? <p className="deposit-alert error" role="alert">{error}</p> : null}
+        {notice ? <p className="deposit-alert success" role="status">{notice}</p> : null}
+
+        <section className="deposit-details" aria-label="Deposit details">
+          <label>
+            <span>Deposit to</span>
+            <select
+              value={depositToId}
+              onChange={(event) => setDepositToId(event.target.value)}
+              required
+              disabled={loading}
+            >
+              <option value="">Select cash or bank account</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.account_name} · {account.account_type}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Date</span>
+            <input
+              type="date"
+              value={depositDate}
+              onChange={(event) => setDepositDate(event.target.value)}
+              required
+            />
+          </label>
+          <label className="deposit-memo-field">
+            <span>Memo</span>
+            <input
+              maxLength={5000}
+              value={memo}
+              onChange={(event) => setMemo(event.target.value)}
+              placeholder="Optional deposit note"
+            />
+          </label>
+          <label>
+            <span>Reference</span>
+            <input
+              maxLength={100}
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+        </section>
+
+        <p className="deposit-instruction">
+          Select received customer payments or add amounts to deposit below.
+        </p>
+
+        <section className="deposit-lines-section">
+          <div className="deposit-lines-heading">
+            <div>
+              <h2>Payments included</h2>
+              <p>Each line credits its source ledger account and debits the deposit account.</p>
+            </div>
+            <button type="button" className="deposit-secondary" onClick={loadPayments} disabled={paymentsLoading}>
+              {paymentsLoading ? "Loading…" : "＋ Select payments"}
+            </button>
+          </div>
+          <div className="deposit-table-scroll">
+            <table className="deposit-lines-table">
+              <thead>
+                <tr>
+                  <th>Received from</th>
+                  <th>From account</th>
+                  <th>Memo</th>
+                  <th>Cheque no.</th>
+                  <th>Payment method</th>
+                  <th className="number-cell">Amount ({currency === "GHS" ? "GHC" : currency})</th>
+                  <th><span className="sr-only">Remove</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, index) => (
+                  <tr key={line.paymentRecordId || `line-${index}`}>
+                    <td>
+                      <input
+                        aria-label={`Received from, line ${index + 1}`}
+                        value={line.receivedFrom}
+                        onChange={(event) => updateLine(index, "receivedFrom", event.target.value)}
+                        maxLength={200}
+                        placeholder="Name or source"
+                        readOnly={Boolean(line.paymentRecordId)}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        aria-label={`From account, line ${index + 1}`}
+                        value={line.fromAccount}
+                        onChange={(event) => updateLine(index, "fromAccount", event.target.value)}
+                        disabled={Boolean(line.paymentRecordId)}
+                      >
+                        <option value="">Select account</option>
+                        {ledgerAccounts.map((account) => {
+                          const name = `${account.code} - ${account.name}`;
+                          return <option key={account.id} value={name}>{name}</option>;
+                        })}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        aria-label={`Memo, line ${index + 1}`}
+                        value={line.memo}
+                        onChange={(event) => updateLine(index, "memo", event.target.value)}
+                        maxLength={5000}
+                        placeholder="Line memo"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        aria-label={`Cheque number, line ${index + 1}`}
+                        value={line.chequeNumber}
+                        onChange={(event) => updateLine(index, "chequeNumber", event.target.value)}
+                        maxLength={100}
+                        placeholder="—"
+                        readOnly={Boolean(line.paymentRecordId)}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        aria-label={`Payment method, line ${index + 1}`}
+                        value={line.paymentMethod}
+                        onChange={(event) => updateLine(index, "paymentMethod", event.target.value)}
+                        disabled={Boolean(line.paymentRecordId)}
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="bank_transfer">Bank transfer</option>
+                      </select>
+                    </td>
+                    <td className="number-cell">
+                      <input
+                        aria-label={`Amount, line ${index + 1}`}
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={line.amount}
+                        onChange={(event) => updateLine(index, "amount", event.target.value)}
+                        readOnly={Boolean(line.paymentRecordId)}
+                        placeholder="0.00"
+                      />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="deposit-remove-line"
+                        aria-label={`Remove line ${index + 1}`}
+                        onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}
+                      >
+                        ×
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button
+            type="button"
+            className="deposit-add-line"
+            onClick={() => setLines((current) => [...current, emptyLine()])}
+          >
+            + Add another line
+          </button>
+        </section>
+
+        <section className="deposit-summary">
+          <div className="deposit-cashback">
+            <p>
+              Cash back reduces the bank deposit and is posted to the selected asset account.
+            </p>
+            <label>
+              <span>Cash back goes to</span>
+              <select value={cashBackAccount} onChange={(event) => setCashBackAccount(event.target.value)}>
+                <option value="">Select asset account</option>
+                {cashBackAccounts.map((account) => {
+                  const name = `${account.code} - ${account.name}`;
+                  return <option key={account.id} value={name}>{name}</option>;
+                })}
+              </select>
+            </label>
+            <label>
+              <span>Cash back memo</span>
+              <input
+                maxLength={5000}
+                value={cashBackMemo}
+                onChange={(event) => setCashBackMemo(event.target.value)}
+                placeholder="Optional"
+              />
+            </label>
+            <label>
+              <span>Cash back amount</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={cashBackAmount}
+                onChange={(event) => setCashBackAmount(event.target.value)}
+                placeholder="0.00"
+              />
+            </label>
+          </div>
+          <div className="deposit-totals">
+            <div><span>Deposit subtotal</span><strong>{money(subtotal, currency)}</strong></div>
+            <div><span>Cash back</span><strong>− {money(cashBack, currency)}</strong></div>
+            <div className="deposit-grand-total"><span>Deposit total</span><strong>{money(depositTotal, currency)}</strong></div>
+          </div>
+        </section>
+
+        <footer className="deposit-footer">
+          <p>Posting creates a balanced journal entry.</p>
+          <div>
+            <button type="submit" className="deposit-save" disabled={saving || loading}>
+              {saving ? "Saving…" : "Save & Close"}
+            </button>
+            <button type="button" className="deposit-save primary" onClick={(event) => saveDeposit(event, true)} disabled={saving || loading}>
+              Save &amp; New
+            </button>
+            <button type="button" className="deposit-revert" onClick={resetDeposit} disabled={saving}>
+              Revert
+            </button>
+          </div>
+        </footer>
+      </form>
+
+      {paymentDialogOpen ? (
+        <div className="deposit-dialog-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setPaymentDialogOpen(false);
+        }}>
+          <section className="deposit-dialog" role="dialog" aria-modal="true" aria-labelledby="deposit-payment-title">
+            <header>
+              <div>
+                <p className="deposit-eyebrow">Available customer receipts</p>
+                <h2 id="deposit-payment-title">Select payments to deposit</h2>
+              </div>
+              <button type="button" aria-label="Close payment picker" onClick={() => setPaymentDialogOpen(false)}>×</button>
+            </header>
+            <div className="deposit-dialog-content">
+              {availablePayments.length ? (
+                <div className="deposit-history-scroll">
+                  <table className="deposit-history-table">
+                    <thead><tr><th>Date</th><th>Received from</th><th>From account</th><th>Method</th><th className="number-cell">Amount</th><th /></tr></thead>
+                    <tbody>
+                      {availablePayments.map((payment) => {
+                        const selected = selectedPaymentIds.has(String(payment.id));
+                        const sameAccount = String(payment.cash_bank_account_id) === depositToId;
+                        return (
+                          <tr key={payment.id}>
+                            <td>{payment.payment_date}</td>
+                            <td>{payment.payee}</td>
+                            <td>{payment.fromAccount}</td>
+                            <td>{payment.payment_type.replace("_", " ")}</td>
+                            <td className="number-cell">{money(payment.amount, currency)}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="deposit-secondary"
+                                onClick={() => addPayment(payment)}
+                                disabled={selected || sameAccount}
+                                title={sameAccount ? "This receipt is already in the selected deposit account" : ""}
+                              >
+                                {selected ? "Added" : sameAccount ? "Already deposited" : "Add"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="deposit-empty">There are no undeposited customer receipts in {currency}.</p>
+              )}
+            </div>
+            <footer>
+              <p>Receipts already assigned to this deposit account are excluded.</p>
+              <button type="button" className="deposit-save primary" onClick={() => setPaymentDialogOpen(false)}>Done</button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+export default Deposit;
