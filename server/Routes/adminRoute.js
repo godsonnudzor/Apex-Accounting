@@ -2479,60 +2479,6 @@ router.get("/api/deposits", async (req, res) => {
   }
 });
 
-router.get("/api/deposits/payments", async (req, res) => {
-  try {
-    const { allowed } = await canUseAccounting(req);
-    if (!allowed)
-      return res.status(403).json({ message: "Deposit permission required" });
-    const currency = String(req.query?.currency || "GHS")
-      .trim()
-      .toUpperCase();
-    if (!/^[A-Z]{3,10}$/.test(currency))
-      return res.status(400).json({ message: "Select a valid currency" });
-    const { data, error } = await supabase
-      .from("payment_records")
-      .select(
-        "id, payment_type, payment_number, payment_date, payee, amount, memo, currency, customer_id, cash_bank_account_id, customers(name), cash_bank_accounts!inner(id, account_name, currency, ledger_accounts!inner(id, code, name)), deposit_lines(id)",
-      )
-      .eq("settlement_type", "receipt")
-      .eq("currency", currency)
-      .not("customer_id", "is", null)
-      .is("deposit_lines.id", null)
-      .order("payment_date", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(200);
-    if (error) throw error;
-    return res.json({
-      payments: (data || []).map((payment) => {
-        const cashAccount = relationRecord(payment.cash_bank_accounts);
-        const linkedLedgerAccount = relationRecord(cashAccount?.ledger_accounts);
-        return {
-          id: payment.id,
-          payment_type: payment.payment_type,
-          payment_number: payment.payment_number,
-          payment_date: payment.payment_date,
-          customer_id: payment.customer_id,
-          payee:
-            relationRecord(payment.customers)?.name || payment.payee,
-          amount: Number(payment.amount),
-          memo: payment.memo,
-          currency: payment.currency,
-          cash_bank_account_id: payment.cash_bank_account_id,
-          source_ledger_account_id: linkedLedgerAccount?.id || null,
-          fromAccount: linkedLedgerAccount
-            ? `${linkedLedgerAccount.code} - ${linkedLedgerAccount.name}`
-            : "",
-        };
-      }),
-    });
-  } catch (error) {
-    console.error("Undeposited payment lookup error:", error);
-    return res
-      .status(500)
-      .json({ message: error?.message || "Unable to load received payments" });
-  }
-});
-
 router.post("/api/deposits", async (req, res) => {
   try {
     const { currentUser, allowed } = await canUseAccounting(req);
