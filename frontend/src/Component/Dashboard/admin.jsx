@@ -59,87 +59,6 @@ const alerts = [
   },
 ];
 
-const employeeWorkspaces = [
-  {
-    label: "Bills",
-    description: "Create and review supplier bills.",
-    to: "/bill",
-    permissions: ["bills"],
-  },
-  {
-    label: "Invoices",
-    description: "Create and manage customer invoices.",
-    to: "/invoice",
-    permissions: ["invoice", "bills"],
-  },
-  {
-    label: "Write cheque",
-    description: "Create cash and cheque transactions.",
-    to: "/write-cheque",
-    permissions: ["writeCheque"],
-  },
-  {
-    label: "Payroll",
-    description: "Review payroll activity and compensation.",
-    to: "/PayrollDashboard",
-    permissions: ["payroll"],
-  },
-  {
-    label: "Departments",
-    description: "View and manage departments.",
-    to: "/department",
-    permissions: ["departments"],
-  },
-  {
-    label: "Employee records",
-    description: "Browse employee information.",
-    to: "/employees",
-    permissions: ["employeeManagement"],
-  },
-  {
-    label: "Salaries",
-    description: "View salary records.",
-    to: "/salary",
-    permissions: ["salaries"],
-  },
-  {
-    label: "Leave",
-    description: "Open leave records and requests.",
-    to: "/leaveManagement",
-    permissions: ["leaveManagement"],
-  },
-  {
-    label: "Group accounts",
-    description: "Open group account management.",
-    to: "/GroupAccount",
-    permissions: ["groupAccount"],
-  },
-  {
-    label: "Tax analyzer",
-    description: "Calculate and save tax scenarios.",
-    to: "/tax-analyzer",
-    permissions: ["taxJurisdictions", "userScenarios"],
-  },
-  {
-    label: "Tax brackets",
-    description: "View the tax bracket library.",
-    to: "/tax-analyzer/brackets",
-    permissions: ["taxBrackets"],
-  },
-  {
-    label: "Profit & Loss",
-    description: "Review income, expenses, and net profit.",
-    to: "/financial-reports/profit-loss",
-    permissions: ["reports", "writeCheque"],
-  },
-  {
-    label: "Balance Sheet",
-    description: "Review account balances and financial position.",
-    to: "/financial-reports/balance-sheet",
-    permissions: ["reports", "writeCheque"],
-  },
-];
-
 function CashFlowChart({ data }) {
   const maximum = Math.max(
     1,
@@ -564,10 +483,6 @@ function Admin() {
       note: "supplier bills",
     },
   };
-  const availableWorkspaces = employeeWorkspaces.filter(({ permissions }) =>
-    permissions.some(hasPermission),
-  );
-
   const runAction = (action) => {
     setMessage(`${action} is ready to start`);
     window.setTimeout(() => setMessage(""), 2600);
@@ -668,33 +583,6 @@ function Admin() {
             ↻ <span>Reconcile bank</span>
           </button>
         </div>}
-        {!isAdmin && (
-          <section className="employee-workspace-section">
-            <div className="employee-workspace-heading">
-              <div>
-                <p className="eyebrow">Your access</p>
-                <h2>Available workspaces</h2>
-              </div>
-              <span>{availableWorkspaces.length} available</span>
-            </div>
-            {availableWorkspaces.length ? (
-              <div className="employee-workspace-grid">
-                {availableWorkspaces.map(({ label, description, to }) => (
-                  <Link className="employee-workspace-card" key={to} to={to}>
-                    <span aria-hidden="true">{label[0]}</span>
-                    <strong>{label}</strong>
-                    <p>{description}</p>
-                    <small>Open workspace &rarr;</small>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="employee-workspace-empty">
-                No additional workspaces are enabled for your account.
-              </div>
-            )}
-          </section>
-        )}
         {canViewFinancialReports && <section className="metric-grid" aria-label="Financial health">
           {metrics.map((metric) => (
             <article className="metric-card" key={metric.label}>
