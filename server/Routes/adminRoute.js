@@ -2452,7 +2452,7 @@ router.get("/api/deposits", async (req, res) => {
     const { data, error } = await supabase
       .from("deposit_records")
       .select(
-        "id, journal_entry_id, deposit_date, reference, currency, subtotal, cash_back_amount, memo, created_at, cash_bank_accounts(account_name), deposit_lines(id)",
+        "id, journal_entry_id, deposit_date, reference, currency, subtotal, cash_back_amount, memo, created_at, cash_bank_accounts(account_name), deposit_ledger_accounts:ledger_accounts!deposit_records_deposit_ledger_account_id_fkey(code, name), deposit_lines(id)",
       )
       .order("deposit_date", { ascending: false })
       .order("id", { ascending: false })
@@ -2462,7 +2462,12 @@ router.get("/api/deposits", async (req, res) => {
       deposits: (data || []).map((deposit) => ({
         ...deposit,
         account_name:
-          relationRecord(deposit.cash_bank_accounts)?.account_name || "",
+          (() => {
+            const ledger = relationRecord(deposit.deposit_ledger_accounts);
+            return ledger
+              ? `${ledger.code} - ${ledger.name}`
+              : relationRecord(deposit.cash_bank_accounts)?.account_name || "";
+          })(),
         line_count: (deposit.deposit_lines || []).length,
       })),
     });
@@ -2487,10 +2492,11 @@ router.get("/api/deposits/payments", async (req, res) => {
     const { data, error } = await supabase
       .from("payment_records")
       .select(
-        "id, payment_type, payment_number, payment_date, payee, amount, memo, currency, cash_bank_account_id, customers(name), cash_bank_accounts!inner(id, account_name, currency, ledger_accounts!inner(code, name)), deposit_lines(id)",
+        "id, payment_type, payment_number, payment_date, payee, amount, memo, currency, customer_id, cash_bank_account_id, customers(name), cash_bank_accounts!inner(id, account_name, currency, ledger_accounts!inner(id, code, name)), deposit_lines(id)",
       )
       .eq("settlement_type", "receipt")
       .eq("currency", currency)
+      .not("customer_id", "is", null)
       .is("deposit_lines.id", null)
       .order("payment_date", { ascending: false })
       .order("id", { ascending: false })
@@ -2505,12 +2511,14 @@ router.get("/api/deposits/payments", async (req, res) => {
           payment_type: payment.payment_type,
           payment_number: payment.payment_number,
           payment_date: payment.payment_date,
+          customer_id: payment.customer_id,
           payee:
             relationRecord(payment.customers)?.name || payment.payee,
           amount: Number(payment.amount),
           memo: payment.memo,
           currency: payment.currency,
           cash_bank_account_id: payment.cash_bank_account_id,
+          source_ledger_account_id: linkedLedgerAccount?.id || null,
           fromAccount: linkedLedgerAccount
             ? `${linkedLedgerAccount.code} - ${linkedLedgerAccount.name}`
             : "",
@@ -2542,11 +2550,11 @@ router.post("/api/deposits", async (req, res) => {
     )
       return res.status(400).json({ message: "Enter a valid deposit date" });
 
-    const cashBankAccountId = Number(req.body?.cashBankAccountId);
+    const depositLedgerAccountId = Number(req.body?.depositLedgerAccountId);
     const cashBackAmount = Number(req.body?.cashBackAmount || 0);
     const rawLines = Array.isArray(req.body?.lines) ? req.body.lines : [];
-    if (!Number.isSafeInteger(cashBankAccountId) || cashBankAccountId <= 0)
-      return res.status(400).json({ message: "Select a valid deposit account" });
+    if (!Number.isSafeInteger(depositLedgerAccountId) || depositLedgerAccountId <= 0)
+      return res.status(400).json({ message: "Select a valid asset account to deposit into" });
     if (!rawLines.length || rawLines.length > 100)
       return res.status(400).json({
         message: "A deposit must have between 1 and 100 payment lines",
@@ -2565,6 +2573,11 @@ router.post("/api/deposits", async (req, res) => {
         line?.paymentRecordId === ""
           ? null
           : Number(line.paymentRecordId),
+      partyType: String(line?.partyType || "").trim().toLowerCase(),
+      partyId:
+        line?.partyId === null || line?.partyId === undefined || line?.partyId === ""
+          ? null
+          : Number(line.partyId),
       receivedFrom: String(line?.receivedFrom || "").trim(),
       fromAccount: String(line?.fromAccount || "").trim(),
       memo: String(line?.memo || "").trim(),
@@ -2578,6 +2591,9 @@ router.post("/api/deposits", async (req, res) => {
           (line.paymentRecordId !== null &&
             (!Number.isSafeInteger(line.paymentRecordId) ||
               line.paymentRecordId <= 0)) ||
+          !["supplier", "customer", "employee"].includes(line.partyType) ||
+          !Number.isSafeInteger(line.partyId) ||
+          line.partyId <= 0 ||
           !line.receivedFrom ||
           line.receivedFrom.length > 200 ||
           !line.fromAccount ||
@@ -2628,7 +2644,7 @@ router.post("/api/deposits", async (req, res) => {
         p_deposit_date: depositDate,
         p_reference: reference || null,
         p_memo: memo || null,
-        p_cash_bank_account_id: cashBankAccountId,
+        p_deposit_ledger_account_id: depositLedgerAccountId,
         p_cash_back_account: cashBackAmount > 0 ? cashBackAccount : null,
         p_cash_back_memo: cashBackMemo || null,
         p_cash_back_amount: cashBackAmount,

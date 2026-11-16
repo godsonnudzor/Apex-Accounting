@@ -5,6 +5,8 @@ import { getApiUrl, readApiResponse } from "../context/auth";
 const today = new Date().toISOString().slice(0, 10);
 const emptyLine = () => ({
   receivedFrom: "",
+  partyType: "",
+  partyId: "",
   fromAccount: "",
   memo: "",
   chequeNumber: "",
@@ -29,7 +31,11 @@ function Deposit() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const showingHistory = searchParams.get("view") === "history";
-  const [accounts, setAccounts] = useState([]);
+  const [parties, setParties] = useState({
+    suppliers: [],
+    customers: [],
+    employees: [],
+  });
   const [ledgerAccounts, setLedgerAccounts] = useState([]);
   const [history, setHistory] = useState([]);
   const [availablePayments, setAvailablePayments] = useState([]);
@@ -48,10 +54,13 @@ function Deposit() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const depositTo = accounts.find(
+  const assetAccounts = ledgerAccounts.filter(
+    (account) => account.account_type === "asset",
+  );
+  const depositTo = assetAccounts.find(
     (account) => String(account.id) === depositToId,
   );
-  const currency = String(depositTo?.currency || "GHS").toUpperCase();
+  const currency = "GHS";
   const subtotal = useMemo(
     () =>
       lines.reduce(
@@ -66,8 +75,10 @@ function Deposit() {
     () => new Set(lines.filter((line) => line.paymentRecordId).map((line) => String(line.paymentRecordId))),
     [lines],
   );
-  const cashBackAccounts = ledgerAccounts.filter(
-    (account) => account.account_type === "asset" && account.is_active,
+  const cashBackAccounts = assetAccounts.filter(
+    (account) =>
+      `${account.code} - ${account.name}` !==
+      `${depositTo?.code} - ${depositTo?.name}`,
   );
 
   const loadHistory = async () => {
@@ -81,23 +92,29 @@ function Deposit() {
   useEffect(() => {
     let active = true;
     Promise.all([
-      fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" }).then(
-        (response) => apiResult(response, "Unable to load cash and bank accounts"),
-      ),
       fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then(
         (response) => apiResult(response, "Unable to load ledger accounts"),
+      ),
+      fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load suppliers, customers, and employees"),
       ),
       fetch(getApiUrl("/api/deposits"), { credentials: "include" }).then(
         (response) => apiResult(response, "Unable to load deposit history"),
       ),
     ])
-      .then(([cashResult, ledgerResult, historyResult]) => {
+      .then(([ledgerResult, partyResult, historyResult]) => {
         if (!active) return;
-        const activeAccounts = cashResult.accounts || [];
-        setAccounts(activeAccounts);
+        const activeAssets = (ledgerResult.accounts || []).filter(
+          (account) => account.account_type === "asset",
+        );
         setLedgerAccounts(ledgerResult.accounts || []);
+        setParties({
+          suppliers: partyResult.suppliers || [],
+          customers: partyResult.customers || [],
+          employees: partyResult.employees || [],
+        });
         setHistory(historyResult.deposits || []);
-        setDepositToId(String(activeAccounts[0]?.id || ""));
+        setDepositToId(String(activeAssets[0]?.id || ""));
       })
       .catch((loadError) => {
         if (active) setError(loadError.message);
@@ -146,6 +163,8 @@ function Deposit() {
     if (selectedPaymentIds.has(String(payment.id))) return;
     const paymentLine = {
       receivedFrom: payment.payee,
+      partyType: "customer",
+      partyId: String(payment.customer_id || ""),
       fromAccount: payment.fromAccount,
       memo: payment.memo || "",
       chequeNumber: payment.payment_number || "",
@@ -196,7 +215,7 @@ function Deposit() {
         line.paymentRecordId,
     );
     if (!depositToId) {
-      setError("Choose an active cash or bank account to deposit into.");
+      setError("Choose an active asset account to deposit into.");
       return;
     }
     if (!depositLines.length) {
@@ -207,13 +226,15 @@ function Deposit() {
       depositLines.some(
         (line) =>
           !line.receivedFrom.trim() ||
+          !line.partyType ||
+          !line.partyId ||
           !line.fromAccount.trim() ||
           !Number.isFinite(Number(line.amount)) ||
           Number(line.amount) <= 0 ||
           !hasAtMostTwoDecimals(Number(line.amount)),
       )
     ) {
-      setError("Each line needs a received-from name, source account, and positive amount with up to two decimals.");
+      setError("Each line needs a received-from party, source account, and positive amount with up to two decimals.");
       return;
     }
     if (
@@ -240,7 +261,7 @@ function Deposit() {
           depositDate,
           reference,
           memo,
-          cashBankAccountId: Number(depositToId),
+          depositLedgerAccountId: Number(depositToId),
           cashBackAccount,
           cashBackMemo,
           cashBackAmount: cashBack,
@@ -361,14 +382,23 @@ function Deposit() {
             <span>Deposit to</span>
             <select
               value={depositToId}
-              onChange={(event) => setDepositToId(event.target.value)}
+              onChange={(event) => {
+                const nextAccount = assetAccounts.find(
+                  (account) => String(account.id) === event.target.value,
+                );
+                const nextName = nextAccount
+                  ? `${nextAccount.code} - ${nextAccount.name}`
+                  : "";
+                setDepositToId(event.target.value);
+                if (cashBackAccount === nextName) setCashBackAccount("");
+              }}
               required
               disabled={loading}
             >
-              <option value="">Select cash or bank account</option>
-              {accounts.map((account) => (
+              <option value="">Select an asset account</option>
+              {assetAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.account_name} · {account.account_type}
+                  {account.code} - {account.name}
                 </option>
               ))}
             </select>
@@ -403,14 +433,14 @@ function Deposit() {
         </section>
 
         <p className="deposit-instruction">
-          Select received customer payments or add amounts to deposit below.
+          Select received payments or add amounts to deposit below.
         </p>
 
         <section className="deposit-lines-section">
           <div className="deposit-lines-heading">
             <div>
               <h2>Payments included</h2>
-              <p>Each line credits its source ledger account and debits the deposit account.</p>
+              <p>Select the person or company that paid, then choose the source ledger account.</p>
             </div>
             <button type="button" className="deposit-secondary" onClick={loadPayments} disabled={paymentsLoading}>
               {paymentsLoading ? "Loading…" : "＋ Select payments"}
@@ -433,14 +463,44 @@ function Deposit() {
                 {lines.map((line, index) => (
                   <tr key={line.paymentRecordId || `line-${index}`}>
                     <td>
-                      <input
+                      <select
                         aria-label={`Received from, line ${index + 1}`}
-                        value={line.receivedFrom}
-                        onChange={(event) => updateLine(index, "receivedFrom", event.target.value)}
-                        maxLength={200}
-                        placeholder="Name or source"
-                        readOnly={Boolean(line.paymentRecordId)}
-                      />
+                        value={line.partyType && line.partyId ? `${line.partyType}:${line.partyId}` : ""}
+                        onChange={(event) => {
+                          const [partyType = "", partyId = ""] = event.target.value.split(":");
+                          const collection = parties[`${partyType}s`] || [];
+                          const party = collection.find((item) => String(item.id) === partyId);
+                          const name = party?.name || party?.users?.name ||
+                            [party?.first_name, party?.last_name].filter(Boolean).join(" ");
+                          setLines((current) => current.map((item, lineIndex) =>
+                            lineIndex === index
+                              ? { ...item, partyType, partyId, receivedFrom: name }
+                              : item,
+                          ));
+                          setError("");
+                        }}
+                        required
+                        disabled={Boolean(line.paymentRecordId)}
+                      >
+                        <option value="">Select employee, supplier, or customer</option>
+                        <optgroup label="Customers">
+                          {parties.customers.map((party) => (
+                            <option key={`customer-${party.id}`} value={`customer:${party.id}`}>{party.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Suppliers">
+                          {parties.suppliers.map((party) => (
+                            <option key={`supplier-${party.id}`} value={`supplier:${party.id}`}>{party.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Employees">
+                          {parties.employees.map((party) => (
+                            <option key={`employee-${party.id}`} value={`employee:${party.id}`}>
+                              {party.name || party.users?.name || `${party.first_name || ""} ${party.last_name || ""}`.trim()}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
                     </td>
                     <td>
                       <select
@@ -602,7 +662,7 @@ function Deposit() {
                     <tbody>
                       {availablePayments.map((payment) => {
                         const selected = selectedPaymentIds.has(String(payment.id));
-                        const sameAccount = String(payment.cash_bank_account_id) === depositToId;
+                        const sameAccount = String(payment.source_ledger_account_id) === depositToId;
                         return (
                           <tr key={payment.id}>
                             <td>{payment.payment_date}</td>
