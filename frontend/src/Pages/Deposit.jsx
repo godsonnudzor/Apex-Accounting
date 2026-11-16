@@ -95,23 +95,29 @@ function Deposit() {
       fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then(
         (response) => apiResult(response, "Unable to load ledger accounts"),
       ),
-      fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" }).then(
-        (response) => apiResult(response, "Unable to load suppliers, customers, and employees"),
+      fetch(getApiUrl("/api/suppliers?includeInactive=true"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load suppliers"),
+      ),
+      fetch(getApiUrl("/api/customers?includeInactive=true"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load customers"),
+      ),
+      fetch(getApiUrl("/api/employees"), { credentials: "include" }).then(
+        (response) => apiResult(response, "Unable to load employees"),
       ),
       fetch(getApiUrl("/api/deposits"), { credentials: "include" }).then(
         (response) => apiResult(response, "Unable to load deposit history"),
       ),
     ])
-      .then(([ledgerResult, partyResult, historyResult]) => {
+      .then(([ledgerResult, supplierResult, customerResult, employeeResult, historyResult]) => {
         if (!active) return;
         const activeAssets = (ledgerResult.accounts || []).filter(
           (account) => account.account_type === "asset",
         );
         setLedgerAccounts(ledgerResult.accounts || []);
         setParties({
-          suppliers: partyResult.suppliers || [],
-          customers: partyResult.customers || [],
-          employees: partyResult.employees || [],
+          suppliers: supplierResult.suppliers || [],
+          customers: customerResult.customers || [],
+          employees: employeeResult.employees || [],
         });
         setHistory(historyResult.deposits || []);
         setDepositToId(String(activeAssets[0]?.id || ""));
