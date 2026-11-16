@@ -234,61 +234,84 @@ function Admin() {
     .toUpperCase();
   const isAdmin = String(user?.role).toLowerCase() === "admin";
   const role = isAdmin ? "Administrator" : "Employee";
+  const canViewFinancialReports =
+    isAdmin || hasPermission("reports") || hasPermission("writeCheque");
+  const canViewTransactions = isAdmin || hasPermission("writeCheque");
   useEffect(() => {
-    if (!isAdmin) {
-      setDashboardReportLoading(false);
-      setDashboardAgingLoading(false);
-      setDashboardTransactionsLoading(false);
-      return undefined;
+    let active = true;
+    const reportRequests = [];
+
+    if (canViewFinancialReports) {
+      reportRequests.push(
+        [
+          "report",
+          `/api/reports/financial?year=${new Date().getFullYear()}`,
+          "Unable to load dashboard financial data",
+        ],
+        [
+          "aging",
+          "/api/reports/aging",
+          "Unable to load dashboard aging data",
+        ],
+      );
+    }
+    if (canViewTransactions) {
+      reportRequests.push([
+        "transactions",
+        "/api/journal?status=posted&limit=8",
+        "Unable to load recent transactions",
+      ]);
     }
 
-    let active = true;
-    const year = new Date().getFullYear();
-    setDashboardReportLoading(true);
+    setDashboardReport(null);
+    setDashboardAging(null);
+    setDashboardTransactions([]);
     setDashboardReportError("");
-    setDashboardAgingLoading(true);
     setDashboardAgingError("");
-    setDashboardTransactionsLoading(true);
     setDashboardTransactionsError("");
+    setDashboardReportLoading(canViewFinancialReports);
+    setDashboardAgingLoading(canViewFinancialReports);
+    setDashboardTransactionsLoading(canViewTransactions);
 
-    const request = (path, fallbackMessage) =>
+    if (!reportRequests.length) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const request = ([, path, fallbackMessage]) =>
       fetch(getApiUrl(path), { credentials: "include" }).then(
         async (response) => {
-        const result = await readApiResponse(response);
-        if (!response.ok) {
-          throw new Error(result.message || fallbackMessage);
-        }
-        return result;
+          const result = await readApiResponse(response);
+          if (!response.ok) {
+            throw new Error(result.message || fallbackMessage);
+          }
+          return result;
         },
       );
 
-    Promise.allSettled([
-      request(
-        `/api/reports/financial?year=${year}`,
-        "Unable to load dashboard financial data",
-      ),
-      request("/api/reports/aging", "Unable to load dashboard aging data"),
-      request(
-        "/api/journal?status=posted&limit=8",
-        "Unable to load recent transactions",
-      ),
-    ]).then(([reportResult, agingResult, transactionResult]) => {
+    Promise.allSettled(reportRequests.map(request)).then((results) => {
       if (!active) return;
-      if (reportResult.status === "fulfilled") {
-        setDashboardReport(reportResult.value);
-      } else {
-        setDashboardReportError(reportResult.reason.message);
-      }
-      if (agingResult.status === "fulfilled") {
-        setDashboardAging(agingResult.value);
-      } else {
-        setDashboardAgingError(agingResult.reason.message);
-      }
-      if (transactionResult.status === "fulfilled") {
-        setDashboardTransactions(transactionResult.value.entries || []);
-      } else {
-        setDashboardTransactionsError(transactionResult.reason.message);
-      }
+      results.forEach((result, index) => {
+        const [kind] = reportRequests[index];
+        if (result.status === "fulfilled") {
+          if (kind === "report") setDashboardReport(result.value);
+          if (kind === "aging") setDashboardAging(result.value);
+          if (kind === "transactions") {
+            setDashboardTransactions(result.value.entries || []);
+          }
+        } else {
+          if (kind === "report") {
+            setDashboardReportError(result.reason.message);
+          }
+          if (kind === "aging") {
+            setDashboardAgingError(result.reason.message);
+          }
+          if (kind === "transactions") {
+            setDashboardTransactionsError(result.reason.message);
+          }
+        }
+      });
       setDashboardReportLoading(false);
       setDashboardAgingLoading(false);
       setDashboardTransactionsLoading(false);
@@ -297,7 +320,7 @@ function Admin() {
     return () => {
       active = false;
     };
-  }, [isAdmin]);
+  }, [canViewFinancialReports, canViewTransactions, user?.id]);
 
   const reportMonths = dashboardReport?.months || [];
   const monthlyProfitLoss = dashboardReport?.monthlyProfitLoss || [];
@@ -623,7 +646,7 @@ function Admin() {
             <p className="subtitle">
               {isAdmin
                 ? "Here’s what’s happening with your finances today."
-                : "Your workspace shows only the tools enabled for your account."}
+                : "Here’s the financial activity and workspace access available to your account."}
             </p>
           </div>
           {isAdmin && <button
@@ -672,7 +695,7 @@ function Admin() {
             )}
           </section>
         )}
-        {isAdmin && <section className="metric-grid" aria-label="Financial health">
+        {canViewFinancialReports && <section className="metric-grid" aria-label="Financial health">
           {metrics.map((metric) => (
             <article className="metric-card" key={metric.label}>
               <div className={`metric-icon ${metric.tone}`}>{metric.icon}</div>
@@ -691,7 +714,7 @@ function Admin() {
             </article>
           ))}
         </section>}
-        {isAdmin && dashboardReportError ? (
+        {canViewFinancialReports && dashboardReportError ? (
           <p
             className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
             role="alert"
@@ -699,7 +722,8 @@ function Admin() {
             Live dashboard financial data could not be loaded: {dashboardReportError}
           </p>
         ) : null}
-        {isAdmin && <section className="dashboard-grid">
+        {(canViewFinancialReports || canViewTransactions || isAdmin) && <section className="dashboard-grid">
+          {canViewFinancialReports && <>
           <article className="panel cash-panel">
             <div className="panel-header">
               <div>
@@ -799,6 +823,8 @@ function Admin() {
               </p>
             )}
           </article>
+          </>}
+          {canViewTransactions && (
           <article className="panel transactions-panel" id="transactions">
             <div className="panel-header">
               <div>
@@ -846,6 +872,8 @@ function Admin() {
               </p>
             )}
           </article>
+          )}
+          {canViewFinancialReports && (
           <article className="panel aging-panel">
             <div className="panel-header">
               <div>
@@ -853,9 +881,11 @@ function Admin() {
                 <p>Open customer invoices by age</p>
                 <p>Payment allocations are not included yet.</p>
               </div>
-              <Link className="text-button" to="/customers/aging">
-                View report <span>→</span>
-              </Link>
+              {(isAdmin || hasPermission("invoice") || hasPermission("bills")) && (
+                <Link className="text-button" to="/customers/aging">
+                  View report <span>→</span>
+                </Link>
+              )}
             </div>
             {dashboardAgingLoading ? (
               <p className="py-8 text-center text-sm text-slate-500">
@@ -891,6 +921,8 @@ function Admin() {
               </div>
             )}
           </article>
+          )}
+          {isAdmin && (
           <article className="panel alerts-panel">
             <div className="panel-header">
               <div>
@@ -915,6 +947,7 @@ function Admin() {
               View all notifications <span>→</span>
             </button>
           </article>
+          )}
         </section>}
         {message && (
           <div className="toast" role="status">

@@ -2644,7 +2644,7 @@ router.get("/api/payments/history", async (req, res) => {
 
 router.get("/api/reports/financial", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, ["reports", "write_cheque"]);
     if (!allowed)
       return res.status(403).json({ message: "Report permission required" });
     const year = /^\d{4}$/.test(String(req.query?.year || ""))
@@ -2777,7 +2777,7 @@ router.get("/api/reports/financial", async (req, res) => {
 
 router.get("/api/reports/financial/details", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, ["reports", "write_cheque"]);
     if (!allowed)
       return res.status(403).json({ message: "Report permission required" });
     const account = String(req.query?.account || "").trim();
@@ -2869,7 +2869,7 @@ router.get("/api/reports/financial/details", async (req, res) => {
 
 router.get("/api/reports/aging", async (req, res) => {
   try {
-    const { allowed } = await canUseAccounting(req);
+    const { allowed } = await canUseAccounting(req, ["reports", "write_cheque"]);
     if (!allowed)
       return res.status(403).json({ message: "Report permission required" });
     const { data, error } = await supabase
