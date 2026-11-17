@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
 import DropdownMenu from "./DropdownMenu";
 import { getApiUrl, readApiResponse, useAuth } from "../../context/auth";
+import {
+  readOpenedDocuments,
+  removeOpenedDocument,
+} from "../../lib/openDocuments";
 
 const metrics = [
   {
@@ -126,11 +130,15 @@ function CashFlowChart({ data }) {
 
 function Admin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, hasPermission } = useAuth();
   const [range, setRange] = useState("6 months");
   const [darkMode, setDarkMode] = useState(false);
   const [message, setMessage] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openedDocuments, setOpenedDocuments] = useState(() =>
+    readOpenedDocuments(user?.id),
+  );
   const [dashboardReport, setDashboardReport] = useState(null);
   const [dashboardReportLoading, setDashboardReportLoading] = useState(true);
   const [dashboardReportError, setDashboardReportError] = useState("");
@@ -156,6 +164,9 @@ function Admin() {
   const canViewFinancialReports =
     isAdmin || hasPermission("reports") || hasPermission("writeCheque");
   const canViewTransactions = isAdmin || hasPermission("writeCheque");
+  useEffect(() => {
+    setOpenedDocuments(readOpenedDocuments(user?.id));
+  }, [user?.id]);
   useEffect(() => {
     let active = true;
     const reportRequests = [];
@@ -504,8 +515,101 @@ function Admin() {
             Apex<span className="brand-muted"> / {isAdmin ? "finance" : "workspace"}</span>
           </span>
         </div>
-        
-       
+        <nav className="nav-list" aria-label="My shortcuts">
+          <p className="sidebar-section-title">My shortcuts</p>
+          <Link
+            className={`nav-item${location.pathname === (isAdmin ? "/dashboard" : "/EmployeeDashboard") ? " active" : ""}`}
+            to={isAdmin ? "/dashboard" : "/EmployeeDashboard"}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span aria-hidden="true">⌂</span>Home
+          </Link>
+          {(isAdmin || hasPermission("invoice") || hasPermission("bills")) && (
+            <Link
+              className={`nav-item${location.pathname.startsWith("/customers") ? " active" : ""}`}
+              to="/customersCenter"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span aria-hidden="true">♙</span>Customers
+            </Link>
+          )}
+          {(isAdmin || hasPermission("invoice") || hasPermission("bills")) && (
+            <Link
+              className={`nav-item${location.pathname.startsWith("/suppliers") ? " active" : ""}`}
+              to="/suppliersCenter"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span aria-hidden="true">▤</span>Suppliers
+            </Link>
+          )}
+          {(isAdmin || hasPermission("employeeManagement")) && (
+            <Link
+              className={`nav-item${location.pathname.startsWith("/employees") ? " active" : ""}`}
+              to="/employees"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span aria-hidden="true">♟</span>Employees
+            </Link>
+          )}
+          {(isAdmin || hasPermission("writeCheque")) && (
+            <Link
+              className={`nav-item${["/write-cheque", "/deposits", "/journal"].some((path) => location.pathname.startsWith(path)) ? " active" : ""}`}
+              to="/write-cheque"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span aria-hidden="true">▣</span>Online banking
+            </Link>
+          )}
+          {(isAdmin || hasPermission("reports") || hasPermission("writeCheque")) && (
+            <Link
+              className={`nav-item${location.pathname.startsWith("/financial-reports") ? " active" : ""}`}
+              to="/financial-reports/profit-loss"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span aria-hidden="true">▥</span>Reports
+            </Link>
+          )}
+        </nav>
+        <section className="open-documents" aria-label="Opened documents">
+          <div className="open-documents-heading">
+            <h2>Opened documents</h2>
+            {openedDocuments.length > 0 && <span>{openedDocuments.length}</span>}
+          </div>
+          {openedDocuments.length ? (
+            <ul>
+              {openedDocuments.map((document) => (
+                <li
+                  className={location.pathname + location.search === document.href ? "current" : ""}
+                  key={document.href}
+                >
+                  <Link
+                    to={document.href}
+                    title={document.title}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span aria-hidden="true">▤</span>
+                    <span>{document.title}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label={`Close ${document.title}`}
+                    title={`Close ${document.title}`}
+                    onClick={() => {
+                      removeOpenedDocument(user.id, document.href);
+                      setOpenedDocuments(readOpenedDocuments(user.id));
+                    }}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="open-documents-empty">
+              Pages you visit will appear here.
+            </p>
+          )}
+        </section>
         <div className="sidebar-bottom">
           {isAdmin && (
             <Link className="nav-item" to="/settings">

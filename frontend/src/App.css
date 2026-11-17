@@ -246,6 +246,7 @@ button {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 .brand,
 .mobile-brand {
@@ -273,9 +274,17 @@ button {
   font-size: 12px;
 }
 .nav-list {
-  margin-top: 53px;
+  margin-top: 31px;
   display: grid;
   gap: 6px;
+}
+.sidebar-section-title {
+  margin: 0 0 5px 15px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .07em;
 }
 .nav-item {
   min-height: 44px;
@@ -305,6 +314,92 @@ button {
   background: #d9eee8;
   border-radius: 20px;
   font-size: 10px;
+}
+.open-documents {
+  min-height: 0;
+  margin-top: 22px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+.open-documents-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 8px 8px;
+}
+.open-documents-heading h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.open-documents-heading > span {
+  padding: 2px 7px;
+  border-radius: 20px;
+  color: #227d66;
+  background: #d9eee8;
+  font-size: 10px;
+  font-weight: 700;
+}
+.open-documents ul {
+  display: grid;
+  gap: 3px;
+  max-height: min(32vh, 260px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.open-documents li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 6px;
+}
+.open-documents li.current {
+  background: #e8f2ef;
+}
+.open-documents li > a {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  gap: 8px;
+  padding: 8px 6px 8px 10px;
+  color: var(--ink);
+  font-size: 11px;
+  text-decoration: none;
+}
+.open-documents li > a span:first-child {
+  color: #668078;
+}
+.open-documents li > a span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.open-documents li > button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 18px;
+}
+.open-documents li > button:hover {
+  color: #bd4d4d;
+  background: var(--line);
+}
+.open-documents-empty {
+  margin: 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 .sidebar-bottom {
   margin-top: auto;

@@ -40,6 +40,7 @@ import TaxDataTable from "./components/TaxDataTable";
 import { useLoaderData } from "react-router-dom";
 import GroupAccount from "./Pages/GroupAccount";
 import AuditTrail from "./Pages/AuditTrail";
+import { registerOpenedDocument } from "./lib/openDocuments";
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
@@ -427,9 +428,35 @@ const router = createBrowserRouter([
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
 
+function OpenDocumentTracker() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    let lastRegisteredLocation = "";
+    const trackLocation = (state) => {
+      if (state.navigation.state !== "idle") return;
+
+      const { pathname, search } = state.location;
+      const locationKey = `${pathname}${search}`;
+      if (locationKey === lastRegisteredLocation) return;
+
+      lastRegisteredLocation = locationKey;
+      registerOpenedDocument(user.id, pathname, search);
+    };
+
+    trackLocation(router.state);
+    return router.subscribe(trackLocation);
+  }, [user?.id]);
+
+  return null;
+}
+
 function App() {
   return (
     <AuthProvider>
+      <OpenDocumentTracker />
       <RouterProvider router={router} />
     </AuthProvider>
   );
