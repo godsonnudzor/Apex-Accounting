@@ -1031,6 +1031,75 @@ router.get("/api/cash-bank-accounts", async (req, res) => {
   }
 });
 
+router.post("/api/cash-bank-accounts", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Banking permission required" });
+
+    const ledgerAccountId = Number(req.body?.ledgerAccountId);
+    const accountName = String(req.body?.accountName || "").trim();
+    const bankName = String(req.body?.bankName || "").trim();
+    const accountNumber = String(req.body?.accountNumber || "").trim();
+    const currency = String(req.body?.currency || "GHS").trim().toUpperCase();
+    if (
+      !Number.isSafeInteger(ledgerAccountId) ||
+      ledgerAccountId < 1 ||
+      !accountName ||
+      accountName.length > 150 ||
+      bankName.length > 150 ||
+      accountNumber.length > 100 ||
+      !/^[A-Z]{3}$/.test(currency)
+    ) {
+      return res.status(400).json({ message: "Enter valid bank account details" });
+    }
+
+    const { data: ledgerAccount, error: ledgerError } = await supabase
+      .from("ledger_accounts")
+      .select("id, account_type, is_active")
+      .eq("id", ledgerAccountId)
+      .maybeSingle();
+    if (ledgerError) throw ledgerError;
+    if (
+      !ledgerAccount ||
+      !ledgerAccount.is_active ||
+      ledgerAccount.account_type !== "asset"
+    ) {
+      return res.status(400).json({
+        message: "Select an active asset ledger account for the bank account",
+      });
+    }
+
+    const { data: account, error } = await supabase
+      .from("cash_bank_accounts")
+      .insert({
+        ledger_account_id: ledgerAccountId,
+        account_name: accountName,
+        bank_name: bankName || null,
+        account_number: accountNumber || null,
+        account_type: "bank",
+        currency,
+      })
+      .select(
+        "id, account_name, account_number, bank_name, account_type, currency, ledger_account_id, ledger_accounts(id, code, name, account_type)",
+      )
+      .single();
+    if (error) {
+      if (error.code === "23505")
+        return res.status(409).json({
+          message: "That bank account name or ledger account is already registered",
+        });
+      throw error;
+    }
+    return res.status(201).json({ account: { ...account, balance: 0 } });
+  } catch (error) {
+    console.error("Cash and bank account creation error:", error);
+    return res.status(500).json({
+      message: error?.message || "Unable to register bank account",
+    });
+  }
+});
+
 router.get("/api/bank-reconciliations", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req);
