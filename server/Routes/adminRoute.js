@@ -805,6 +805,12 @@ const canUseAccounting = async (req, permission = "write_cheque") => {
   };
 };
 
+const isValidDateOnly = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+};
+
 const getAccountingActorName = async (user) => {
   const { data, error } = await supabase
     .from("users")
@@ -1022,6 +1028,170 @@ router.get("/api/cash-bank-accounts", async (req, res) => {
       .json({
         message: error?.message || "Unable to load cash and bank accounts",
       });
+  }
+});
+
+router.get("/api/bank-reconciliations", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Banking permission required" });
+
+    const accountId = Number(req.query?.accountId);
+    const startDate = String(req.query?.startDate || "");
+    const endDate = String(req.query?.endDate || "");
+    if (
+      !Number.isSafeInteger(accountId) ||
+      accountId < 1 ||
+      !isValidDateOnly(startDate) ||
+      !isValidDateOnly(endDate) ||
+      startDate > endDate
+    ) {
+      return res.status(400).json({
+        message: "A bank account and valid statement date range are required",
+      });
+    }
+
+    const { data: cashAccount, error: accountError } = await supabase
+      .from("cash_bank_accounts")
+      .select(
+        "id, account_name, bank_name, account_number, account_type, currency, ledger_accounts(code, name)",
+      )
+      .eq("id", accountId)
+      .eq("is_active", true)
+      .eq("account_type", "bank")
+      .maybeSingle();
+    if (accountError) throw accountError;
+    if (!cashAccount)
+      return res.status(404).json({ message: "Active bank account not found" });
+
+    const ledgerAccount = Array.isArray(cashAccount.ledger_accounts)
+      ? cashAccount.ledger_accounts[0]
+      : cashAccount.ledger_accounts;
+    if (!ledgerAccount?.code || !ledgerAccount?.name) {
+      throw new Error("The selected bank account is not linked to a ledger account");
+    }
+    const ledgerName = `${ledgerAccount.code} - ${ledgerAccount.name}`;
+
+    const [entriesResult, historyResult, clearedResult] = await Promise.all([
+      supabase
+        .from("journal_entries")
+        .select(
+          "id, entry_date, reference, description, journal_lines!inner(id, account, debit, credit, memo)",
+        )
+        .eq("status", "posted")
+        .eq("journal_lines.account", ledgerName)
+        .gte("entry_date", startDate)
+        .lte("entry_date", endDate)
+        .order("entry_date", { ascending: true })
+        .order("id", { ascending: true }),
+      supabase
+        .from("bank_reconciliations")
+        .select(
+          "id, statement_start_date, statement_end_date, opening_balance, statement_ending_balance, cleared_amount, difference, created_at, bank_reconciliation_lines(journal_line_id)",
+        )
+        .eq("cash_bank_account_id", accountId)
+        .order("statement_end_date", { ascending: false }),
+      supabase
+        .from("bank_reconciliation_lines")
+        .select("journal_line_id"),
+    ]);
+    if (entriesResult.error) throw entriesResult.error;
+    if (historyResult.error) throw historyResult.error;
+    if (clearedResult.error) throw clearedResult.error;
+
+    const alreadyReconciled = new Set(
+      (clearedResult.data || []).map((line) => Number(line.journal_line_id)),
+    );
+    const transactions = (entriesResult.data || []).flatMap((entry) =>
+      (entry.journal_lines || [])
+        .filter((line) => !alreadyReconciled.has(Number(line.id)))
+        .map((line) => ({
+          id: line.id,
+          entryId: entry.id,
+          date: entry.entry_date,
+          reference: entry.reference,
+          description: entry.description || line.memo || "",
+          amount: Number(line.debit || 0) - Number(line.credit || 0),
+        })),
+    );
+
+    return res.json({
+      transactions,
+      reconciliations: historyResult.data || [],
+    });
+  } catch (error) {
+    console.error("Bank reconciliation lookup error:", error);
+    return res.status(500).json({
+      message: error?.message || "Unable to load bank reconciliation data",
+    });
+  }
+});
+
+router.post("/api/bank-reconciliations", async (req, res) => {
+  try {
+    const { currentUser, allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Banking permission required" });
+
+    const accountId = Number(req.body?.accountId);
+    const startDate = String(req.body?.startDate || "");
+    const endDate = String(req.body?.endDate || "");
+    const openingBalanceValue = req.body?.openingBalance;
+    const endingBalanceValue = req.body?.endingBalance;
+    const openingBalance = Number(openingBalanceValue);
+    const endingBalance = Number(endingBalanceValue);
+    const clearedLineIds = req.body?.clearedLineIds;
+    if (
+      !Number.isSafeInteger(accountId) ||
+      accountId < 1 ||
+      !isValidDateOnly(startDate) ||
+      !isValidDateOnly(endDate) ||
+      startDate > endDate ||
+      openingBalanceValue === "" ||
+      openingBalanceValue === null ||
+      openingBalanceValue === undefined ||
+      endingBalanceValue === "" ||
+      endingBalanceValue === null ||
+      endingBalanceValue === undefined ||
+      !Number.isFinite(openingBalance) ||
+      !Number.isFinite(endingBalance) ||
+      Math.abs(openingBalance * 100 - Math.round(openingBalance * 100)) > 1e-7 ||
+      Math.abs(endingBalance * 100 - Math.round(endingBalance * 100)) > 1e-7 ||
+      !Array.isArray(clearedLineIds) ||
+      clearedLineIds.some((id) => !Number.isSafeInteger(Number(id)) || Number(id) < 1)
+    ) {
+      return res.status(400).json({ message: "Invalid reconciliation details" });
+    }
+
+    const { data: reconciliationId, error } = await supabase.rpc(
+      "complete_bank_reconciliation",
+      {
+        p_cash_bank_account_id: accountId,
+        p_statement_start_date: startDate,
+        p_statement_end_date: endDate,
+        p_opening_balance: openingBalance,
+        p_statement_ending_balance: endingBalance,
+        p_cleared_journal_line_ids: clearedLineIds.map(Number),
+        p_created_by: currentUser.id,
+      },
+    );
+    if (error) {
+      if (error.code === "23505")
+        return res.status(409).json({
+          message: "The statement period already exists or a selected transaction was reconciled",
+        });
+      if (error.code === "22023")
+        return res.status(400).json({ message: error.message });
+      throw error;
+    }
+
+    return res.status(201).json({ reconciliationId });
+  } catch (error) {
+    console.error("Bank reconciliation save error:", error);
+    return res.status(500).json({
+      message: error?.message || "Unable to complete bank reconciliation",
+    });
   }
 });
 

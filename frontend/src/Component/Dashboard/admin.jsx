@@ -553,7 +553,7 @@ function Admin() {
           )}
           {(isAdmin || hasPermission("writeCheque")) && (
             <Link
-              className={`nav-item${["/write-cheque", "/deposits", "/journal"].some((path) => location.pathname.startsWith(path)) ? " active" : ""}`}
+              className={`nav-item${["/write-cheque", "/deposits", "/journal", "/bank-reconciliation"].some((path) => location.pathname.startsWith(path)) ? " active" : ""}`}
               to="/write-cheque"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -683,7 +683,7 @@ function Admin() {
           <button onClick={() => runAction("Record expense")}>
             ↓ <span>Record expense</span>
           </button>
-          <button onClick={() => runAction("Bank reconciliation")}>
+          <button onClick={() => navigate("/bank-reconciliation")}>
             ↻ <span>Reconcile bank</span>
           </button>
         </div>}

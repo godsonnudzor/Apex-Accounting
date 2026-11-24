@@ -168,6 +168,12 @@
 @media (max-width: 850px) { .deposit-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }.deposit-summary { grid-template-columns: 1fr; }.deposit-totals { max-width: 380px; width: 100%; margin-left: auto; } }
 @media (max-width: 560px) { .deposit-app { padding: 14px 10px 30px; }.deposit-header, .deposit-toolbar { align-items: flex-start; flex-direction: column; }.deposit-header { gap: 12px; }.deposit-toolbar { padding: 12px; }.deposit-toolbar-links { width: 100%; justify-content: space-between; }.deposit-form { padding: 12px 12px 0; }.deposit-details { grid-template-columns: 1fr; }.deposit-instruction, .deposit-footer { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }.deposit-lines-heading { align-items: flex-start; flex-direction: column; }.deposit-cashback { grid-template-columns: 1fr; }.deposit-footer { align-items: flex-start; flex-direction: column; }.deposit-footer > div { width: 100%; flex-wrap: wrap; } }
 
+.bank-reconciliation-details { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.bank-reconciliation-history { margin-top: 18px; }
+.bank-reconciliation-history > .deposit-lines-heading { padding: 18px 16px 0; }
+@media (max-width: 850px) { .bank-reconciliation-details { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .bank-reconciliation-details { grid-template-columns: 1fr; } }
+
 .settings-app { min-height: 100vh; padding: 42px 6vw 70px; color: #18313a; background: #f3f7f6; background-image: radial-gradient(#d4e4e0 1px, transparent 1px); background-size: 26px 26px; font-family: "DM Sans", "Segoe UI", sans-serif; }
 .settings-topbar { display: flex; justify-content: space-between; align-items: flex-start; max-width: 1120px; margin: 0 auto 32px; }
 .settings-back { color: #227d66; text-decoration: none; font-size: 13px; font-weight: 700; }

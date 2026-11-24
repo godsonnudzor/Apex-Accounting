@@ -11,6 +11,7 @@ const routeTitles = {
   "/GroupAccount": "Group ledgers",
   "/write-cheque": "Write cheque",
   "/deposits": "Deposits",
+  "/bank-reconciliation": "Bank reconciliation",
   "/journal": "Journal entries",
   "/audit-trail": "Audit trail",
   "/chart-of-accounts": "Chart of accounts",
