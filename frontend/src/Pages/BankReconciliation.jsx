@@ -22,15 +22,7 @@ const formatMoney = (value, currency) => {
 
 function BankReconciliation() {
   const [accounts, setAccounts] = useState([]);
-  const [ledgerAccounts, setLedgerAccounts] = useState([]);
   const [accountId, setAccountId] = useState("");
-  const [newAccount, setNewAccount] = useState({
-    ledgerAccountId: "",
-    accountName: "",
-    bankName: "",
-    accountNumber: "",
-    currency: "GHS",
-  });
   const [startDate, setStartDate] = useState(firstOfMonth);
   const [endDate, setEndDate] = useState(today);
   const [openingBalance, setOpeningBalance] = useState("");
@@ -41,7 +33,6 @@ function BankReconciliation() {
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savingAccount, setSavingAccount] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -77,36 +68,18 @@ function BankReconciliation() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" }).then(
-        (response) =>
-          apiResult(response, "Unable to load cash and bank accounts"),
-      ),
-      fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }).then(
-        (response) => apiResult(response, "Unable to load ledger accounts"),
-      ),
-    ])
-      .then(([accountResult, ledgerResult]) => {
+    fetch(getApiUrl("/api/cash-bank-accounts"), { credentials: "include" })
+      .then((response) =>
+        apiResult(response, "Unable to load cash and bank accounts"),
+      )
+      .then((accountResult) => {
         if (!active) return;
-        const allAccounts = accountResult.accounts || [];
-        const bankAccounts = allAccounts.filter(
-          (account) => account.account_type === "bank",
-        );
-        setAccounts(bankAccounts);
-        const linkedLedgerAccountIds = new Set(
-          allAccounts.map((account) => Number(account.ledger_account_id)),
-        );
-        setLedgerAccounts(
-          (ledgerResult.accounts || []).filter(
-            (account) =>
-              account.account_type === "asset" &&
-              !linkedLedgerAccountIds.has(Number(account.id)),
-          ),
-        );
+        const activeAccounts = accountResult.accounts || [];
+        setAccounts(activeAccounts);
         setAccountId((current) =>
-          bankAccounts.some((account) => String(account.id) === current)
+          activeAccounts.some((account) => String(account.id) === current)
             ? current
-            : String(bankAccounts[0]?.id || ""),
+            : String(activeAccounts[0]?.id || ""),
         );
       })
       .catch((loadError) => {
@@ -119,46 +92,6 @@ function BankReconciliation() {
       active = false;
     };
   }, []);
-
-  const createBankAccount = async (event) => {
-    event.preventDefault();
-    setError("");
-    setNotice("");
-    setSavingAccount(true);
-    try {
-    const response = await fetch(getApiUrl("/api/cash-bank-accounts"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newAccount),
-    });
-    const result = await apiResult(response, "Unable to register bank account");
-    setAccounts((current) =>
-      [...current, result.account].sort((left, right) =>
-        left.account_name.localeCompare(right.account_name),
-      ),
-    );
-    setAccountId(String(result.account.id));
-    setLedgerAccounts((current) =>
-      current.filter(
-        (account) =>
-          Number(account.id) !== Number(result.account.ledger_account_id),
-      ),
-    );
-    setNewAccount({
-      ledgerAccountId: "",
-      accountName: "",
-      bankName: "",
-      accountNumber: "",
-      currency: "GHS",
-    });
-    setNotice("Bank account registered and ready to reconcile.");
-    } catch (saveError) {
-    setError(saveError.message);
-    } finally {
-    setSavingAccount(false);
-    }
-  };
 
   useEffect(() => {
     if (!accountId || !startDate || !endDate || startDate > endDate) {
@@ -258,111 +191,11 @@ function BankReconciliation() {
       {error && <p className="deposit-alert error" role="alert">{error}</p>}
       {notice && <p className="deposit-alert success" role="status">{notice}</p>}
 
-      {(!loadingAccounts && !accounts.length) && (
+      {!loadingAccounts && !accounts.length && (
         <p className="deposit-alert bank-account-empty" role="status">
-          No bank accounts are registered yet. Add one below, linked to an
-          active asset ledger account.
+          No active cash or bank accounts are available.
         </p>
       )}
-
-      <details className="bank-account-setup" open={!accounts.length}>
-        <summary>{accounts.length ? "Add a bank account" : "Register a bank account"}</summary>
-        <form onSubmit={createBankAccount}>
-          <label>
-            Asset ledger account
-            <select
-              value={newAccount.ledgerAccountId}
-              onChange={(event) =>
-                setNewAccount((current) => ({
-                  ...current,
-                  ledgerAccountId: event.target.value,
-                }))
-              }
-              required
-              disabled={!ledgerAccounts.length || savingAccount}
-            >
-              <option value="">
-                {ledgerAccounts.length
-                  ? "Select an unlinked asset account"
-                  : "No unlinked asset accounts available"}
-              </option>
-              {ledgerAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.code} - {account.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!ledgerAccounts.length && (
-            <p className="bank-account-ledger-hint">
-              No unlinked asset accounts are available.{" "}
-              <Link to="/ledger-accounts/new">Create an asset ledger account</Link>.
-            </p>
-          )}
-          <label>
-            Bank account name
-            <input
-              value={newAccount.accountName}
-              onChange={(event) =>
-                setNewAccount((current) => ({
-                  ...current,
-                  accountName: event.target.value,
-                }))
-              }
-              maxLength={150}
-              required
-            />
-          </label>
-          <label>
-            Bank name
-            <input
-              value={newAccount.bankName}
-              onChange={(event) =>
-                setNewAccount((current) => ({
-                  ...current,
-                  bankName: event.target.value,
-                }))
-              }
-              maxLength={150}
-            />
-          </label>
-          <label>
-            Account number
-            <input
-              value={newAccount.accountNumber}
-              onChange={(event) =>
-                setNewAccount((current) => ({
-                  ...current,
-                  accountNumber: event.target.value,
-                }))
-              }
-              maxLength={100}
-            />
-          </label>
-          <label>
-            Currency
-            <input
-              value={newAccount.currency}
-              onChange={(event) =>
-                setNewAccount((current) => ({
-                  ...current,
-                  currency: event.target.value.toUpperCase(),
-                }))
-              }
-              maxLength={3}
-              pattern="[A-Za-z]{3}"
-              required
-            />
-          </label>
-          <button
-            type="submit"
-            className="deposit-save primary"
-            disabled={!ledgerAccounts.length || savingAccount}
-          >
-            {savingAccount ? "Registering..." : "Register bank account"}
-          </button>
-        </form>
-      </details>
 
       <form className="deposit-form" onSubmit={completeReconciliation}>
         <section
@@ -370,7 +203,7 @@ function BankReconciliation() {
           aria-label="Statement details"
         >
           <label>
-            Bank account
+            Bank Account
             <select
               value={accountId}
               onChange={(event) => setAccountId(event.target.value)}
@@ -378,11 +211,14 @@ function BankReconciliation() {
               required
             >
               <option value="">
-                {loadingAccounts ? "Loading accounts..." : "Select bank account"}
+                {loadingAccounts
+                  ? "Loading accounts..."
+                  : "Select cash or bank account"}
               </option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.account_name}
+                  {` (${account.account_type})`}
                   {account.bank_name ? ` · ${account.bank_name}` : ""}
                 </option>
               ))}
