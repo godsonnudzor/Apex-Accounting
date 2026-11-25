@@ -6,6 +6,14 @@ import QuickReport from "../components/QuickReport";
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 const initialGroupForm = { name: "", accountType: "asset" };
+const initialCashBankForm = {
+  accountType: "bank",
+  accountNumber: "",
+  accountName: "",
+  currency: "GHS",
+  bankName: "",
+  bankBranch: "",
+};
 
 const ChartOfAccounts = () => {
   const [accounts, setAccounts] = useState([]);
@@ -19,6 +27,11 @@ const ChartOfAccounts = () => {
   const [groupError, setGroupError] = useState("");
   const [groupMessage, setGroupMessage] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
+  const [showCashBankForm, setShowCashBankForm] = useState(false);
+  const [cashBankForm, setCashBankForm] = useState(initialCashBankForm);
+  const [savingCashBank, setSavingCashBank] = useState(false);
+  const [cashBankError, setCashBankError] = useState("");
+  const [cashBankMessage, setCashBankMessage] = useState("");
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -221,6 +234,48 @@ const ChartOfAccounts = () => {
     }
   };
 
+  const createCashBankAccount = async (event) => {
+    event.preventDefault();
+    setCashBankError("");
+    setCashBankMessage("");
+    setSavingCashBank(true);
+    try {
+      const response = await fetch(getApiUrl("/api/cash-bank-accounts"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cashBankForm),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to create cash or bank account");
+      }
+      setAccounts((current) =>
+        [...current, result.account].sort((left, right) =>
+          String(left.code).localeCompare(String(right.code)),
+        ),
+      );
+      setCashBankForm(initialCashBankForm);
+      setShowCashBankForm(false);
+      setCashBankMessage(`${result.account.name} was added under Current Assets.`);
+    } catch (saveError) {
+      setCashBankError(saveError.message);
+    } finally {
+      setSavingCashBank(false);
+    }
+  };
+
+  const updateCashBankForm = (field, value) => {
+    setCashBankForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "accountType" && value === "cash"
+        ? { bankName: "", bankBranch: "" }
+        : {}),
+    }));
+    setCashBankError("");
+  };
+
   const openLedgerReport = async (account) => {
     setSelectedAccount(account);
     setLedgerLoading(true);
@@ -255,6 +310,17 @@ const ChartOfAccounts = () => {
             <p className="mt-2 text-sm text-slate-500">Manage the accounts used by payroll, payments, and journal entries.</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setCashBankError("");
+                setCashBankMessage("");
+                setShowCashBankForm(true);
+              }}
+              className="rounded border border-teal-700 bg-white px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50"
+            >
+              Add cash / bank account
+            </button>
             <Link to="/ledger-accounts/new" className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-teal-800">Create ledger account</Link>
             <a href="#group-ledgers" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 no-underline hover:bg-slate-50">Group ledgers</a>
             <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm">
@@ -266,6 +332,7 @@ const ChartOfAccounts = () => {
 
         {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         {partyError && <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">Party ledgers could not be loaded: {partyError}</p>}
+        {cashBankMessage && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{cashBankMessage}</p>}
         <section id="group-ledgers" className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-slate-900">Group ledgers</h2>
@@ -374,6 +441,143 @@ const ChartOfAccounts = () => {
             </tbody>
           </table>
         </div>
+
+        {showCashBankForm ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !savingCashBank) {
+                setShowCashBankForm(false);
+              }
+            }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cash-bank-dialog-title"
+              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
+            >
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-teal-600">Current Assets</p>
+                  <h2 id="cash-bank-dialog-title" className="mt-1 text-xl font-bold text-slate-900">
+                    Add cash or bank account
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    This creates both the ledger account and its linked cash/bank record.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close dialog"
+                  disabled={savingCashBank}
+                  onClick={() => setShowCashBankForm(false)}
+                  className="rounded px-2 py-1 text-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  ×
+                </button>
+              </div>
+              <form onSubmit={createCashBankAccount} className="space-y-4">
+                {cashBankError ? (
+                  <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                    {cashBankError}
+                  </p>
+                ) : null}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Account type
+                    <select
+                      required
+                      value={cashBankForm.accountType}
+                      onChange={(event) => updateCashBankForm("accountType", event.target.value)}
+                      className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2"
+                    >
+                      <option value="bank">Bank</option>
+                      <option value="cash">Cash</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Account name
+                    <input
+                      required
+                      maxLength={150}
+                      value={cashBankForm.accountName}
+                      onChange={(event) => updateCashBankForm("accountName", event.target.value)}
+                      placeholder="Main operating account"
+                      className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Currency
+                    <input
+                      required
+                      maxLength={3}
+                      pattern="[A-Za-z]{3}"
+                      title="Enter a three-letter currency code, for example GHS or USD"
+                      value={cashBankForm.currency}
+                      onChange={(event) => updateCashBankForm("currency", event.target.value.toUpperCase())}
+                      placeholder="GHS"
+                      className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 uppercase"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Account number{cashBankForm.accountType === "bank" ? " *" : ""}
+                    <input
+                      required={cashBankForm.accountType === "bank"}
+                      maxLength={100}
+                      value={cashBankForm.accountNumber}
+                      onChange={(event) => updateCashBankForm("accountNumber", event.target.value)}
+                      className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                    />
+                  </label>
+                  {cashBankForm.accountType === "bank" ? (
+                    <>
+                      <label className="text-sm font-medium text-slate-700">
+                        Bank name
+                        <input
+                          required
+                          maxLength={150}
+                          value={cashBankForm.bankName}
+                          onChange={(event) => updateCashBankForm("bankName", event.target.value)}
+                          placeholder="Bank name"
+                          className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                        />
+                      </label>
+                      <label className="text-sm font-medium text-slate-700">
+                        Bank branch
+                        <input
+                          required
+                          maxLength={150}
+                          value={cashBankForm.bankBranch}
+                          onChange={(event) => updateCashBankForm("bankBranch", event.target.value)}
+                          placeholder="Branch name"
+                          className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+                <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+                  <button
+                    type="button"
+                    disabled={savingCashBank}
+                    onClick={() => setShowCashBankForm(false)}
+                    className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingCashBank}
+                    className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+                  >
+                    {savingCashBank ? "Creating…" : "Create account"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
 
         {selectedAccount ? (
           <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

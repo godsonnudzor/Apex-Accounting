@@ -983,6 +983,78 @@ router.post("/api/ledger/accounts", async (req, res) => {
   }
 });
 
+router.post("/api/cash-bank-accounts", async (req, res) => {
+  try {
+    const { allowed } = await canUseAccounting(req);
+    if (!allowed)
+      return res.status(403).json({ message: "Ledger permission required" });
+
+    const accountName = String(req.body?.accountName || "").trim();
+    const accountNumber = String(req.body?.accountNumber || "").trim();
+    const currency = String(req.body?.currency || "").trim().toUpperCase();
+    const bankName = String(req.body?.bankName || "").trim();
+    const bankBranch = String(req.body?.bankBranch || "").trim();
+    const accountType = String(req.body?.accountType || "").trim().toLowerCase();
+    if (
+      !accountName ||
+      accountName.length > 150 ||
+      !/^[A-Z]{3}$/.test(currency) ||
+      !["cash", "bank"].includes(accountType)
+    ) {
+      return res.status(400).json({
+        message: "Enter an account name, a three-letter currency, and a valid account type",
+      });
+    }
+    if (accountType === "bank" && (!accountNumber || !bankName || !bankBranch)) {
+      return res.status(400).json({
+        message: "Bank accounts require an account number, bank name, and branch",
+      });
+    }
+    if (
+      accountNumber.length > 100 ||
+      bankName.length > 150 ||
+      bankBranch.length > 150
+    ) {
+      return res.status(400).json({ message: "One or more account details are too long" });
+    }
+
+    const { data, error } = await supabase.rpc("create_cash_bank_account", {
+      p_account_name: accountName,
+      p_account_number: accountNumber || null,
+      p_currency: currency,
+      p_bank_name: bankName || null,
+      p_bank_branch: bankBranch || null,
+      p_account_type: accountType,
+    });
+    if (error) {
+      if (error.code === "23505") {
+        return res.status(409).json({
+          message: "A cash or bank account with that name already exists",
+        });
+      }
+      if (error.code === "22023") {
+        return res.status(400).json({ message: error.message });
+      }
+      throw error;
+    }
+    if (!data?.account || !data?.cashBankAccount) {
+      throw new Error("Cash and bank account creation returned an incomplete result");
+    }
+    return res.status(201).json({
+      account: {
+        ...data.account,
+        balance: 0,
+      },
+      cashBankAccount: data.cashBankAccount,
+    });
+  } catch (error) {
+    console.error("Cash and bank account creation error:", error);
+    return res.status(500).json({
+      message: error?.message || "Unable to create cash or bank account",
+    });
+  }
+});
+
 router.get("/api/cash-bank-accounts", async (req, res) => {
   try {
     const { allowed } = await canUseAccounting(req, [
@@ -995,7 +1067,7 @@ router.get("/api/cash-bank-accounts", async (req, res) => {
     const { data: accounts, error } = await supabase
       .from("cash_bank_accounts")
       .select(
-        "id, account_name, account_number, bank_name, account_type, currency, ledger_account_id, ledger_accounts(id, code, name, account_type)",
+        "id, account_name, account_number, bank_name, bank_branch, account_type, currency, ledger_account_id, ledger_accounts(id, code, name, account_type)",
       )
       .eq("is_active", true)
       .order("account_name");

@@ -220,6 +220,7 @@ function BankReconciliation() {
                   {account.account_name}
                   {` (${account.account_type})`}
                   {account.bank_name ? ` · ${account.bank_name}` : ""}
+                  {account.bank_branch ? ` · ${account.bank_branch}` : ""}
                 </option>
               ))}
             </select>
