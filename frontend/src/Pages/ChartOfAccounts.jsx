@@ -1,11 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { getApiUrl, readApiResponse } from "../context/auth";
 import QuickReport from "../components/QuickReport";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
-const initialGroupForm = { name: "", accountType: "asset" };
 const initialAccountForm = {
   kind: "ledger",
   code: "",
@@ -20,15 +19,11 @@ const initialAccountForm = {
 const ChartOfAccounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [groupLedgers, setGroupLedgers] = useState([]);
-  const [groupForm, setGroupForm] = useState(initialGroupForm);
   const [parties, setParties] = useState({ suppliers: [], customers: [], employees: [] });
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [partyError, setPartyError] = useState("");
-  const [groupError, setGroupError] = useState("");
-  const [groupMessage, setGroupMessage] = useState("");
-  const [savingGroup, setSavingGroup] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [accountForm, setAccountForm] = useState(initialAccountForm);
   const [savingAccount, setSavingAccount] = useState(false);
@@ -204,39 +199,6 @@ const ChartOfAccounts = () => {
       .sort((left, right) => left.name.localeCompare(right.name));
   }, [filter, groupLedgers, visibleAccounts]);
 
-  const createGroup = async (event) => {
-    event.preventDefault();
-    setGroupError("");
-    setGroupMessage("");
-    setSavingGroup(true);
-    try {
-      const response = await fetch(
-        getApiUrl("/api/ledger/accounts?resource=groups"),
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(groupForm),
-        },
-      );
-      const result = await readApiResponse(response);
-      if (!response.ok) {
-        throw new Error(result.message || "Unable to create group ledger");
-      }
-      setGroupLedgers((current) =>
-        [...current, result.group].sort((left, right) =>
-          left.name.localeCompare(right.name),
-        ),
-      );
-      setGroupForm(initialGroupForm);
-      setGroupMessage(`Group ledger "${result.group.name}" created.`);
-    } catch (saveError) {
-      setGroupError(saveError.message);
-    } finally {
-      setSavingGroup(false);
-    }
-  };
-
   const createAccount = async (event) => {
     event.preventDefault();
     setAccountError("");
@@ -352,7 +314,6 @@ const ChartOfAccounts = () => {
             >
               Create ledger account
             </button>
-            <a href="#group-ledgers" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 no-underline hover:bg-slate-50">Group ledgers</a>
             <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm">
               <option value="all">All account types</option>
               {accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
@@ -363,46 +324,6 @@ const ChartOfAccounts = () => {
         {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         {partyError && <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">Party ledgers could not be loaded: {partyError}</p>}
         {accountMessage && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{accountMessage}</p>}
-        <section id="group-ledgers" className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Group ledgers</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Create and view groups here. Accounts assigned to each group appear beneath it in the chart.
-            </p>
-          </div>
-          {groupError ? <p className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{groupError}</p> : null}
-          {groupMessage ? <p className="mb-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{groupMessage}</p> : null}
-          <form onSubmit={createGroup} className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px_auto] sm:items-end">
-            <label className="text-sm font-medium text-slate-700">
-              Group name
-              <input
-                required
-                maxLength={100}
-                value={groupForm.name}
-                onChange={(event) => {
-                  setGroupForm((current) => ({ ...current, name: event.target.value }));
-                  setGroupError("");
-                  setGroupMessage("");
-                }}
-                placeholder="Current Assets"
-                className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
-              />
-            </label>
-            <label className="text-sm font-medium text-slate-700">
-              Account type
-              <select
-                value={groupForm.accountType}
-                onChange={(event) => setGroupForm((current) => ({ ...current, accountType: event.target.value }))}
-                className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2"
-              >
-                {accountTypes.map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
-              </select>
-            </label>
-            <button type="submit" disabled={savingGroup} className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60">
-              {savingGroup ? "Creating…" : "Create group"}
-            </button>
-          </form>
-        </section>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[850px] text-left text-sm">
