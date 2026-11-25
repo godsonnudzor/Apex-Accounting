@@ -1,15 +1,17 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getApiUrl, readApiResponse } from "../context/auth";
 import QuickReport from "../components/QuickReport";
 
 const accountTypes = ["asset", "liability", "equity", "income", "expense"];
 const formatMoney = (value) => `GHC ${Number(value || 0).toFixed(2)}`;
 const initialGroupForm = { name: "", accountType: "asset" };
-const initialCashBankForm = {
-  accountType: "bank",
+const initialAccountForm = {
+  kind: "ledger",
+  code: "",
+  name: "",
+  groupLedger: "",
   accountNumber: "",
-  accountName: "",
   currency: "GHS",
   bankName: "",
   bankBranch: "",
@@ -27,14 +29,15 @@ const ChartOfAccounts = () => {
   const [groupError, setGroupError] = useState("");
   const [groupMessage, setGroupMessage] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
-  const [showCashBankForm, setShowCashBankForm] = useState(false);
-  const [cashBankForm, setCashBankForm] = useState(initialCashBankForm);
-  const [savingCashBank, setSavingCashBank] = useState(false);
-  const [cashBankError, setCashBankError] = useState("");
-  const [cashBankMessage, setCashBankMessage] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [accountForm, setAccountForm] = useState(initialAccountForm);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [accountMessage, setAccountMessage] = useState("");
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+  const showCreateDialog = searchParams.get("create") === "1";
 
   const loadAccounts = async () => {
     const response = await fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" });
@@ -234,46 +237,74 @@ const ChartOfAccounts = () => {
     }
   };
 
-  const createCashBankAccount = async (event) => {
+  const createAccount = async (event) => {
     event.preventDefault();
-    setCashBankError("");
-    setCashBankMessage("");
-    setSavingCashBank(true);
+    setAccountError("");
+    setAccountMessage("");
+    setSavingAccount(true);
     try {
-      const response = await fetch(getApiUrl("/api/cash-bank-accounts"), {
+      const isCashBank = accountForm.kind === "cash" || accountForm.kind === "bank";
+      const response = await fetch(
+        getApiUrl(isCashBank ? "/api/cash-bank-accounts" : "/api/ledger/accounts"),
+        {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cashBankForm),
-      });
+        body: JSON.stringify(
+          isCashBank
+            ? {
+                accountType: accountForm.kind,
+                accountNumber: accountForm.accountNumber,
+                accountName: accountForm.name,
+                currency: accountForm.currency,
+                bankName: accountForm.bankName,
+                bankBranch: accountForm.bankBranch,
+              }
+            : {
+                code: accountForm.code,
+                name: accountForm.name,
+                groupLedger: accountForm.groupLedger,
+              },
+        ),
+        },
+      );
       const result = await readApiResponse(response);
       if (!response.ok) {
-        throw new Error(result.message || "Unable to create cash or bank account");
+        throw new Error(result.message || "Unable to create ledger account");
       }
       setAccounts((current) =>
         [...current, result.account].sort((left, right) =>
           String(left.code).localeCompare(String(right.code)),
         ),
       );
-      setCashBankForm(initialCashBankForm);
-      setShowCashBankForm(false);
-      setCashBankMessage(`${result.account.name} was added under Current Assets.`);
+      setAccountForm(initialAccountForm);
+      setAccountMessage(
+        isCashBank
+          ? `${result.account.name} was added under Current Assets.`
+          : `Created ${result.account.code} — ${result.account.name}.`,
+      );
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("create");
+        return next;
+      }, { replace: true });
     } catch (saveError) {
-      setCashBankError(saveError.message);
+      setAccountError(saveError.message);
     } finally {
-      setSavingCashBank(false);
+      setSavingAccount(false);
     }
   };
 
-  const updateCashBankForm = (field, value) => {
-    setCashBankForm((current) => ({
+  const updateAccountForm = (field, value) => {
+    setAccountForm((current) => ({
       ...current,
       [field]: value,
-      ...(field === "accountType" && value === "cash"
+      ...(field === "kind" && value !== "bank"
         ? { bankName: "", bankBranch: "" }
         : {}),
     }));
-    setCashBankError("");
+    setAccountError("");
+    setAccountMessage("");
   };
 
   const openLedgerReport = async (account) => {
@@ -313,15 +344,14 @@ const ChartOfAccounts = () => {
             <button
               type="button"
               onClick={() => {
-                setCashBankError("");
-                setCashBankMessage("");
-                setShowCashBankForm(true);
+                setAccountError("");
+                setAccountMessage("");
+                setSearchParams({ create: "1" });
               }}
-              className="rounded border border-teal-700 bg-white px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50"
+              className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
             >
-              Add cash / bank account
+              Create ledger account
             </button>
-            <Link to="/ledger-accounts/new" className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-teal-800">Create ledger account</Link>
             <a href="#group-ledgers" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 no-underline hover:bg-slate-50">Group ledgers</a>
             <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm">
               <option value="all">All account types</option>
@@ -332,7 +362,7 @@ const ChartOfAccounts = () => {
 
         {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         {partyError && <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">Party ledgers could not be loaded: {partyError}</p>}
-        {cashBankMessage && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{cashBankMessage}</p>}
+        {accountMessage && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{accountMessage}</p>}
         <section id="group-ledgers" className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-slate-900">Group ledgers</h2>
@@ -442,136 +472,201 @@ const ChartOfAccounts = () => {
           </table>
         </div>
 
-        {showCashBankForm ? (
+        {showCreateDialog ? (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
             onMouseDown={(event) => {
-              if (event.target === event.currentTarget && !savingCashBank) {
-                setShowCashBankForm(false);
+              if (event.target === event.currentTarget && !savingAccount) {
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current);
+                  next.delete("create");
+                  return next;
+                }, { replace: true });
               }
             }}
           >
             <section
               role="dialog"
               aria-modal="true"
-              aria-labelledby="cash-bank-dialog-title"
+              aria-labelledby="create-account-dialog-title"
               className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
             >
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-wider text-teal-600">Current Assets</p>
-                  <h2 id="cash-bank-dialog-title" className="mt-1 text-xl font-bold text-slate-900">
-                    Add cash or bank account
+                  <p className="text-sm font-semibold uppercase tracking-wider text-teal-600">Chart of Accounts</p>
+                  <h2 id="create-account-dialog-title" className="mt-1 text-xl font-bold text-slate-900">
+                    Create ledger account
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    This creates both the ledger account and its linked cash/bank record.
+                    Choose an account type. Bank and cash accounts are linked to the ledger automatically.
                   </p>
                 </div>
                 <button
                   type="button"
                   aria-label="Close dialog"
-                  disabled={savingCashBank}
-                  onClick={() => setShowCashBankForm(false)}
+                  disabled={savingAccount}
+                  onClick={() => {
+                    setSearchParams((current) => {
+                      const next = new URLSearchParams(current);
+                      next.delete("create");
+                      return next;
+                    }, { replace: true });
+                  }}
                   className="rounded px-2 py-1 text-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
                 >
                   ×
                 </button>
               </div>
-              <form onSubmit={createCashBankAccount} className="space-y-4">
-                {cashBankError ? (
+              <form onSubmit={createAccount} className="space-y-4">
+                {accountError ? (
                   <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-                    {cashBankError}
+                    {accountError}
                   </p>
                 ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-medium text-slate-700">
-                    Account type
+                    Account kind
                     <select
                       required
-                      value={cashBankForm.accountType}
-                      onChange={(event) => updateCashBankForm("accountType", event.target.value)}
+                      value={accountForm.kind}
+                      onChange={(event) => updateAccountForm("kind", event.target.value)}
                       className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2"
                     >
-                      <option value="bank">Bank</option>
+                      <option value="ledger">General ledger</option>
                       <option value="cash">Cash</option>
+                      <option value="bank">Bank</option>
                     </select>
                   </label>
+                  {accountForm.kind === "ledger" ? (
+                    <>
+                      <label className="text-sm font-medium text-slate-700">
+                        Account code
+                        <input
+                          required
+                          maxLength={30}
+                          value={accountForm.code}
+                          onChange={(event) => updateAccountForm("code", event.target.value)}
+                          placeholder="5700"
+                          className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <label className="text-sm font-medium text-slate-700">
+                        Currency
+                        <input
+                          required
+                          maxLength={3}
+                          pattern="[A-Za-z]{3}"
+                          title="Enter a three-letter currency code, for example GHS or USD"
+                          value={accountForm.currency}
+                          onChange={(event) => updateAccountForm("currency", event.target.value.toUpperCase())}
+                          placeholder="GHS"
+                          className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 uppercase"
+                        />
+                      </label>
+                    </>
+                  )}
                   <label className="text-sm font-medium text-slate-700">
                     Account name
                     <input
                       required
                       maxLength={150}
-                      value={cashBankForm.accountName}
-                      onChange={(event) => updateCashBankForm("accountName", event.target.value)}
-                      placeholder="Main operating account"
+                      value={accountForm.name}
+                      onChange={(event) => updateAccountForm("name", event.target.value)}
+                      placeholder={accountForm.kind === "ledger" ? "Bank charges" : "Main operating account"}
                       className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
                     />
                   </label>
-                  <label className="text-sm font-medium text-slate-700">
-                    Currency
-                    <input
-                      required
-                      maxLength={3}
-                      pattern="[A-Za-z]{3}"
-                      title="Enter a three-letter currency code, for example GHS or USD"
-                      value={cashBankForm.currency}
-                      onChange={(event) => updateCashBankForm("currency", event.target.value.toUpperCase())}
-                      placeholder="GHS"
-                      className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 uppercase"
-                    />
-                  </label>
-                  <label className="text-sm font-medium text-slate-700">
-                    Account number{cashBankForm.accountType === "bank" ? " *" : ""}
-                    <input
-                      required={cashBankForm.accountType === "bank"}
-                      maxLength={100}
-                      value={cashBankForm.accountNumber}
-                      onChange={(event) => updateCashBankForm("accountNumber", event.target.value)}
-                      className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
-                    />
-                  </label>
-                  {cashBankForm.accountType === "bank" ? (
+                  {accountForm.kind === "ledger" ? (
+                    <label className="text-sm font-medium text-slate-700">
+                      Group ledger
+                      <select
+                        required
+                        value={accountForm.groupLedger}
+                        onChange={(event) => updateAccountForm("groupLedger", event.target.value)}
+                        disabled={loading}
+                        className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2"
+                      >
+                        <option value="">Select a group ledger</option>
+                        {groupLedgers.map((group) => (
+                          <option key={group.name} value={group.name}>{group.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
                     <>
                       <label className="text-sm font-medium text-slate-700">
-                        Bank name
+                        Account number{accountForm.kind === "bank" ? " *" : ""}
                         <input
-                          required
-                          maxLength={150}
-                          value={cashBankForm.bankName}
-                          onChange={(event) => updateCashBankForm("bankName", event.target.value)}
-                          placeholder="Bank name"
+                          required={accountForm.kind === "bank"}
+                          maxLength={100}
+                          value={accountForm.accountNumber}
+                          onChange={(event) => updateAccountForm("accountNumber", event.target.value)}
                           className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
                         />
                       </label>
-                      <label className="text-sm font-medium text-slate-700">
-                        Bank branch
-                        <input
-                          required
-                          maxLength={150}
-                          value={cashBankForm.bankBranch}
-                          onChange={(event) => updateCashBankForm("bankBranch", event.target.value)}
-                          placeholder="Branch name"
-                          className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
-                        />
-                      </label>
+                      {accountForm.kind === "bank" ? (
+                        <>
+                          <label className="text-sm font-medium text-slate-700">
+                            Bank name
+                            <input
+                              required
+                              maxLength={150}
+                              value={accountForm.bankName}
+                              onChange={(event) => updateAccountForm("bankName", event.target.value)}
+                              placeholder="Bank name"
+                              className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                            />
+                          </label>
+                          <label className="text-sm font-medium text-slate-700">
+                            Bank branch
+                            <input
+                              required
+                              maxLength={150}
+                              value={accountForm.bankBranch}
+                              onChange={(event) => updateAccountForm("bankBranch", event.target.value)}
+                              placeholder="Branch name"
+                              className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+                            />
+                          </label>
+                        </>
+                      ) : null}
                     </>
-                  ) : null}
+                  )}
+                  {accountForm.kind === "ledger" && (
+                    <p className="text-sm text-slate-600 sm:col-span-2">
+                      Account type is determined by the selected group ledger.
+                    </p>
+                  )}
+                  {accountForm.kind !== "ledger" && (
+                    <p className="text-sm text-slate-600 sm:col-span-2">
+                      This account will be created under Current Assets and linked to banking and payment workflows.
+                    </p>
+                  )}
                 </div>
                 <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                   <button
                     type="button"
-                    disabled={savingCashBank}
-                    onClick={() => setShowCashBankForm(false)}
+                    disabled={savingAccount}
+                    onClick={() => {
+                      setSearchParams((current) => {
+                        const next = new URLSearchParams(current);
+                        next.delete("create");
+                        return next;
+                      }, { replace: true });
+                    }}
                     className="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={savingCashBank}
+                    disabled={savingAccount || (accountForm.kind === "ledger" && loading)}
                     className="rounded bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
                   >
-                    {savingCashBank ? "Creating…" : "Create account"}
+                    {savingAccount ? "Creating…" : "Create account"}
                   </button>
                 </div>
               </form>
