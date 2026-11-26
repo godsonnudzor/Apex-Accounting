@@ -26,6 +26,7 @@ const SuppliersCenter = () => {
   const [detailTab, setDetailTab] = useState("Transactions");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
@@ -35,31 +36,52 @@ const SuppliersCenter = () => {
         fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
         fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" }),
       ]);
-      const partyResultPromise = partyResponse.status === 404
-        ? fetch(getApiUrl("/api/reports/aging"), { credentials: "include" })
-          .then(async (agingResponse) => {
-            const agingResult = await readApiResponse(agingResponse);
-            if (!agingResponse.ok) {
-              throw new Error(agingResult.message || "Unable to load supplier balances");
-            }
-            return {
-              suppliers: (agingResult.suppliers || []).map((supplier) => ({
-                id: supplier.supplier_id,
-                balance: supplier.total,
-              })),
-            };
-          })
-        : readApiResponse(partyResponse);
-      const [supplierResult, billResult, accountResult, partyResult] = await Promise.all([
+      const [supplierResult, billResult, accountResult] = await Promise.all([
         readApiResponse(supplierResponse),
         readApiResponse(billResponse),
         readApiResponse(accountResponse),
-        partyResultPromise,
       ]);
+      let partyResult;
+      if (partyResponse.status === 404) {
+        try {
+          const agingResponse = await fetch(getApiUrl("/api/reports/aging"), {
+            credentials: "include",
+          });
+          const agingResult = await readApiResponse(agingResponse);
+          if (!agingResponse.ok) {
+            throw new Error(agingResult.message || "Unable to load supplier balances");
+          }
+          partyResult = {
+            suppliers: (agingResult.suppliers || []).map((supplier) => ({
+              id: supplier.supplier_id,
+              balance: supplier.total,
+            })),
+          };
+        } catch (balanceError) {
+          const billBalances = new Map();
+          for (const bill of billResult.bills || []) {
+            const supplierId = String(bill.supplier_id);
+            billBalances.set(
+              supplierId,
+              (billBalances.get(supplierId) || 0) + Number(bill.open_balance || 0),
+            );
+          }
+          partyResult = {
+            suppliers: [...billBalances].map(([id, balance]) => ({ id, balance })),
+          };
+          setWarning(
+            `Full supplier balances are unavailable (${balanceError.message}); showing open-bill balances only.`,
+          );
+        }
+      } else {
+        partyResult = await readApiResponse(partyResponse);
+      }
       if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
       if (!billResponse.ok) throw new Error(billResult.message || "Unable to load supplier transactions");
       if (!accountResponse.ok) throw new Error(accountResult.message || "Unable to load ledger accounts");
-      if (!partyResponse.ok) throw new Error(partyResult.message || "Unable to load supplier balances");
+      if (!partyResponse.ok && partyResponse.status !== 404) {
+        throw new Error(partyResult.message || "Unable to load supplier balances");
+      }
       const balances = new Map(
         (partyResult.suppliers || []).map((supplier) => [
           String(supplier.id),
@@ -197,6 +219,7 @@ const SuppliersCenter = () => {
         </header>
 
         {error && <p className="m-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+        {warning && <p className="m-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{warning}</p>}
 
         <div className="grid min-h-[calc(100vh-170px)] lg:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="border-b border-slate-300 bg-slate-50 lg:border-b-0 lg:border-r">
