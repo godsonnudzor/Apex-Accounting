@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getApiUrl } from "../context/auth";
+import { getApiUrl, readApiResponse } from "../context/auth";
 
 const workspaceTabs = ["Suppliers", "Transactions"];
 const detailTabs = ["Transactions", "Contacts", "To Do's", "Notes"];
@@ -36,10 +36,10 @@ const SuppliersCenter = () => {
         fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" }),
       ]);
       const [supplierResult, billResult, accountResult, partyResult] = await Promise.all([
-        supplierResponse.json(),
-        billResponse.json(),
-        accountResponse.json(),
-        partyResponse.json(),
+        readApiResponse(supplierResponse),
+        readApiResponse(billResponse),
+        readApiResponse(accountResponse),
+        readApiResponse(partyResponse),
       ]);
       if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
       if (!billResponse.ok) throw new Error(billResult.message || "Unable to load supplier transactions");
@@ -106,7 +106,7 @@ const SuppliersCenter = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ledgerAccountId }),
       });
-      const result = await response.json();
+      const result = await readApiResponse(response);
       if (!response.ok) throw new Error(result.message || "Unable to update ledger account");
       setBills((current) => current.map((bill) => (
         String(bill.id) !== String(billId)
