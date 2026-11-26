@@ -35,11 +35,26 @@ const SuppliersCenter = () => {
         fetch(getApiUrl("/api/ledger/accounts"), { credentials: "include" }),
         fetch(getApiUrl("/api/journal/lookups"), { credentials: "include" }),
       ]);
+      const partyResultPromise = partyResponse.status === 404
+        ? fetch(getApiUrl("/api/reports/aging"), { credentials: "include" })
+          .then(async (agingResponse) => {
+            const agingResult = await readApiResponse(agingResponse);
+            if (!agingResponse.ok) {
+              throw new Error(agingResult.message || "Unable to load supplier balances");
+            }
+            return {
+              suppliers: (agingResult.suppliers || []).map((supplier) => ({
+                id: supplier.supplier_id,
+                balance: supplier.total,
+              })),
+            };
+          })
+        : readApiResponse(partyResponse);
       const [supplierResult, billResult, accountResult, partyResult] = await Promise.all([
         readApiResponse(supplierResponse),
         readApiResponse(billResponse),
         readApiResponse(accountResponse),
-        readApiResponse(partyResponse),
+        partyResultPromise,
       ]);
       if (!supplierResponse.ok) throw new Error(supplierResult.message || "Unable to load suppliers");
       if (!billResponse.ok) throw new Error(billResult.message || "Unable to load supplier transactions");
